@@ -12,6 +12,8 @@ import {
   Dir,
   BUILDING_DEFS,
   MAP_SIZE,
+  RESOURCE_NAMES,
+  DELTA,
 } from '../types';
 import type { ItemType } from '../types';
 
@@ -232,9 +234,10 @@ export class GameEngine {
         player: {
           x: startX,
           y: startY,
-          inventory: [{ type: 'stone', amount: 5 }],
+          facing: Dir.Down,
+          inventory: [{ type: 'wood', amount: 5 }, { type: 'stone', amount: 5 }],
           maxInventorySlots: 20,
-          stats: { stonesMined: 0, ingotsCrafted: 0, enginesCrafted: 0, timePlayed: 0 },
+          stats: { stonesMined: 0, woodChopped: 0, ingotsCrafted: 0, enginesCrafted: 0, timePlayed: 0 },
         },
         tick: 0,
         gameTime: 0,
@@ -490,15 +493,92 @@ export class GameEngine {
 
   movePlayer(dx: number, dy: number): boolean {
     const p = this._state.save.player;
+    if (dx !== 0 || dy !== 0) {
+      p.facing = (dx === 1 ? Dir.Right : dx === -1 ? Dir.Left : dy === -1 ? Dir.Up : Dir.Down) as DirectionValue;
+    }
     const nx = p.x + dx;
     const ny = p.y + dy;
     if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) return false;
     const tile = this._state.save.map[ny][nx];
-    if (tile.terrain === 'water' || tile.terrain === 'rock') return false;
+    if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'forest') return false;
     // Allow movement onto building tiles to interact with them (rotate/remove)
     p.x = nx;
     p.y = ny;
     return true;
+  }
+
+  getFacing(): DirectionValue {
+    return this._state.save.player.facing;
+  }
+
+  getFacingTile(): { x: number; y: number } | null {
+    const p = this._state.save.player;
+    const delta = DELTA[p.facing];
+    const nx = p.x + delta.x;
+    const ny = p.y + delta.y;
+    if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) return null;
+    return { x: nx, y: ny };
+  }
+
+  getTileInteractive(x: number, y: number): boolean {
+    const tile = this._state.save.map[y][x];
+    if (!tile) return false;
+    if (tile.resource && tile.resource.amount > 0) return true;
+    return tile.terrain === 'rock' || tile.terrain === 'forest';
+  }
+
+  // The tile that pressing E will harvest.
+  // Prefers the tile being faced; falls back to the tile under the player.
+  getInteractiveTile(): { x: number; y: number } | null {
+    const facing = this.getFacingTile();
+    if (facing && this.getTileInteractive(facing.x, facing.y)) return facing;
+    const p = this._state.save.player;
+    if (this.getTileInteractive(p.x, p.y)) return { x: p.x, y: p.y };
+    return null;
+  }
+
+  getInteractiveLabel(): string {
+    const target = this.getInteractiveTile();
+    if (!target) return '';
+    const tile = this._state.save.map[target.y][target.x];
+    if (tile.resource && tile.resource.amount > 0) return RESOURCE_NAMES[tile.resource.type];
+    if (tile.terrain === 'rock') return 'Stone';
+    if (tile.terrain === 'forest') return 'Wood';
+    return '';
+  }
+
+  interact(): { x: number; y: number; kind: 'resource' | 'rock' | 'tree'; type: string } | null {
+    const target = this.getInteractiveTile();
+    if (!target) return null;
+    const tile = this._state.save.map[target.y][target.x];
+
+    if (tile.resource && tile.resource.amount > 0) {
+      tile.resource.amount--;
+      if (tile.resource.amount < 0) tile.resource.amount = 0;
+      this.addToPlayerInventory({ type: tile.resource.type, amount: 1 });
+      const p = this._state.save.player;
+      p.stats.stonesMined++;
+      if (tile.resource.type === 'wood') p.stats.woodChopped++;
+      return { x: target.x, y: target.y, kind: 'resource', type: tile.resource.type };
+    }
+
+    if (tile.terrain === 'rock') {
+      this.addToPlayerInventory({ type: 'stone', amount: 1 });
+      tile.terrain = 'grass';
+      this._state.save.player.stats.stonesMined++;
+      return { x: target.x, y: target.y, kind: 'rock', type: 'stone' };
+    }
+
+    if (tile.terrain === 'forest') {
+      this.addToPlayerInventory({ type: 'wood', amount: 1 });
+      tile.terrain = 'grass';
+      const p = this._state.save.player;
+      p.stats.stonesMined++;
+      p.stats.woodChopped++;
+      return { x: target.x, y: target.y, kind: 'tree', type: 'wood' };
+    }
+
+    return null;
   }
 
   mineResource(): boolean {
@@ -509,6 +589,7 @@ export class GameEngine {
       if (tile.resource.amount < 0) tile.resource.amount = 0;
       this.addToPlayerInventory({ type: tile.resource.type, amount: 1 });
       p.stats.stonesMined++;
+      if (tile.resource.type === 'wood') p.stats.woodChopped++;
       return true;
     }
     return false;
@@ -523,6 +604,13 @@ export class GameEngine {
       p.stats.stonesMined++;
       return true;
     }
+    if (tile.terrain === 'forest') {
+      this.addToPlayerInventory({ type: 'wood', amount: 1 });
+      tile.terrain = 'grass';
+      p.stats.stonesMined++;
+      p.stats.woodChopped++;
+      return true;
+    }
     return false;
   }
 
@@ -531,7 +619,7 @@ export class GameEngine {
     const tile = this._state.save.map[ty][tx];
     const p = this._state.save.player;
     const isPlayerTile = p.x === tx && p.y === ty;
-    if (tile.building || (!isPlayerTile && (tile.terrain === 'water' || tile.terrain === 'rock'))) return false;
+    if (tile.building || (!isPlayerTile && (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'forest'))) return false;
 
     const def = BUILDING_DEFS[buildingType];
     if (!this.canAfford(def.cost)) return false;
@@ -550,7 +638,7 @@ export class GameEngine {
         const ny = ty + dy;
         if (nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE) {
           const ntile = this._state.save.map[ny][nx];
-          if (!ntile.building && ntile.terrain !== 'water' && ntile.terrain !== 'rock') {
+          if (!ntile.building && ntile.terrain !== 'water' && ntile.terrain !== 'rock' && ntile.terrain !== 'forest') {
             p.x = nx;
             p.y = ny;
             break;
@@ -564,7 +652,7 @@ export class GameEngine {
   placeBuilding(buildingType: BuildingTypeValue): boolean {
     const p = this._state.save.player;
     const tile = this._state.save.map[p.y][p.x];
-    if (tile.building || tile.terrain === 'water' || tile.terrain === 'rock') return false;
+    if (tile.building || tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'forest') return false;
 
     const def = BUILDING_DEFS[buildingType];
     if (!this.canAfford(def.cost)) return false;
@@ -752,6 +840,17 @@ export class GameEngine {
       }
     }
     return result;
+  }
+
+  countBuildings(type?: BuildingTypeValue): number {
+    let count = 0;
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const tile = this._state.save.map[y][x];
+        if (tile.building && (!type || tile.building.type === type)) count++;
+      }
+    }
+    return count;
   }
 
   getPlayerPosition(): { x: number; y: number } {

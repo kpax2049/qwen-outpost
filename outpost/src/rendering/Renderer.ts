@@ -21,6 +21,9 @@ export interface RenderOptions {
   selectedTile: { x: number; y: number } | null;
   buildPreview: { x: number; y: number } | null;
   buildColor?: string;
+  interactiveTile?: { x: number; y: number } | null;
+  interactiveLabel?: string;
+  facing?: DirectionValue;
 }
 
 interface Particle {
@@ -210,7 +213,7 @@ export class Renderer {
     this.waterTime += 0.05;
 
     const { ctx } = this;
-    const { selectedTile, buildPreview, buildColor } = options;
+    const { selectedTile, buildPreview, buildColor, interactiveTile, interactiveLabel, facing } = options;
 
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -286,7 +289,7 @@ export class Renderer {
     }
 
     // Render player
-    this.drawPlayer(player.x, player.y);
+    this.drawPlayer(player.x, player.y, facing ?? player.facing);
 
     // Render particles
     this.drawParticles();
@@ -323,6 +326,50 @@ export class Renderer {
         TILE_SIZE + 2,
         TILE_SIZE + 2
       );
+
+      ctx.restore();
+    }
+
+    // Highlight the tile E will interact with
+    if (interactiveTile) {
+      ctx.save();
+      ctx.translate(camera.x, camera.y);
+      ctx.scale(camera.zoom, camera.zoom);
+
+      ctx.strokeStyle = 'rgba(255, 170, 0, 0.9)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(
+        interactiveTile.x * TILE_SIZE - 2,
+        interactiveTile.y * TILE_SIZE - 2,
+        TILE_SIZE + 4,
+        TILE_SIZE + 4
+      );
+      ctx.fillStyle = 'rgba(255, 170, 0, 0.12)';
+      ctx.fillRect(
+        interactiveTile.x * TILE_SIZE,
+        interactiveTile.y * TILE_SIZE,
+        TILE_SIZE,
+        TILE_SIZE
+      );
+
+      if (interactiveLabel) {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        const text = `E: ${interactiveLabel}`;
+        ctx.font = 'bold 11px monospace';
+        const tw = ctx.measureText(text).width + 12;
+        ctx.fillRect(
+          interactiveTile.x * TILE_SIZE + TILE_SIZE / 2 - tw / 2,
+          interactiveTile.y * TILE_SIZE - 18,
+          tw,
+          16
+        );
+        ctx.fillStyle = '#ffcc00';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, interactiveTile.x * TILE_SIZE + TILE_SIZE / 2, interactiveTile.y * TILE_SIZE - 10);
+        ctx.textBaseline = 'alphabetic';
+        ctx.textAlign = 'left';
+      }
 
       ctx.restore();
     }
@@ -409,6 +456,19 @@ export class Renderer {
           ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
         }
         ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'wood': {
+        // Log with tree top
+        ctx.fillStyle = '#6a4a1a';
+        ctx.fillRect(cx - size / 4, cy, size / 2, size * 0.9);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(cx, cy - size * 0.6, size * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx - size * 0.3, cy - size * 0.7, size * 0.3, 0, Math.PI * 2);
         ctx.fill();
         break;
       }
@@ -625,7 +685,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPlayer(gx: number, gy: number): void {
+  private drawPlayer(gx: number, gy: number, facing: DirectionValue): void {
     const { ctx } = this;
     const cx = gx * TILE_SIZE + TILE_SIZE / 2;
     const cy = gy * TILE_SIZE + TILE_SIZE / 2;
@@ -655,6 +715,24 @@ export class Renderer {
     ctx.beginPath();
     ctx.arc(cx - 3, cy - 3, 4, 0, Math.PI * 2);
     ctx.fill();
+
+    // Facing indicator arrow
+    ctx.save();
+    ctx.translate(cx, cy);
+    switch (facing) {
+      case Dir.Up: ctx.rotate(-Math.PI / 2); break;
+      case Dir.Right: ctx.rotate(0); break;
+      case Dir.Down: ctx.rotate(Math.PI / 2); break;
+      case Dir.Left: ctx.rotate(Math.PI); break;
+    }
+    ctx.fillStyle = 'rgba(255, 220, 120, 0.95)';
+    ctx.beginPath();
+    ctx.moveTo(6, 0);
+    ctx.lineTo(-1, -5);
+    ctx.lineTo(-1, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 
     // Pulsing ring
     const pulse = Math.sin(this.frameCount * 0.05) * 0.3 + 0.7;

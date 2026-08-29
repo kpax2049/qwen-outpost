@@ -20,7 +20,8 @@ export const HelpPanel: React.FC = () => (
 
     <div style={{ color: '#ddd', fontSize: 12, marginBottom: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
       <div style={{ color: '#44cc44', fontWeight: 'bold' }}>Actions</div>
-      <div><strong>E</strong> - Mine resource on current tile</div>
+      <div><strong>E</strong> - Harvest the tile you're facing (or standing on)</div>
+      <div>&nbsp;&nbsp;- Trees → Wood, Rocks → Stone, Ore deposits → their ore</div>
       <div><strong>R</strong> - Rotate building on current tile</div>
       <div><strong>Q</strong> - Remove building (get half refund)</div>
     </div>
@@ -43,6 +44,9 @@ export const HelpPanel: React.FC = () => (
 
     <div style={{ color: '#ddd', fontSize: 11, marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, lineHeight: 1.6 }}>
       <div style={{ color: '#ffcc00', fontWeight: 'bold', marginBottom: 4 }}>Tips</div>
+      <div>• Face a tree or rock and press E to gather Wood / Stone (they're obstacles — stand next to them)</div>
+      <div>• Stand on or face an ore deposit (coal, iron, copper, gold) and press E to mine it</div>
+      <div>• The orange highlight shows what pressing E will harvest</div>
       <div>• Place miners on resource deposits to automate gathering</div>
       <div>• Use conveyors to transport items between buildings</div>
       <div>• Smelters need ore + coal to make ingots</div>

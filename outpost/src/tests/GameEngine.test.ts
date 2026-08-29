@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../engine/GameEngine';
-import { BUILDING_DEFS, MAP_SIZE, ITEM_DISPLAY_NAMES } from '../types';
+import { BUILDING_DEFS, MAP_SIZE, ITEM_DISPLAY_NAMES, Dir } from '../types';
 import type { BuildingTypeValue } from '../types';
 
 // Helper: give player resources to build anything
@@ -537,5 +537,109 @@ describe('Map Boundaries', () => {
 
     const nearby = engine.getNearbyBuildings(60, 60, 2);
     expect(nearby.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('GameEngine - Harvesting Model', () => {
+  it('player facing updates to the direction of movement', () => {
+    const engine = new GameEngine(42);
+    engine.movePlayer(0, 1);
+    expect(engine.getFacing()).toBe(Dir.Down);
+    engine.movePlayer(-1, 0);
+    expect(engine.getFacing()).toBe(Dir.Left);
+    engine.movePlayer(0, -1);
+    expect(engine.getFacing()).toBe(Dir.Up);
+    engine.movePlayer(1, 0);
+    expect(engine.getFacing()).toBe(Dir.Right);
+  });
+
+  it('chops wood from a facing tree', () => {
+    const engine = new GameEngine(42);
+    // Put a tree directly above the player
+    engine.map[59][60].terrain = 'forest';
+    engine.map[59][60].resource = undefined;
+    engine.movePlayer(0, -1); // face up (but blocked -> facing still Up)
+    const before = engine.player.inventory.find(i => i.type === 'wood')?.amount ?? 0;
+    const result = engine.interact();
+    expect(result).toBeTruthy();
+    if (result) expect(result.type).toBe('wood');
+    const after = engine.player.inventory.find(i => i.type === 'wood')?.amount ?? 0;
+    expect(after).toBe(before + 1);
+    expect(engine.map[59][60].terrain).toBe('grass');
+    expect(engine.player.stats.woodChopped).toBe(1);
+  });
+
+  it('mines stone from a facing rock', () => {
+    const engine = new GameEngine(42);
+    // Put rock to the right of the player
+    engine.map[60][61].terrain = 'rock';
+    engine.map[60][61].resource = undefined;
+    engine.movePlayer(1, 0); // face right (blocked -> facing Right)
+    const before = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
+    const result = engine.interact();
+    expect(result).toBeTruthy();
+    if (result) expect(result.type).toBe('stone');
+    const after = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
+    expect(after).toBe(before + 1);
+    expect(engine.map[60][61].terrain).toBe('grass');
+  });
+
+  it('mines a facing resource deposit', () => {
+    const engine = new GameEngine(42);
+    // Put a gold deposit above the player
+    engine.map[59][60].terrain = 'grass';
+    engine.map[59][60].resource = { type: 'gold', amount: 10 };
+    engine.movePlayer(0, -1);
+    const result = engine.interact();
+    expect(result).toBeTruthy();
+    if (result) expect(result.type).toBe('gold');
+    expect(engine.player.inventory.find(i => i.type === 'gold')?.amount).toBe(1);
+    expect(engine.map[59][60].resource!.amount).toBe(9);
+  });
+
+  it('harvests deposit under the player when not facing a harvestable tile', () => {
+    const engine = new GameEngine(42);
+    // Gold deposit under the player; facing an empty tile
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'gold', amount: 10 };
+    const result = engine.interact();
+    expect(result).toBeTruthy();
+    if (result) expect(result.type).toBe('gold');
+    expect(engine.player.inventory.find(i => i.type === 'gold')?.amount).toBe(1);
+  });
+
+  it('returns null when nothing harvestable', () => {
+    const engine = new GameEngine(42);
+    engine.movePlayer(0, -1);
+    engine.map[59][60].terrain = 'grass';
+    engine.map[59][60].resource = undefined;
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = undefined;
+    expect(engine.interact()).toBeNull();
+  });
+
+  it('tracks the tile E will interact with', () => {
+    const engine = new GameEngine(42);
+    // Facing tree
+    engine.map[59][60].terrain = 'forest';
+    engine.movePlayer(0, -1);
+    const target = engine.getInteractiveTile();
+    expect(target).toEqual({ x: 60, y: 59 });
+    expect(engine.getInteractiveLabel()).toBe('Wood');
+  });
+
+  it('prevents walking onto trees', () => {
+    const engine = new GameEngine(42);
+    engine.map[59][60].terrain = 'forest';
+    expect(engine.movePlayer(0, -1)).toBe(false);
+    expect(engine.player.y).toBe(60);
+  });
+
+  it('counts buildings of a specific type', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('conveyor');
+    expect(engine.countBuildings('conveyor')).toBe(1);
+    expect(engine.countBuildings('miner')).toBe(0);
   });
 });

@@ -28,6 +28,7 @@ src/
 │   ├── BuildMenu.tsx     # Building selection
 │   ├── InventoryPanel.tsx # Resources & stats
 │   ├── HelpPanel.tsx     # Controls reference
+│   ├── Tutorial.tsx      # First-time guided tutorial
 │   └── ObjectivesPanel.tsx # Quest tracker
 ├── types/         # Shared type definitions
 │   └── index.ts          # All interfaces, maps, constants
@@ -52,7 +53,8 @@ The simulation engine handles all game logic:
 - **Building System** - 8 building types with inventory, progress, and power management
 - **Power System** - Generators produce power, consumers draw from it within a 30-tile range
 - **Conveyor Logic** - Items move between buildings based on direction
-- **Player Actions** - Movement, mining, building placement/removal, inventory management
+- **Harvesting** - Unified facing-based `interact()`: E harvests the tile the player faces (falls back to underfoot). Trees (forest) → wood, rocks → stone, deposits → their ore. `facing` updates on movement; forest is non-walkable. Orange highlight + "E: label" badge on the interactive tile
+- **Player Actions** - Movement, harvesting (E), building placement/removal, inventory management
 - **Win Condition** - Craft 5 engines through the full production chain
 - **Save/Load** - Full state serialization to/from localStorage
 
@@ -74,7 +76,7 @@ Canvas2D rendering with visual polish:
 All game data types defined with string literal unions (no enums) to satisfy `verbatimModuleSyntax`:
 
 - **TerrainValue** - 'grass' | 'forest' | 'water' | 'rock' | 'sand'
-- **ResourceTypeValue** - 'stone' | 'iron' | 'copper' | 'coal' | 'gold'
+- **ResourceTypeValue** - 'wood' | 'stone' | 'iron' | 'copper' | 'coal' | 'gold'
 - **ItemType** - Resource types + processed items (ingots, wires, plates, gears, engines)
 - **BuildingTypeValue** - 'storage' | 'chest' | 'generator' | 'miner' | 'conveyor' | 'smelter' | 'steel_smelter' | 'assembler'
 - **DirectionValue** - 0 (Up) | 1 (Right) | 2 (Down) | 3 (Left)
@@ -107,6 +109,19 @@ Gears: iron ingot + copper wire → assembler → gear
 Engines: steel plate + gear + copper wire → assembler → engine
 ```
 
+### Harvesting
+
+Manual gathering is done with a single unified **E** interaction (`GameEngine.interact()`):
+
+1. The player has a `facing` direction that updates on each move.
+2. Pressing **E** targets the tile directly in front of the player (the facing tile), preferring it over the tile underfoot.
+3. If the facing tile has nothing harvestable, it falls back to the tile the player is standing on.
+4. Trees (forest, non-walkable) → **Wood**; rocks (non-walkable) → **Stone**; ore deposits → their ore (coal/iron/copper/gold).
+5. The current interactive tile is shown with an orange highlight and an "E: Wood"/"E: Stone" badge so the player knows what E will do.
+6. `player.stats.woodChopped` / `stonesMined` increment on each harvest (used by objectives and the tutorial).
+
+The player starts with a small starter inventory (`{ wood: 5, stone: 5 }`). The first-time tutorial walks through move → wood → stone → build menu → place a building → automation, with sticky step completion (localStorage `outpost-tutorial-done`) so progress never regresses after spending resources.
+
 ### Win Condition
 
 Craft 5 engines through the full production chain. The engine counter tracks progress in `player.stats.enginesCrafted`.
@@ -115,8 +130,8 @@ Craft 5 engines through the full production chain. The engine counter tracks pro
 
 | Key | Action |
 |-----|--------|
-| WASD / Arrows | Move player |
-| E | Mine resource on current tile |
+| WASD / Arrows | Move player (updates facing) |
+| E | Harvest the tile you're facing (or standing on) — trees → Wood, rocks → Stone, deposits → ore |
 | R | Rotate building on current tile |
 | Q | Remove building (50% refund) |
 | Space | Pause/Resume |
@@ -141,9 +156,10 @@ Craft 5 engines through the full production chain. The engine counter tracks pro
 
 ## Testing
 
-49 unit tests cover:
+58 unit tests cover:
 - Map generation (deterministic, terrain variety, resources)
 - Player movement and mining
+- Harvesting model (facing updates, wood from facing tree, stone from facing rock, deposit mining, under-foot fallback, interactive tile/label)
 - Building placement and rotation
 - Power system (generators, active buildings)
 - Conveyor belt item transfer
@@ -153,6 +169,8 @@ Craft 5 engines through the full production chain. The engine counter tracks pro
 - Win condition tracking
 - Inventory management
 - Map boundaries
+
+The first-time tutorial (`src/ui/Tutorial.tsx`) is exercised in-browser via Playwright (step auto-advance, building placement, completion banner).
 
 ## Performance
 

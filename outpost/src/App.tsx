@@ -9,6 +9,8 @@ import { BuildMenu } from './ui/BuildMenu';
 import { InventoryPanel } from './ui/InventoryPanel';
 import { HelpPanel } from './ui/HelpPanel';
 import { ObjectivesPanel } from './ui/ObjectivesPanel';
+import { Tutorial } from './ui/Tutorial';
+import type { TutorialStep } from './ui/Tutorial';
 
 const SAVE_KEY = 'outpost-save';
 const TILE_SIZE = 48;
@@ -58,6 +60,21 @@ const App: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [nearbyBuildings, setNearbyBuildings] = useState<import('./types').Tile[]>([]);
   const [, setRenderTick] = useState(0);
+
+  const [tutorialDismissed, setTutorialDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem('outpost-tutorial-done') === '1'; } catch { return false; }
+  });
+  const [manualDone, setManualDone] = useState<Record<string, boolean>>({});
+  const [tutorialDoneMap, setTutorialDoneMap] = useState<Record<string, boolean>>({});
+
+  const handleDismissTutorial = useCallback(() => {
+    setTutorialDismissed(true);
+    try { localStorage.setItem('outpost-tutorial-done', '1'); } catch { /* ignore */ }
+  }, []);
+
+  const handleManualNext = useCallback((id: string) => {
+    setManualDone(prev => ({ ...prev, [id]: true }));
+  }, []);
 
   const handleSave = useCallback(() => {
     try {
@@ -110,6 +127,10 @@ const App: React.FC = () => {
 
     rendererRef.current = new Renderer(canvas);
 
+    (window as unknown as { __outpost?: unknown }).__outpost = {
+      get engine() { return engineRef.current; },
+    };
+
     return () => {
       window.removeEventListener('resize', resize);
     };
@@ -145,7 +166,7 @@ const App: React.FC = () => {
           if (!bt) { e.preventDefault(); engine.movePlayer(1, 0); setRenderTick(t => t + 1); }
           break;
         case 'e':
-          if (!bt) { engine.mineResource(); engine.mineTile(); setRenderTick(t => t + 1); }
+          if (!bt) { engine.interact(); setRenderTick(t => t + 1); }
           break;
         case 'r':
           if (!bt) { engine.rotateBuilding(); setRenderTick(t => t + 1); }
@@ -265,6 +286,9 @@ const App: React.FC = () => {
       const mouseW = mousePosRef.current;
       const selTile = selectedTileRef.current;
 
+      const interactiveTile = bt ? null : engine.getInteractiveTile();
+      const interactiveLabel = bt ? '' : engine.getInteractiveLabel();
+
       let previewTile: { x: number; y: number } | null = null;
       let previewColor: string | undefined;
       if (bt && mouseW) {
@@ -288,6 +312,9 @@ const App: React.FC = () => {
           selectedTile: selTile,
           buildPreview: previewTile,
           buildColor: previewColor,
+          interactiveTile,
+          interactiveLabel,
+          facing: engine.getFacing(),
         }
       );
 
@@ -394,6 +421,68 @@ const App: React.FC = () => {
     }
   };
 
+  const eng = engineRef.current;
+  const playerInv = eng.player.inventory;
+  const cMove = eng.player.x !== 60 || eng.player.y !== 60;
+  const cWood = eng.player.stats.woodChopped >= 1;
+  const cStone = (playerInv.find(i => i.type === 'stone')?.amount ?? 0) > 5 || eng.player.stats.stonesMined >= 2;
+  const cBuild = showBuildMenu || showInventory || showHelp;
+  const cPlace = eng.countBuildings() >= 1;
+
+  useEffect(() => {
+    setTutorialDoneMap(prev => {
+      const completions: [string, boolean][] = [
+        ['move', cMove], ['wood', cWood], ['stone', cStone], ['build', cBuild], ['place', cPlace],
+      ];
+      let change = false;
+      const next = { ...prev };
+      for (const [k, v] of completions) {
+        if (v && !next[k]) { next[k] = true; change = true; }
+      }
+      return change ? next : prev;
+    });
+  }, [cMove, cWood, cStone, cBuild, cPlace]);
+
+  // Effective done = fresh condition OR already sticky-completed (never regresses)
+  const effectiveDone: Record<string, boolean> = { ...tutorialDoneMap };
+  for (const [k, v] of [['move', cMove], ['wood', cWood], ['stone', cStone], ['build', cBuild], ['place', cPlace]] as [string, boolean][]) {
+    if (v) effectiveDone[k] = true;
+  }
+  const seenNext = !!manualDone['next'];
+
+  const tutorialSteps: TutorialStep[] = [
+    {
+      id: 'move', title: 'Move Around',
+      body: 'Use WASD or Arrow keys to move. Scroll to zoom and Alt+Click to pan. Head toward a green forest tree to begin gathering.',
+      done: effectiveDone.move,
+    },
+    {
+      id: 'wood', title: 'Gather Wood',
+      body: 'Face a tree and press E to chop it for Wood. The highlighted orange tile shows exactly what E will interact with.',
+      done: effectiveDone.wood,
+    },
+    {
+      id: 'stone', title: 'Gather Stone',
+      body: 'Find gray rock, face it, and press E to mine Stone. Trees and rocks are obstacles — stand next to them, face them, and press E. Ore deposits (coal, iron, copper, gold) are mined the same way.',
+      done: effectiveDone.stone,
+    },
+    {
+      id: 'build', title: 'Open the Build Menu',
+      body: 'Press B (or click Build above) to open the build menu and select a structure.',
+      done: effectiveDone.build,
+    },
+    {
+      id: 'place', title: 'Place a Building',
+      body: 'Pick a building, walk near an open tile, and click to place it. Try a Chest (3 Stone) or Conveyor (2 Stone). Press R to rotate, Q to remove.',
+      done: effectiveDone.place,
+    },
+    {
+      id: 'next', title: 'Power & Automation',
+      body: 'Place a Coal Generator (needs iron, copper, stone) and feed it Coal to produce power, then put a Miner on an ore deposit to automate gathering. Conveyors move items between buildings. Smelters and assemblers craft advanced parts. Work toward crafting 5 engines!',
+      done: seenNext, manual: true,
+    },
+  ];
+
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#1a1a2e', position: 'relative', userSelect: 'none' }}>
       <canvas
@@ -471,6 +560,13 @@ const App: React.FC = () => {
 
       {showHelp && <HelpPanel />}
       {showObjectives && <ObjectivesPanel enginesCrafted={engineRef.current.player.stats.enginesCrafted} stonesMined={engineRef.current.player.stats.stonesMined} />}
+
+      <Tutorial
+        steps={tutorialSteps}
+        dismissed={tutorialDismissed}
+        onDismiss={handleDismissTutorial}
+        onManualNext={handleManualNext}
+      />
     </div>
   );
 };

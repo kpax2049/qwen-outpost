@@ -17,9 +17,10 @@ export const TerrainMap = {
 export type TerrainValue = typeof TerrainMap[keyof typeof TerrainMap];
 
 // Resource types
-export type ResourceType = 'stone' | 'iron' | 'copper' | 'coal' | 'gold';
+export type ResourceType = 'wood' | 'stone' | 'iron' | 'copper' | 'coal' | 'gold';
 
 export const ResourceTypeMap = {
+  wood: 'wood',
   stone: 'stone',
   iron: 'iron',
   copper: 'copper',
@@ -30,6 +31,7 @@ export const ResourceTypeMap = {
 export type ResourceTypeValue = typeof ResourceTypeMap[keyof typeof ResourceTypeMap];
 
 export const RESOURCE_COLORS: Record<ResourceTypeValue, string> = {
+  wood: '#8a5a2a',
   stone: '#8a8a8a',
   iron: '#a0522d',
   copper: '#b87333',
@@ -38,6 +40,7 @@ export const RESOURCE_COLORS: Record<ResourceTypeValue, string> = {
 };
 
 export const RESOURCE_NAMES: Record<ResourceTypeValue, string> = {
+  wood: 'Wood',
   stone: 'Stone',
   iron: 'Iron Ore',
   copper: 'Copper Ore',
@@ -55,6 +58,7 @@ export type ItemType = ResourceTypeValue
   | 'engine';
 
 export const ItemTypeMap = {
+  wood: 'wood',
   stone: 'stone',
   iron: 'iron',
   copper: 'copper',
@@ -69,6 +73,7 @@ export const ItemTypeMap = {
 } as const;
 
 export const ITEM_DISPLAY_NAMES: Record<ItemType, string> = {
+  wood: 'Wood',
   stone: 'Stone',
   iron: 'Iron Ore',
   copper: 'Copper Ore',
@@ -83,6 +88,7 @@ export const ITEM_DISPLAY_NAMES: Record<ItemType, string> = {
 };
 
 export const ITEM_COLORS: Record<ItemType, string> = {
+  wood: '#8a5a2a',
   stone: '#8a8a8a',
   iron: '#a0522d',
   copper: '#b87333',
@@ -174,10 +180,12 @@ export interface Building {
 export interface PlayerState {
   x: number;
   y: number;
+  facing: DirectionValue;
   inventory: Item[];
   maxInventorySlots: number;
   stats: {
     stonesMined: number;
+    woodChopped: number;
     ingotsCrafted: number;
     enginesCrafted: number;
     timePlayed: number;

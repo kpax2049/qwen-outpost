@@ -146,7 +146,7 @@ export const HUD: React.FC<HUDProps> = ({
         background: 'rgba(20,20,40,0.7)', borderRadius: 4, padding: '6px 10px',
         color: '#666', fontSize: 10, lineHeight: 1.6, zIndex: 10,
       }}>
-        <div>WASD/Arrows: Move | E: Mine | R: Rotate | Q: Remove</div>
+        <div>WASD/Arrows: Move | E: Harvest (facing tile) | R: Rotate | Q: Remove</div>
         <div>Alt+Click: Pan | Scroll: Zoom | Space: Pause</div>
       </div>
 
