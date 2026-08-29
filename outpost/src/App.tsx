@@ -52,6 +52,57 @@ const App: React.FC = () => {
   const [cameraStart, setCameraStart] = useState<{ x: number; y: number } | null>(null);
   const [showWinMessage, setShowWinMessage] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [nearbyBuildings, setNearbyBuildings] = useState<import('./types').Tile[]>([]);
+
+  const handleSave = useCallback(() => {
+    try {
+      saveGame(engineRef.current);
+      setSaveStatus({ message: 'Game saved!', type: 'success' });
+    } catch {
+      setSaveStatus({ message: 'Failed to save game', type: 'error' });
+    }
+    setTimeout(() => setSaveStatus(null), 2000);
+  }, []);
+
+  const handleLoad = useCallback(() => {
+    try {
+      if (loadGame(engineRef.current)) {
+        setSaveStatus({ message: 'Game loaded!', type: 'success' });
+      } else {
+        setSaveStatus({ message: 'No save game found', type: 'error' });
+      }
+    } catch {
+      setSaveStatus({ message: 'Failed to load game', type: 'error' });
+    }
+    setTimeout(() => setSaveStatus(null), 2000);
+  }, []);
+
+  // Stable refs for the game loop so the effect is never torn down by React state changes
+  const cameraRef = useRef(camera);
+  const mousePosRef = useRef(mousePos);
+  const buildTypeRef = useRef(buildType);
+  const selectedTileRef = useRef(selectedTile);
+  const showWinRef = useRef(showWinMessage);
+  const setShowWinRef = useRef(setShowWinMessage);
+  const handleSaveRef = useRef(handleSave);
+  const handleLoadRef = useRef(handleLoad);
+
+  // Sync refs with state (no effect restart because nothing is in the dep array)
+  useEffect(() => { cameraRef.current = camera; });
+  useEffect(() => { mousePosRef.current = mousePos; });
+  useEffect(() => { buildTypeRef.current = buildType; });
+  useEffect(() => { selectedTileRef.current = selectedTile; });
+  useEffect(() => { showWinRef.current = showWinMessage; });
+  useEffect(() => { setShowWinRef.current = setShowWinMessage; });
+
+  const handleNewGame = useCallback(() => {
+    if (confirm('Start a new game? Current progress will be lost (use Save to keep it).')) {
+      clearSave();
+      engineRef.current = new GameEngine(Math.floor(Math.random() * 999999));
+      setSaveStatus({ message: 'New game started!', type: 'info' });
+      setTimeout(() => setSaveStatus(null), 2000);
+    }
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -62,8 +113,8 @@ const App: React.FC = () => {
       canvas.height = window.innerHeight;
       const engine = engineRef.current;
       const pos = engine.getPlayerPosition();
-      const camX = pos.x * 48 - canvas.width / 2;
-      const camY = pos.y * 48 - canvas.height / 2;
+      const camX = pos.x * 48 - canvas.width / (2 * 1.2);
+      const camY = pos.y * 48 - canvas.height / (2 * 1.2);
       setCamera({ x: camX, y: camY, zoom: 1.2 });
     };
 
@@ -147,11 +198,11 @@ const App: React.FC = () => {
           break;
         case 'f5':
           e.preventDefault();
-          handleSave();
+          handleSaveRef.current();
           break;
         case 'f9':
           e.preventDefault();
-          handleLoad();
+          handleLoadRef.current();
           break;
       }
     };
@@ -160,6 +211,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Stable game loop - no volatile state in deps
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !rendererRef.current) return;
@@ -181,14 +233,15 @@ const App: React.FC = () => {
         tickAccumulatorRef.current -= tickInterval;
       }
 
-      if (engine.getWinState()) {
+      if (engine.getWinState() && !showWinRef.current) {
+        setShowWinRef.current(true);
         setShowWinMessage(true);
       }
 
       const pos = engine.getPlayerPosition();
       setCamera(prev => {
-        const targetX = pos.x * 48 - canvas.width / 2 / prev.zoom;
-        const targetY = pos.y * 48 - canvas.height / 2 / prev.zoom;
+        const targetX = pos.x * 48 - canvas.width / (2 * prev.zoom);
+        const targetY = pos.y * 48 - canvas.height / (2 * prev.zoom);
         return {
           ...prev,
           x: prev.x + (targetX - prev.x) * 0.1,
@@ -196,28 +249,35 @@ const App: React.FC = () => {
         };
       });
 
-      const mouseWorldPos = mousePos ? {
-        x: (mousePos.x - camera.x) / camera.zoom,
-        y: (mousePos.y - camera.y) / camera.zoom,
-      } : null;
+      // Update nearby buildings periodically
+      const buildings = engine.getNearbyBuildings(pos.x, pos.y, 3);
+      setNearbyBuildings(buildings);
+
+      const mouseW = mousePosRef.current;
+      const bt = buildTypeRef.current;
+      const selTile = selectedTileRef.current;
 
       let previewTile: { x: number; y: number } | null = null;
       let previewColor: string | undefined;
-      if (buildType && mouseWorldPos) {
-        const tx = Math.floor(mouseWorldPos.x / 48);
-        const ty = Math.floor(mouseWorldPos.y / 48);
+      if (bt && mouseW) {
+        const mouseWCam = {
+          x: (mouseW.x - cameraRef.current.x) / cameraRef.current.zoom,
+          y: (mouseW.y - cameraRef.current.y) / cameraRef.current.zoom,
+        };
+        const tx = Math.floor(mouseWCam.x / 48);
+        const ty = Math.floor(mouseWCam.y / 48);
         if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
           previewTile = { x: tx, y: ty };
-          previewColor = BUILDING_COLORS[buildType];
+          previewColor = BUILDING_COLORS[bt];
         }
       }
 
       renderer.render(
         engine.map,
         engine.player,
-        camera,
+        cameraRef.current,
         {
-          selectedTile,
+          selectedTile: selTile,
           buildPreview: previewTile,
           buildColor: previewColor,
         }
@@ -226,7 +286,7 @@ const App: React.FC = () => {
 
     const rafId = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(rafId);
-  }, [camera, mousePos, buildType, selectedTile]);
+  }, []); // Empty deps = never restarts
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -247,35 +307,37 @@ const App: React.FC = () => {
       return;
     }
 
-    const worldX = (mx - camera.x) / camera.zoom;
-    const worldY = (my - camera.y) / camera.zoom;
+    const worldX = (mx - cameraRef.current.x) / cameraRef.current.zoom;
+    const worldY = (my - cameraRef.current.y) / cameraRef.current.zoom;
     const tx = Math.floor(worldX / 48);
     const ty = Math.floor(worldY / 48);
 
     if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
       setSelectedTile({ x: tx, y: ty });
     }
-  }, [isDragging, dragStart, cameraStart, camera]);
+  }, [isDragging, dragStart, cameraStart]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
-      setCameraStart({ x: camera.x, y: camera.y });
+      setCameraStart({ x: cameraRef.current.x, y: cameraRef.current.y });
       return;
     }
 
-    if (buildType && selectedTile) {
+    const bt = buildTypeRef.current;
+    const st = selectedTileRef.current;
+    if (bt && st) {
       const engine = engineRef.current;
       const player = engine.player;
-      const dx = Math.abs(selectedTile.x - player.x);
-      const dy = Math.abs(selectedTile.y - player.y);
+      const dx = Math.abs(st.x - player.x);
+      const dy = Math.abs(st.y - player.y);
 
       if (dx <= 1 && dy <= 1) {
-        engine.placeBuilding(buildType);
+        engine.placeBuilding(bt);
       }
     }
-  }, [buildType, selectedTile, camera]);
+  }, []);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -298,38 +360,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSave = useCallback(() => {
-    try {
-      saveGame(engineRef.current);
-      setSaveStatus({ message: 'Game saved!', type: 'success' });
-    } catch {
-      setSaveStatus({ message: 'Failed to save game', type: 'error' });
-    }
-    setTimeout(() => setSaveStatus(null), 2000);
-  }, []);
-
-  const handleLoad = useCallback(() => {
-    try {
-      if (loadGame(engineRef.current)) {
-        setSaveStatus({ message: 'Game loaded!', type: 'success' });
-      } else {
-        setSaveStatus({ message: 'No save game found', type: 'error' });
-      }
-    } catch {
-      setSaveStatus({ message: 'Failed to load game', type: 'error' });
-    }
-    setTimeout(() => setSaveStatus(null), 2000);
-  }, []);
-
-  const handleNewGame = useCallback(() => {
-    if (confirm('Start a new game? Current progress will be lost (use Save to keep it).')) {
-      clearSave();
-      engineRef.current = new GameEngine(Math.floor(Math.random() * 999999));
-      setSaveStatus({ message: 'New game started!', type: 'info' });
-      setTimeout(() => setSaveStatus(null), 2000);
-    }
-  }, []);
-
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (buildType && ['q', 'w', 'e', 'r'].includes(e.key.toLowerCase())) {
@@ -343,16 +373,16 @@ const App: React.FC = () => {
       }
       if (e.ctrlKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        handleSave();
+        handleSaveRef.current();
       }
       if (e.ctrlKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
-        handleLoad();
+        handleLoadRef.current();
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [buildType, handleSave, handleLoad]);
+  }, [buildType]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#1a1a2e', position: 'relative', userSelect: 'none' }}>
@@ -422,11 +452,7 @@ const App: React.FC = () => {
       {showInventory && (
         <InventoryPanel
           playerInventory={engineRef.current.player.inventory}
-          nearbyBuildings={engineRef.current.getNearbyBuildings(
-            engineRef.current.player.x,
-            engineRef.current.player.y,
-            3
-          )}
+          nearbyBuildings={nearbyBuildings}
           playerStats={engineRef.current.player.stats}
         />
       )}
