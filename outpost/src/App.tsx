@@ -3,7 +3,7 @@ import { GameEngine } from './engine/GameEngine';
 import { Renderer } from './rendering/Renderer';
 import type { Camera } from './rendering/Renderer';
 import { Dir, BUILDING_COLORS } from './types';
-import type { BuildingTypeValue, PowerSummary } from './types';
+import type { BuildingTypeValue, PowerSummary, DirectionValue } from './types';
 import { HUD } from './ui/HUD';
 import { BuildMenu } from './ui/BuildMenu';
 import { InventoryPanel } from './ui/InventoryPanel';
@@ -15,6 +15,8 @@ import type { TutorialStep } from './ui/Tutorial';
 
 const SAVE_KEY = 'outpost-save';
 const TILE_SIZE = 48;
+/** How far (Chebyshev distance) the player can place a building from their tile. */
+const BUILD_RANGE = 6;
 
 function saveGame(engine: GameEngine): string {
   const data = engine.save();
@@ -37,6 +39,37 @@ function clearSave(): void {
   localStorage.removeItem(SAVE_KEY);
 }
 
+/** Whether a build tile is placeable at (tx,ty): valid terrain/occupancy AND within range. */
+function thisTilePlaceable(engine: GameEngine, buildingType: BuildingTypeValue, tx: number, ty: number): boolean {
+  const p = engine.player;
+  const inRange = Math.max(Math.abs(tx - p.x), Math.abs(ty - p.y)) <= BUILD_RANGE;
+  return inRange && engine.canPlaceAt(buildingType, tx, ty).ok;
+}
+
+/**
+ * Build an axis-aligned (L/straight) tile path from anchor to target, walking one
+ * orthogonal leg first then the other. Returns the list of distinct tiles.
+ */
+function buildOrthoPath(a: { x: number; y: number }, b: { x: number; y: number }): { x: number; y: number }[] {
+  const path: { x: number; y: number }[] = [];
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const stepX = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+  const stepY = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+  let x = a.x;
+  let y = a.y;
+  path.push({ x, y });
+  // Walk the dominant axis first, then the other (gives one clean orthogonal bend).
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    while (x !== b.x) { x += stepX; path.push({ x, y }); }
+    while (y !== b.y) { y += stepY; path.push({ x, y }); }
+  } else {
+    while (y !== b.y) { y += stepY; path.push({ x, y }); }
+    while (x !== b.x) { x += stepX; path.push({ x, y }); }
+  }
+  return path;
+}
+
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine>(new GameEngine(42));
@@ -50,8 +83,16 @@ const App: React.FC = () => {
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const cameraStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectedTileRef = useRef<{ x: number; y: number } | null>(null);
+  // Conveyor route drag state (plain left-click while the conveyor tool is armed).
+  const buildDraggingRef = useRef(false);
+  const buildDragAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  const buildDragPathRef = useRef<{ x: number; y: number }[]>([]);
   const inspectedRef = useRef<{ x: number; y: number } | null>(null);
   const showWinRef = useRef(false);
+  // Mirrors of menu-open state for the (stale-closure-free) keydown handler.
+  const buildMenuOpenRef = useRef(false);
+  const inventoryOpenRef = useRef(false);
+  const helpOpenRef = useRef(false);
 
   const [showBuildMenu, setShowBuildMenu] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
@@ -112,6 +153,12 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const closeInspection = useCallback(() => {
+    inspectedRef.current = null;
+    setInspectedData(null);
+    setRenderTick(t => t + 1);
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -147,48 +194,43 @@ const App: React.FC = () => {
       const engine = engineRef.current;
       const bt = buildTypeRef.current;
 
-      if (bt) {
-        const k = e.key.toLowerCase();
-        if (k === 'w' || k === 'arrowup') { engine.setBuildDirection(Dir.Up); setRenderTick(t => t + 1); return; }
-        if (k === 's' || k === 'arrowdown') { engine.setBuildDirection(Dir.Down); setRenderTick(t => t + 1); return; }
-        if (k === 'a' || k === 'arrowleft') { engine.setBuildDirection(Dir.Left); setRenderTick(t => t + 1); return; }
-        if (k === 'd' || k === 'arrowright') { engine.setBuildDirection(Dir.Right); setRenderTick(t => t + 1); return; }
-        if (k === 'r') {
-          engine.setBuildDirection(((engine.getBuildDirection() + 1) % 4) as import('./types').DirectionValue);
-          setRenderTick(t => t + 1); return;
-        }
-        if (k === 'q') {
-          engine.setBuildDirection(((engine.getBuildDirection() + 3) % 4) as import('./types').DirectionValue);
-          setRenderTick(t => t + 1); return;
-        }
-      }
-
+      // Move always works, regardless of build state. This is the QOL core of
+      // building while roaming: WASD/arrows never get hijacked by a build tool.
       switch (e.key.toLowerCase()) {
         case 'w': case 'arrowup':
-          if (!bt) { e.preventDefault(); engine.movePlayer(0, -1); setRenderTick(t => t + 1); }
-          break;
+          e.preventDefault(); engine.movePlayer(0, -1); setRenderTick(t => t + 1); break;
         case 's': case 'arrowdown':
-          if (!bt) { e.preventDefault(); engine.movePlayer(0, 1); setRenderTick(t => t + 1); }
-          break;
+          e.preventDefault(); engine.movePlayer(0, 1); setRenderTick(t => t + 1); break;
         case 'a': case 'arrowleft':
-          if (!bt) { e.preventDefault(); engine.movePlayer(-1, 0); setRenderTick(t => t + 1); }
-          break;
+          e.preventDefault(); engine.movePlayer(-1, 0); setRenderTick(t => t + 1); break;
         case 'd': case 'arrowright':
-          if (!bt) { e.preventDefault(); engine.movePlayer(1, 0); setRenderTick(t => t + 1); }
-          break;
-        case 'e':
-          if (!bt) { engine.interact(); setRenderTick(t => t + 1); }
-          break;
-        case 'r':
-          if (!bt) { engine.rotateBuilding(); setRenderTick(t => t + 1); }
-          break;
-        case 'q':
-          if (!bt) { engine.removeBuilding(); setRenderTick(t => t + 1); }
-          break;
-        case ' ':
-          e.preventDefault();
-          engine.setPaused(!engine.getConfig().paused);
-          break;
+          e.preventDefault(); engine.movePlayer(1, 0); setRenderTick(t => t + 1); break;
+      }
+
+      // R rotates: with a build tool armed it rotates the direction the (single-click)
+      // building will face; otherwise it rotates the building underfoot.
+      if (e.key.toLowerCase() === 'r') {
+        if (bt) {
+          engine.setBuildDirection(((engine.getBuildDirection() + 1) % 4) as DirectionValue);
+          setRenderTick(t => t + 1);
+        } else {
+          engine.rotateBuilding();
+          setRenderTick(t => t + 1);
+        }
+        return;
+      }
+      if (e.key.toLowerCase() === 'e' && !bt) {
+        engine.interact();
+        setRenderTick(t => t + 1);
+      }
+      if (e.key.toLowerCase() === 'q' && !bt) {
+        engine.removeBuilding();
+        setRenderTick(t => t + 1);
+      }
+      if (e.key.toLowerCase() === ' ') {
+        e.preventDefault();
+        engine.setPaused(!engine.getConfig().paused);
+        return;
       }
 
       switch (e.key.toLowerCase()) {
@@ -206,25 +248,38 @@ const App: React.FC = () => {
 
       switch (e.key.toLowerCase()) {
         case 'b':
-          setShowBuildMenu(prev => { setShowInventory(false); setShowHelp(false); return !prev; });
+          setShowInventory(false); inventoryOpenRef.current = false;
+          setShowHelp(false); helpOpenRef.current = false;
+          setShowBuildMenu(prev => { const n = !prev; buildMenuOpenRef.current = n; return n; });
           break;
         case 'i':
-          setShowInventory(prev => { setShowBuildMenu(false); setShowHelp(false); return !prev; });
+          setShowBuildMenu(false); buildMenuOpenRef.current = false;
+          setShowHelp(false); helpOpenRef.current = false;
+          setShowInventory(prev => { const n = !prev; inventoryOpenRef.current = n; return n; });
           break;
         case 'h':
-          setShowHelp(prev => { setShowBuildMenu(false); setShowInventory(false); return !prev; });
+          setShowBuildMenu(false); buildMenuOpenRef.current = false;
+          setShowInventory(false); inventoryOpenRef.current = false;
+          setShowHelp(prev => { const n = !prev; helpOpenRef.current = n; return n; });
           break;
         case 'o':
           setShowObjectives(prev => !prev);
           break;
       }
 
+      // Staged Escape: first drop the armed build tool (keep menus), then close
+      // open panels. It never destroys more than one layer at a time.
       if (e.key.toLowerCase() === 'escape') {
-        setBuildType(null);
-        buildTypeRef.current = null;
-        setShowBuildMenu(false);
-        setShowInventory(false);
-        setShowHelp(false);
+        if (bt) {
+          setBuildType(null);
+          buildTypeRef.current = null;
+        } else if (inspectedRef.current) {
+          closeInspection();
+        } else if (buildMenuOpenRef.current || inventoryOpenRef.current || helpOpenRef.current) {
+          setShowBuildMenu(false); buildMenuOpenRef.current = false;
+          setShowInventory(false); inventoryOpenRef.current = false;
+          setShowHelp(false); helpOpenRef.current = false;
+        }
       }
 
       if (e.key.toLowerCase() === 'f5') {
@@ -248,7 +303,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, handleLoad]);
+  }, [handleSave, handleLoad, closeInspection]);
 
   // Stable game loop - no volatile state in deps
   useEffect(() => {
@@ -281,13 +336,6 @@ const App: React.FC = () => {
 
       const pos = engine.getPlayerPosition();
 
-      if (!isDraggingRef.current) {
-        const targetX = canvas.width / 2 - pos.x * TILE_SIZE * cameraRef.current.zoom;
-        const targetY = canvas.height / 2 - pos.y * TILE_SIZE * cameraRef.current.zoom;
-        cameraRef.current.x += (targetX - cameraRef.current.x) * 0.1;
-        cameraRef.current.y += (targetY - cameraRef.current.y) * 0.1;
-      }
-
       if (frameCount % 30 === 0) {
         const buildings = engine.getNearbyBuildings(pos.x, pos.y, 3);
         setNearbyBuildings(buildings);
@@ -314,10 +362,24 @@ const App: React.FC = () => {
       const interactiveTile = bt ? null : engine.getInteractiveTile();
       const interactiveLabel = bt ? '' : engine.getInteractiveLabel();
 
+      // Suppress camera auto-follow while panning OR while building a conveyor route.
+      if (!isDraggingRef.current && !buildDraggingRef.current) {
+        const targetX = canvas.width / 2 - pos.x * TILE_SIZE * cameraRef.current.zoom;
+        const targetY = canvas.height / 2 - pos.y * TILE_SIZE * cameraRef.current.zoom;
+        cameraRef.current.x += (targetX - cameraRef.current.x) * 0.1;
+        cameraRef.current.y += (targetY - cameraRef.current.y) * 0.1;
+      }
+
+      // Conveyor route being dragged: preview the whole path.
+      let buildPath: { x: number; y: number }[] | undefined;
+      if (buildDraggingRef.current && buildDragPathRef.current.length > 0) {
+        buildPath = buildDragPathRef.current;
+      }
+
       let previewTile: { x: number; y: number } | null = null;
       let previewColor: string | undefined;
-      let previewValid: boolean | undefined;
-      if (bt && mouseW) {
+      let buildValid: boolean | undefined;
+      if (bt && !buildPath && mouseW && !buildDraggingRef.current) {
         const mouseWCam = {
           x: (mouseW.x - cameraRef.current.x) / cameraRef.current.zoom,
           y: (mouseW.y - cameraRef.current.y) / cameraRef.current.zoom,
@@ -327,10 +389,13 @@ const App: React.FC = () => {
         if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
           previewTile = { x: tx, y: ty };
           previewColor = BUILDING_COLORS[bt];
-          previewValid = engine.canPlaceAt(bt, tx, ty).ok;
+          buildValid = thisTilePlaceable(engine, bt, tx, ty);
         }
       }
 
+      const buildPathValid = buildPath && bt
+        ? buildPath.every(c => thisTilePlaceable(engine, bt as BuildingTypeValue, c.x, c.y))
+        : undefined;
       renderer.render(
         engine.map,
         engine.player,
@@ -339,7 +404,9 @@ const App: React.FC = () => {
           selectedTile: selTile,
           buildPreview: previewTile,
           buildColor: previewColor,
-          buildValid: previewValid,
+          buildValid,
+          buildPath,
+          buildPathValid,
           buildDirection: bt === 'conveyor' ? engine.getBuildDirection() : undefined,
           inspectedTile: inspectedRef.current,
           interactiveTile,
@@ -378,6 +445,16 @@ const App: React.FC = () => {
     if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
       selectedTileRef.current = { x: tx, y: ty };
     }
+
+    // While dragging a conveyor route, extend the path toward the cursor.
+    if (buildDraggingRef.current && buildDragAnchorRef.current) {
+      if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
+        buildDragPathRef.current = buildOrthoPath(buildDragAnchorRef.current, { x: tx, y: ty });
+      } else {
+        buildDragPathRef.current = [buildDragAnchorRef.current];
+      }
+      setRenderTick(t => t + 1);
+    }
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -403,17 +480,24 @@ const App: React.FC = () => {
       const tx = Math.floor(worldX / TILE_SIZE);
       const ty = Math.floor(worldY / TILE_SIZE);
       selectedTileRef.current = { x: tx, y: ty };
+      const engine = engineRef.current;
 
-      if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
-        const engine = engineRef.current;
-        const player = engine.player;
-        const dx = Math.abs(tx - player.x);
-        const dy = Math.abs(ty - player.y);
+      if (tx < 0 || tx >= 120 || ty < 0 || ty >= 120) return;
 
-        if (dx <= 1 && dy <= 1) {
-          engine.placeBuildingAt(bt, tx, ty);
-          setRenderTick(t => t + 1);
-        }
+      // Conveyor: a plain left-drag draws an orthogonal multi-tile route.
+      // On mouse down we anchor the route; on mouse up we lay it out.
+      if (bt === 'conveyor') {
+        buildDraggingRef.current = true;
+        buildDragAnchorRef.current = { x: tx, y: ty };
+        buildDragPathRef.current = [{ x: tx, y: ty }];
+        setRenderTick(t => t + 1);
+        return;
+      }
+
+      // Non-conveyor: single-click placement (still sticky / repeatable).
+      if (thisTilePlaceable(engine, bt, tx, ty)) {
+        engine.placeBuildingAt(bt, tx, ty);
+        setRenderTick(t => t + 1);
       }
       return;
     }
@@ -443,9 +527,32 @@ const App: React.FC = () => {
     isDraggingRef.current = false;
     dragStartRef.current = null;
     cameraStartRef.current = null;
+
+    // Finish a conveyor route drag: layer the path with auto-orientation.
+    if (buildDraggingRef.current) {
+      const path = buildDragPathRef.current;
+      buildDraggingRef.current = false;
+      buildDragAnchorRef.current = null;
+      buildDragPathRef.current = [];
+      if (buildTypeRef.current === 'conveyor' && path.length > 0) {
+        const engine = engineRef.current;
+        for (let i = 0; i < path.length; i++) {
+          const cell = path[i];
+          // Orient each belt toward the next tile in the route (corners included).
+          const next = path[i + 1];
+          const dir: DirectionValue =
+            next && next.x !== cell.x ? (next.x > cell.x ? Dir.Right : Dir.Left)
+            : next ? (next.y > cell.y ? Dir.Down : Dir.Up)
+            : engine.getBuildDirection();
+          engine.setBuildDirection(dir);
+          engine.placeBuildingAt('conveyor', cell.x, cell.y);
+        }
+        setRenderTick(t => t + 1);
+      }
+    }
   }, []);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
     const newZoom = Math.max(0.3, Math.min(3, cameraRef.current.zoom + zoomDelta));
@@ -462,6 +569,16 @@ const App: React.FC = () => {
     cameraRef.current.zoom = newZoom;
   }, []);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // Attach non-passive so we can preventDefault (zoom the canvas on scroll).
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
+
   const handleBuildSelect = (type: BuildingTypeValue) => {
     if (buildType === type) {
       setBuildType(null);
@@ -471,12 +588,6 @@ const App: React.FC = () => {
       buildTypeRef.current = type;
     }
   };
-
-  const closeInspection = useCallback(() => {
-    inspectedRef.current = null;
-    setInspectedData(null);
-    setRenderTick(t => t + 1);
-  }, []);
 
   const handleDeposit = useCallback((type: string) => {
     const ip = inspectedRef.current;
@@ -559,27 +670,27 @@ const App: React.FC = () => {
     },
     {
       id: 'place', title: 'Place a Building',
-      body: 'Pick a building, walk near an open tile, and click to place it. Try a Chest (3 Stone) or Conveyor (2 Stone). Conveyors face a direction — use A/S/W/D or R while placing so the belt points where items should flow.',
+      body: 'Pick a building, then click a tile to place it. You can keep moving with WASD while the tool is armed — it stays selected for repeated placement until you press Esc or Cancel. A chest costs 3 Stone.',
       done: effectiveDone.place,
     },
     {
       id: 'belt', title: 'Chain Conveyors',
-      body: 'Place 3+ Conveyor Belts so they point into each other (items flow belt-to-belt — this even works around corners). Belts that face each other get blocked and glow red. Click any building to inspect its status.',
+      body: 'Select the Conveyor, then CLICK-DRAG across the map to lay a whole belt route in one stroke — belts point and turn at corners automatically. Use R to flip the direction of a single belt. Belts that face each other get blocked and glow red. Click any building to inspect its status.',
       done: effectiveDone.belt,
     },
     {
       id: 'power', title: 'Power Your Grid',
-      body: 'Place a Coal Generator and give it Coal (click it, then "Coal +1"), so it produces 50 power. Machines and belts stop without power — check the POWER GRID panel top-right.',
+      body: 'Place a Coal Generator and give it Coal (click it, then "Coal +1"). One global grid powers the ENTIRE outpost — no cables needed, distance doesn\'t matter. Machines and belts stop without enough power; watch the OUTPOST POWER GRID panel top-right.',
       done: effectiveDone.power,
     },
     {
       id: 'inspect', title: 'Inspect a Building',
-      body: 'Click any building to open its inspector: status, power, inventory, belt connections and fuel left. Blocked belts show a red gate — clicking them explains why.',
+      body: 'Click any building to open its inspector: status, power, inventory, belt connections and fuel left. A stopped machine clearly says why (e.g. "No Power — shared Outpost Grid"). Blocked belts show a red gate — clicking them explains why.',
       done: effectiveDone.inspect,
     },
     {
       id: 'next', title: 'Automate A Coal Line',
-      body: 'Now build a working line: Miner on a coal deposit → Conveyors (bending 90° if needed) → Coal Generator. Keep the surplus positive, then use Smelters and Assemblers to craft 5 engines!',
+      body: 'Now build a working line: Miner on a coal deposit → Conveyors (click-drag bends 90° automatically) → Coal Generator. The global grid powers it all, so keep the surplus positive, then use Smelters and Assemblers to craft 5 engines!',
       done: seenNext, manual: true,
     },
   ];
@@ -592,7 +703,6 @@ const App: React.FC = () => {
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
         onContextMenu={e => e.preventDefault()}
-        onWheel={handleWheel}
         style={{ width: '100%', height: '100%', display: 'block' }}
       />
 
@@ -631,9 +741,9 @@ const App: React.FC = () => {
         onIncreaseSpeed={() => engineRef.current.setTickRate(engineRef.current.getConfig().tickRate + 1)}
         onDecreaseSpeed={() => engineRef.current.setTickRate(engineRef.current.getConfig().tickRate - 1)}
         onResetSpeed={() => engineRef.current.setTickRate(10)}
-        onToggleBuildMenu={() => { setShowBuildMenu(!showBuildMenu); setShowInventory(false); setShowHelp(false); }}
-        onToggleInventory={() => { setShowInventory(!showInventory); setShowBuildMenu(false); setShowHelp(false); }}
-        onToggleHelp={() => { setShowHelp(!showHelp); setShowBuildMenu(false); setShowInventory(false); }}
+        onToggleBuildMenu={() => { const n = !showBuildMenu; setShowBuildMenu(n); buildMenuOpenRef.current = n; setShowInventory(false); inventoryOpenRef.current = false; setShowHelp(false); helpOpenRef.current = false; }}
+        onToggleInventory={() => { const n = !showInventory; setShowInventory(n); inventoryOpenRef.current = n; setShowBuildMenu(false); buildMenuOpenRef.current = false; setShowHelp(false); helpOpenRef.current = false; }}
+        onToggleHelp={() => { const n = !showHelp; setShowHelp(n); helpOpenRef.current = n; setShowBuildMenu(false); buildMenuOpenRef.current = false; setShowInventory(false); inventoryOpenRef.current = false; }}
         onToggleObjectives={() => setShowObjectives(!showObjectives)}
         onSave={handleSave}
         onLoad={handleLoad}

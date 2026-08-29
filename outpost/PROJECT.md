@@ -51,7 +51,7 @@ The simulation engine handles all game logic:
 
 - **Map Generation** - Seeded PRNG creates deterministic 120x120 grids with terrain, resources, and ore deposits
 - **Building System** - 8 building types with inventory, progress, and power management
-- **Power System** - Generators produce power, consumers draw from it within a 30-tile range
+- **Power System** - A single **global shared grid** for the whole map: powered consumers draw as long as total production covers total consumption, regardless of distance. Generators only produce while fueled (coal). No cables/range connectivity — this is intentional and documented in Help/Tutorial/Inspection/HUD. The Renderer draws animated power-link visuals from each running generator to its nearest consumers (visual-only, radius 6) so the shared grid is visible. Deliberately no spatial cable/pole network.
 - **Conveyor Logic** - Items move between buildings based on direction
 - **Harvesting** - Unified facing-based `interact()`: E harvests the tile the player faces (falls back to underfoot). Trees (forest) → wood, rocks → stone, deposits → their ore. `facing` updates on movement; forest is non-walkable. Orange highlight + "E: label" badge on the interactive tile
 - **Player Actions** - Movement, harvesting (E), building placement/removal, inventory management
@@ -128,11 +128,13 @@ Craft 5 engines through the full production chain. The engine counter tracks pro
 
 ## Controls
 
+The build tool is **sticky** (stays armed after placing) and never hijacks movement. Each Escape press drops one layer: first deselect the armed tool, then close the open panel/menu.
+
 | Key | Action |
 |-----|--------|
-| WASD / Arrows | Move player (updates facing) |
+| WASD / Arrows | Move player (updates facing) — always works, even while a build tool is armed |
 | E | Harvest the tile you're facing (or standing on) — trees → Wood, rocks → Stone, deposits → ore |
-| R | Rotate building on current tile |
+| R | Rotate the building underfoot; or rotate the build direction for a single conveyor when a build tool is armed |
 | Q | Remove building (50% refund) |
 | Space | Pause/Resume |
 | +/-, 0-3 | Adjust simulation speed |
@@ -144,7 +146,9 @@ Craft 5 engines through the full production chain. The engine counter tracks pro
 | Ctrl+L / F9 | Load game |
 | Alt+Click | Pan camera |
 | Scroll | Zoom |
-| Escape | Deselect build mode |
+| Click (tool armed) | Place a building (must be within `BUILD_RANGE` = 6 Chebyshev tiles) |
+| Click-drag (conveyor) | Lay an orthogonal L/straight belt route with auto-oriented belts (corners included) in one drag |
+| Escape | Staged: 1st deselects the build tool; 2nd closes the open menu/panel |
 
 ## Save/Load
 
@@ -156,8 +160,7 @@ Craft 5 engines through the full production chain. The engine counter tracks pro
 
 ## Testing
 
-58 unit tests cover:
-- Map generation (deterministic, terrain variety, resources)
+67 unit tests cover:- Map generation (deterministic, terrain variety, resources)
 - Player movement and mining
 - Harvesting model (facing updates, wood from facing tree, stone from facing rock, deposit mining, under-foot fallback, interactive tile/label)
 - Building placement and rotation

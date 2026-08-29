@@ -1,5 +1,6 @@
 import React from 'react';
 import type { BuildingTypeValue, DirectionValue, PowerSummary } from '../types';
+import { BUILDING_NAMES } from '../types';
 
 interface HUDProps {
   tickRate: number;
@@ -135,10 +136,10 @@ export const HUD: React.FC<HUDProps> = ({
           borderRadius: 4, fontSize: 13, fontWeight: 'bold', zIndex: 10,
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          <span>Building: {buildType}</span>
+          <span>Building: {BUILDING_NAMES[buildType] ?? buildType}</span>
           {buildDirection !== undefined && (
             <span style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 3, padding: '2px 7px', fontSize: 12 }}>
-              {DIR_HINT[buildDirection] ?? 'Wait'}
+              dir {DIR_HINT[buildDirection] ?? ''}
             </span>
           )}
           <button onClick={onDeselectBuild} style={{
@@ -156,7 +157,16 @@ export const HUD: React.FC<HUDProps> = ({
           background: 'rgba(20,20,40,0.8)', color: '#ddd', padding: '5px 12px',
           borderRadius: 4, fontSize: 11, zIndex: 10,
         }}>
-          A/S/W/D or Arrow keys set direction · R rotates · click to place
+          Move to walk · Click-drag to lay a belt route (auto-corners) · R rotates a single belt · click places
+        </div>
+      )}
+      {buildType && buildType !== 'conveyor' && (
+        <div style={{
+          position: 'absolute', top: 80, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(20,20,40,0.8)', color: '#ddd', padding: '5px 12px',
+          borderRadius: 4, fontSize: 11, zIndex: 10,
+        }}>
+          Move to walk · click to place — stays selected until you Cancel or press Esc
         </div>
       )}
 
@@ -164,10 +174,10 @@ export const HUD: React.FC<HUDProps> = ({
         <div style={{
           position: 'absolute', right: 8, top: 52,
           background: 'rgba(20,20,40,0.85)', border: `1px solid ${power.enough ? 'rgba(68,204,68,0.4)' : 'rgba(255,68,68,0.5)'}`,
-          borderRadius: 5, padding: '7px 10px', fontSize: 11, zIndex: 10, minWidth: 190,
+          borderRadius: 5, padding: '7px 10px', fontSize: 11, zIndex: 10, minWidth: 200,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-            <span style={{ color: '#aaa', fontWeight: 'bold', letterSpacing: 1 }}>POWER GRID</span>
+            <span style={{ color: '#aaa', fontWeight: 'bold', letterSpacing: 1 }}>OUTPOST POWER GRID</span>
             <span style={{ color: power.enough ? '#44cc44' : '#ff4444', fontWeight: 'bold' }}>
               {power.enough ? 'OK' : 'LOW'}
             </span>
@@ -179,6 +189,9 @@ export const HUD: React.FC<HUDProps> = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, color: power.surplus >= 0 ? '#88cc88' : '#ff8888' }}>
             <span>Surplus {power.surplus >= 0 ? '+' : ''}{power.surplus}</span>
             <span>{power.fueledGenerators}/{power.generatorCount} generators fueled</span>
+          </div>
+          <div style={{ color: '#7a9bff', marginTop: 3, fontSize: 10 }}>
+            One shared grid for the whole map — no cables needed.
           </div>
           {!power.enough && power.generatorCount > 0 && (
             <div style={{ color: '#ffaa55', marginTop: 3 }}>
@@ -194,8 +207,8 @@ export const HUD: React.FC<HUDProps> = ({
         color: '#666', fontSize: 10, lineHeight: 1.6, zIndex: 10,
       }}>
         <div>WASD/Arrows: Move | E: Harvest (facing tile) | R: Rotate | Q: Remove</div>
-        <div>Alt+Click: Pan | Scroll: Zoom | Space: Pause | Click building: Inspect</div>
-        <div>In build mode: A/S/W/D set conveyor direction | R rotates direction</div>
+        <div>Left-drag with a belt tool: lay a route | Alt+Click: Pan | Scroll: Zoom | Space: Pause</div>
+        <div>Build mode: keep moving with WASD; click places; R sets a single belt's direction; Esc deselects</div>
       </div>
 
       {saveStatus && (

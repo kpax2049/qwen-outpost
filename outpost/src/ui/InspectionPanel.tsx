@@ -60,12 +60,15 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
 
       {!building ? (
         <div style={{ color: '#888', fontSize: 12, lineHeight: 1.6 }}>
-          Click any tile to inspect its building. Buildings have a code with their status; blocked belts show a red gate in the world.
+          Click any tile to inspect its building. Buildings have a status code; blocked belts show a red gate in the world.
           <div style={{ marginTop: 10 }}>
             <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>Power: </span>
             <span style={{ color: power.enough ? '#44cc44' : '#ff4444' }}>
               {power.produced} ⚡ produced / {power.consumed} ⚡ used
             </span>
+            <div style={{ color: '#9ab', fontSize: 11, marginTop: 4 }}>
+              All machines share ONE outpost-wide power grid. Fuel a Generator (add Coal) to power every machine on the map.
+            </div>
             {power.generatorCount === 0 && (
               <div style={{ color: '#ffaa00', fontSize: 11, marginTop: 4 }}>
                 Place a Coal Generator and feed it Coal to power your machines.
@@ -85,10 +88,25 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
             )}
             <div>
               <span style={{ color: '#888' }}>Power:</span>{' '}
-              {building.powerConsumed > 0 && <span>{building.active ? 'Powered' : 'No Power'} ({building.powerConsumed}⚡)</span>}
+              {building.powerConsumed > 0 && (
+                <span style={{ color: building.active ? '#44cc44' : '#ff4444' }}>
+                  {building.active ? 'Powered' : 'No Power'} —{' '}
+                  <span style={{ fontSize: 11 }}>
+                    shared Outpost Grid ({power.produced}⚡ / {power.consumed}⚡)
+                  </span>
+                </span>
+              )}
               {building.powerProduced > 0 && <span>{building.active ? 'Producing' : 'Not Producing'} ({building.powerProduced}⚡)</span>}
-              {building.powerConsumed === 0 && building.powerProduced === 0 && <span>Passive</span>}
+              {building.powerConsumed === 0 && building.powerProduced === 0 && <span>Passive (no power needed)</span>}
             </div>
+
+            {building.powerConsumed > 0 && !building.active && (
+              <div style={{ marginTop: 6, padding: 6, background: 'rgba(255,68,68,0.12)', borderRadius: 4, fontSize: 11, color: '#ff8a8a', lineHeight: 1.5 }}>
+                The whole outpost shares ONE power grid — no cables needed. This machine is
+                stopped because the grid lacks power ({power.produced}⚡ produced vs {power.consumed}⚡ used).
+                Add Coal to a Generator, or remove machines until surplus is positive.
+              </div>
+            )}
 
             {(building.progress !== undefined && building.maxProgress > 1) && (
               <div style={{ marginTop: 6 }}>
@@ -154,11 +172,11 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
             <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
               <div style={{ color: '#888', fontSize: 11, marginBottom: 5 }}>Give one from your inventory</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {playerItems.map(item => {
+                {playerItems.map((item, idx) => {
                   const ok = canDeposit(item.type);
                   return (
                     <button
-                      key={item.type}
+                      key={idx}
                       disabled={!ok || item.amount <= 0}
                       onClick={() => onDeposit(item.type)}
                       style={{

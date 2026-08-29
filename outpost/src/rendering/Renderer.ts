@@ -27,6 +27,9 @@ export interface RenderOptions {
   buildPreview: { x: number; y: number } | null;
   buildColor?: string;
   buildValid?: boolean;
+  /** Multi-tile conveyor route being dragged. */
+  buildPath?: { x: number; y: number }[];
+  buildPathValid?: boolean;
   buildDirection?: DirectionValue;
   inspectedTile?: { x: number; y: number } | null;
   interactiveTile?: { x: number; y: number } | null;
@@ -221,7 +224,7 @@ export class Renderer {
     this.waterTime += 0.05;
 
     const { ctx } = this;
-    const { selectedTile, buildPreview, buildColor, buildValid, buildDirection, inspectedTile, interactiveTile, interactiveLabel, facing } = options;
+    const { selectedTile, buildPreview, buildColor, buildValid, buildPath, buildPathValid, buildDirection, inspectedTile, interactiveTile, interactiveLabel, facing } = options;
 
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -295,6 +298,10 @@ export class Renderer {
         }
       }
     }
+
+    // Render the powered grid: visible energy links from fueled generators to
+    // the machines they power. Makes the shared-grid concept tangible.
+    this.drawPowerLinks(map, startTileX, startTileY, endTileX, endTileY);
 
     // Render player
     this.drawPlayer(player.x, player.y, facing ?? player.facing);
@@ -442,6 +449,45 @@ export class Renderer {
         ctx.arc(boostX + TILE_SIZE / 2, boostY + TILE_SIZE / 2, 9, 0, Math.PI * 2);
         ctx.fill();
         this.drawArrow(boostX + TILE_SIZE / 2, boostY + TILE_SIZE / 2, buildDirection, 10);
+      }
+
+      ctx.restore();
+    }
+
+    // Multi-tile conveyor route being dragged: highlight each planned tile and
+    // draw a connecting guide line so the player sees the whole route at once.
+    if (buildPath && buildPath.length > 0) {
+      ctx.save();
+      ctx.translate(camera.x, camera.y);
+      ctx.scale(camera.zoom, camera.zoom);
+
+      const valid = buildPathValid !== false;
+      ctx.strokeStyle = valid ? 'rgba(180, 255, 180, 0.6)' : 'rgba(255, 80, 80, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      for (let i = 0; i < buildPath.length; i++) {
+        const t = buildPath[i];
+        const cx = t.x * TILE_SIZE + TILE_SIZE / 2;
+        const cy = t.y * TILE_SIZE + TILE_SIZE / 2;
+        if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      for (const t of buildPath) {
+        const tx = t.x * TILE_SIZE;
+        const ty = t.y * TILE_SIZE;
+        const last = t === buildPath[buildPath.length - 1];
+        ctx.globalAlpha = last ? 0.55 : 0.3;
+        ctx.fillStyle = buildColor ?? '#444444';
+        ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
+        ctx.globalAlpha = 1;
+        if (last) {
+          ctx.strokeStyle = valid ? 'rgba(180,255,180,0.8)' : '#ff4444';
+          ctx.lineWidth = 2.5;
+          ctx.strokeRect(tx + 2, ty + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        }
       }
 
       ctx.restore();
@@ -671,6 +717,99 @@ export class Renderer {
         ctx.stroke();
       }
     }
+  }
+
+  /**
+   * Draw visible energy links between fueled (active) generators and the powered
+   * consumers in view, so the shared power grid is legible at a glance. An
+   * L-shaped cable with a moving glow pulse connects each generator to its
+   * nearest powered machines, and a dashed ring marks running generators.
+   */
+  private drawPowerLinks(map: Tile[][], startTileX: number, startTileY: number, endTileX: number, endTileY: number): void {
+    const { ctx } = this;
+    const gens: { x: number; y: number }[] = [];
+    const consumers: { x: number; y: number }[] = [];
+
+    for (let y = Math.max(0, startTileY); y < Math.min(MAP_SIZE, endTileY); y++) {
+      for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
+        const b = map[y][x].building;
+        if (!b) continue;
+        if (b.powerProduced && b.active) gens.push({ x, y });
+        else if (b.powerConsumed > 0 && b.active) consumers.push({ x, y });
+      }
+    }
+
+    if (gens.length === 0 || consumers.length === 0) return;
+
+    const LINK_CAP = 6;
+
+    for (const g of gens) {
+      const sorted = [...consumers]
+        .map(c => ({ c, d: Math.abs(c.x - g.x) + Math.abs(c.y - g.y) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, LINK_CAP);
+
+      for (const { c } of sorted) {
+        const path = this.powerCable(g, c);
+        ctx.strokeStyle = 'rgba(110, 200, 255, 0.10)';
+        ctx.lineWidth = 2.5;
+        this.tracePowerCable(path);
+        ctx.stroke();
+
+        const phase = (this.frameCount * 0.03 + g.x * 0.13 + g.y * 0.07) % 1;
+        const p = this.powerPoint(path, phase);
+        ctx.fillStyle = 'rgba(140, 220, 255, 0.85)';
+        ctx.shadowColor = '#66ccff';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      const gcx = g.x * TILE_SIZE + TILE_SIZE / 2;
+      const gcy = g.y * TILE_SIZE + TILE_SIZE / 2;
+      ctx.strokeStyle = 'rgba(255, 200, 80, 0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.arc(gcx, gcy, TILE_SIZE / 2 + 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  private powerCable(a: { x: number; y: number }, b: { x: number; y: number }) {
+    const T = TILE_SIZE;
+    return {
+      ax: a.x * T + T / 2,
+      ay: a.y * T + T / 2,
+      bx: b.x * T + T / 2,
+      by: b.y * T + T / 2,
+      mx: b.x * T + T / 2,
+      my: a.y * T + T / 2,
+    };
+  }
+
+  private tracePowerCable(c: { ax: number; ay: number; bx: number; by: number; mx: number; my: number }): void {
+    const { ctx } = this;
+    ctx.beginPath();
+    ctx.moveTo(c.ax, c.ay);
+    ctx.lineTo(c.mx, c.my);
+    ctx.lineTo(c.bx, c.by);
+  }
+
+  private powerPoint(c: { ax: number; ay: number; bx: number; by: number; mx: number; my: number }, t: number): { x: number; y: number } {
+    const seg1Len = Math.abs(c.mx - c.ax) + Math.abs(c.my - c.ay);
+    const seg2Len = Math.abs(c.bx - c.mx) + Math.abs(c.by - c.my);
+    const total = seg1Len + seg2Len || 1;
+    const d = t * total;
+    if (d <= seg1Len) {
+      const f = seg1Len === 0 ? 0 : d / seg1Len;
+      return { x: c.ax + (c.mx - c.ax) * f, y: c.ay + (c.my - c.ay) * f };
+    }
+    const f = seg2Len === 0 ? 0 : (d - seg1Len) / seg2Len;
+    return { x: c.mx + (c.bx - c.mx) * f, y: c.my + (c.by - c.my) * f };
   }
 
   private drawConveyor(gx: number, gy: number, building: Building, map: Tile[][]): void {

@@ -29,20 +29,22 @@ export const HelpPanel: React.FC = () => (
 
     <div style={{ color: '#ddd', fontSize: 12, marginBottom: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
       <div style={{ color: '#ffaa00', fontWeight: 'bold' }}>Build Mode</div>
-      <div>Press <strong>B</strong>, pick a building, hover to preview, click to place</div>
-      <div><strong>A/S/W/D or Arrow keys</strong> - Set conveyor direction before placing</div>
-      <div><strong>R</strong> - Rotate the conveyor direction</div>
-      <div><strong>Enter/click</strong> - Place on the highlighted tile</div>
+      <div>Press <strong>B</strong>, pick a building. You can keep <strong>moving</strong> while a build tool is armed.</div>
+      <div><strong>Left-Click</strong> - Place on the tile under the cursor (within ~6 tiles of you)</div>
+      <div><strong>Left-Click + Drag</strong> (Conveyor) - Lay a multi-tile belt route in one stroke; corners are pointed automatically</div>
+      <div><strong>R</strong> - Rotate the direction a single-click conveyor will face</div>
+      <div>The selected building stays armed for repeated placement until you <strong>Cancel</strong> or press <strong>Esc</strong></div>
+      <div><strong>Esc</strong> - First deselects the build tool, next press closes the menu (staged)</div>
     </div>
 
     <div style={{ color: '#ddd', fontSize: 12, marginBottom: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
       <div style={{ color: '#ff66ff', fontWeight: 'bold' }}>Power & Conveyors</div>
+      <div>• <strong>One shared power grid</strong>: every machine on the map draws from the same pool. No cables, poles, or ranges — just build a Generator, feed it Coal, and the whole outpost is powered. Energy links are drawn in the world to show generator → machine connections.</div>
       <div>• Conveyors face a direction — arrows animate the direction items travel</div>
       <div>• Elbows (corners) are drawn as curves; items follow the bend automatically</div>
       <div>• A red gate + pulsing red glow means the belt is <strong>blocked</strong> (e.g. two belts facing each other)</div>
       <div>• Generators burn 1 Coal every 50 ticks and need Coal to produce power</div>
-      <div>• All machines share one power grid — watch the POWER GRID panel top-right</div>
-      <div>• Click a building to inspect; use "Give" buttons to deposit fuel/ore nearby</div>
+      <div>• Watch the <strong>OUTPOST POWER GRID</strong> panel top-right; click a building to inspect and see why it runs or stops</div>
     </div>
 
     <div style={{ color: '#ddd', fontSize: 12, marginBottom: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
@@ -58,7 +60,7 @@ export const HelpPanel: React.FC = () => (
       <div><strong>I</strong> - Toggle inventory panel</div>
       <div><strong>O</strong> - Toggle objectives</div>
       <div><strong>H</strong> - Toggle this help</div>
-      <div><strong>Esc</strong> - Deselect build mode</div>
+      <div><strong>Esc</strong> - Deselect build tool, then close panels (one layer at a time)</div>
     </div>
 
     <div style={{ color: '#ddd', fontSize: 11, marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, lineHeight: 1.6 }}>
@@ -66,8 +68,8 @@ export const HelpPanel: React.FC = () => (
       <div>1. Place a Coal Generator on grass</div>
       <div>2. Inspect it and give it Coal (or mine coal and stand near it to hand it in)</div>
       <div>3. Put a Miner on a coal deposit</div>
-      <div>4. Lay a Conveyor line from the Miner toward the Generator — use A/S/W/D or R so belts point the right way and turn at corners</div>
-      <div>5. Watch the POWER GRID panel: surplus should stay positive</div>
+      <div>4. Pick the Conveyor tool and <strong>click-drag</strong> a route from the Miner toward the Generator — belts point and turn by themselves (press R to flip a single belt)</div>
+      <div>5. Watch the OUTPOST POWER GRID panel: surplus should stay positive. Since the grid is global, the Miner and belts are powered no matter how far they are from the Generator.</div>
       <div>6. If a belt glows red it's blocked — check its direction and the building it leads into</div>
     </div>
   </div>
