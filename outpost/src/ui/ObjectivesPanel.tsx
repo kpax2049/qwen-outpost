@@ -2,12 +2,13 @@ import React from 'react';
 
 interface ObjectivesPanelProps {
   enginesCrafted: number;
+  stonesMined: number;
 }
 
-export const ObjectivesPanel: React.FC<ObjectivesPanelProps> = ({ enginesCrafted }) => {
+export const ObjectivesPanel: React.FC<ObjectivesPanelProps> = ({ enginesCrafted, stonesMined }) => {
   const objectives = [
-    { id: 1, title: 'First Steps', desc: 'Mine your first resource', check: true, alwaysShow: true },
-    { id: 2, title: 'Gathering', desc: 'Mine 10 resources', check: false, metric: 'stones' },
+    { id: 1, title: 'First Steps', desc: 'Mine your first resource', check: stonesMined >= 1, alwaysShow: true },
+    { id: 2, title: 'Gathering', desc: 'Mine 10 resources', check: stonesMined >= 10, metric: 'stones' },
     { id: 3, title: 'Automation', desc: 'Place a Miner', check: false, metric: 'miners' },
     { id: 4, title: 'Power Up', desc: 'Build a Coal Generator', check: false, metric: 'generators' },
     { id: 5, title: 'Processing', desc: 'Build a Smelter', check: false, metric: 'smelters' },

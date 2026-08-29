@@ -133,25 +133,25 @@ const App: React.FC = () => {
 
       switch (e.key.toLowerCase()) {
         case 'w': case 'arrowup':
-          if (!bt) { e.preventDefault(); engine.movePlayer(0, -1); }
+          if (!bt) { e.preventDefault(); engine.movePlayer(0, -1); setRenderTick(t => t + 1); }
           break;
         case 's': case 'arrowdown':
-          if (!bt) { e.preventDefault(); engine.movePlayer(0, 1); }
+          if (!bt) { e.preventDefault(); engine.movePlayer(0, 1); setRenderTick(t => t + 1); }
           break;
         case 'a': case 'arrowleft':
-          if (!bt) { e.preventDefault(); engine.movePlayer(-1, 0); }
+          if (!bt) { e.preventDefault(); engine.movePlayer(-1, 0); setRenderTick(t => t + 1); }
           break;
         case 'd': case 'arrowright':
-          if (!bt) { e.preventDefault(); engine.movePlayer(1, 0); }
+          if (!bt) { e.preventDefault(); engine.movePlayer(1, 0); setRenderTick(t => t + 1); }
           break;
         case 'e':
-          if (!bt) { engine.mineResource(); }
+          if (!bt) { engine.mineResource(); engine.mineTile(); setRenderTick(t => t + 1); }
           break;
         case 'r':
-          if (!bt) { engine.rotateBuilding(); }
+          if (!bt) { engine.rotateBuilding(); setRenderTick(t => t + 1); }
           break;
         case 'q':
-          if (!bt) { engine.removeBuilding(); }
+          if (!bt) { engine.removeBuilding(); setRenderTick(t => t + 1); }
           break;
         case ' ':
           e.preventDefault();
@@ -470,7 +470,7 @@ const App: React.FC = () => {
       )}
 
       {showHelp && <HelpPanel />}
-      {showObjectives && <ObjectivesPanel enginesCrafted={engineRef.current.player.stats.enginesCrafted} />}
+      {showObjectives && <ObjectivesPanel enginesCrafted={engineRef.current.player.stats.enginesCrafted} stonesMined={engineRef.current.player.stats.stonesMined} />}
     </div>
   );
 };

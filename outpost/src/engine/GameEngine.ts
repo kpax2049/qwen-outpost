@@ -495,7 +495,7 @@ export class GameEngine {
     if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) return false;
     const tile = this._state.save.map[ny][nx];
     if (tile.terrain === 'water' || tile.terrain === 'rock') return false;
-    if (tile.building) return false;
+    // Allow movement onto building tiles to interact with them (rotate/remove)
     p.x = nx;
     p.y = ny;
     return true;
