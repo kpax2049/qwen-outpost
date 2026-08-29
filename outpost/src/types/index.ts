@@ -127,6 +127,28 @@ export const DELTA: Record<DirectionValue, { x: number; y: number }> = {
   [Dir.Left]: { x: -1, y: 0 },
 };
 
+export const DIR_NAMES: Record<DirectionValue, string> = {
+  [Dir.Up]: 'Up',
+  [Dir.Right]: 'Right',
+  [Dir.Down]: 'Down',
+  [Dir.Left]: 'Left',
+};
+
+export const DIR_ARROWS: Record<DirectionValue, string> = {
+  [Dir.Up]: '\u25B2', // ▲
+  [Dir.Right]: '\u25B6', // ▶
+  [Dir.Down]: '\u25BC', // ▼
+  [Dir.Left]: '\u25C0', // ◀
+};
+
+export function oppositeDirection(dir: DirectionValue): DirectionValue {
+  return ((dir + 2) % 4) as DirectionValue;
+}
+
+export function directionVector(dir: DirectionValue): { x: number; y: number } {
+  return DELTA[dir];
+}
+
 // Tile on the world map
 export interface Tile {
   terrain: TerrainValue;
@@ -175,6 +197,12 @@ export interface Building {
   producesItem?: ItemType;
   consumesItems?: { type: ItemType; amount: number }[];
   outputDirection?: DirectionValue;
+  /** Coal consumed by this generator (observable fuel history). */
+  fuelBurned?: number;
+  /** True when this conveyor/machine is holding an item it cannot push forward. */
+  blocked?: boolean;
+  /** Human-readable reason a machine is not progressing. */
+  statusReason?: string;
 }
 
 export interface PlayerState {
@@ -267,7 +295,7 @@ export const BUILDING_DEFS: Record<BuildingTypeValue, BuildingDefinition> = {
     powerConsumed: 0,
     powerProduced: 50,
     maxInventory: 20,
-    maxProgress: 1,
+    maxProgress: 50,
     color: '#cc4400',
     shape: 'circle',
   },
@@ -292,7 +320,7 @@ export const BUILDING_DEFS: Record<BuildingTypeValue, BuildingDefinition> = {
     cost: [{ resource: 'stone', amount: 2 }],
     powerConsumed: 1,
     maxInventory: 1,
-    maxProgress: 20,
+    maxProgress: 12,
     color: '#444444',
     shape: 'arrow',
   },
@@ -389,4 +417,67 @@ export interface TooltipData {
   y: number;
   title: string;
   lines: string[];
+}
+
+// ==================== POWER SUMMARY ====================
+
+export interface PowerSummary {
+  produced: number;
+  consumed: number;
+  surplus: number;
+  enough: boolean;
+  generatorCount: number;
+  fueledGenerators: number;
+  consumerCount: number;
+}
+
+// ==================== CONVEYOR CONNECTION ====================
+
+export type ConnectionKind = 'straight' | 'turn' | 'blocked' | 'machine' | 'none' | 'headon';
+
+export interface ConveyorConnection {
+  kind: ConnectionKind;
+  label: string;
+  /** Direction the neighbor belt points (for turns). */
+  toDir?: DirectionValue;
+  /** Building type of the neighbor machine (for machine connections). */
+  machineType?: BuildingTypeValue;
+}
+
+// ==================== BUILDING INSPECTION ====================
+
+export interface BuildingInspection {
+  x: number;
+  y: number;
+  type: BuildingTypeValue;
+  name: string;
+  direction: DirectionValue;
+  directionLabel: string;
+  active: boolean;
+  status: string;
+  statusColor: 'ok' | 'warn' | 'bad';
+  blocked: boolean;
+  inventory: Item[];
+  usedSlots: number;
+  maxInventory: number;
+  progress: number;
+  maxProgress: number;
+  progressPct: number;
+  powerConsumed: number;
+  powerProduced: number;
+  producesItem?: string;
+  consumesItems?: { type: ItemType; amount: number }[];
+  /** Miner only: resource deposit on the tile. */
+  resourceOnTile?: { type: string; amount: number };
+  /** Generator only: coal left + fuel bar percentage (ticks until current coal runs out). */
+  fuelCoal?: number;
+  fuelPct?: number;
+  fuelBurned?: number;
+  /** Conveyor only. */
+  connection?: {
+    incoming: ConveyorConnection | null;
+    outgoing: ConveyorConnection | null;
+  };
+  beltItem?: string | null;
+  isPlayerStanding: boolean;
 }

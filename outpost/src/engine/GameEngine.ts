@@ -8,14 +8,21 @@ import {
   type BuildingTypeValue,
   type DirectionValue,
   type ResourceTypeValue,
+  type ItemType,
+  type PowerSummary,
+  type BuildingInspection,
+  type ConveyorConnection,
   BuildingTypeMap,
   Dir,
   BUILDING_DEFS,
   MAP_SIZE,
   RESOURCE_NAMES,
+  BUILDING_NAMES,
+  ITEM_DISPLAY_NAMES,
   DELTA,
+  oppositeDirection,
+  DIR_NAMES,
 } from '../types';
-import type { ItemType } from '../types';
 
 // ==================== SEEDED PRNG ====================
 
@@ -206,7 +213,7 @@ function createBuilding(type: BuildingTypeValue): Building {
     active: false,
     powerConsumed: def.powerConsumed,
     powerProduced: def.powerProduced,
-    inventory: [{ type: 'stone', amount: 1 }],
+    inventory: type === 'storage' || type === 'chest' ? [{ type: 'stone', amount: 1 }] : [],
     maxInventory: def.maxInventory,
     progress: 0,
     maxProgress: def.maxProgress,
@@ -259,41 +266,102 @@ export class GameEngine {
     if (this._state.config.paused) return;
     this._state.save.tick++;
     this._state.save.gameTime++;
-    this.updatePower();
+    this.updateGenerators();
+    this.updatePowerGrid();
     this.updateBuildings();
     this.updateConveyors();
+    this.updateStatusReasons();
     this.checkWinCondition();
   }
 
-  private updatePower(): void {
-    const p = this._state.save.player;
-    const range = 30;
-    let totalProduced = 0;
-    let totalConsumed = 0;
-
-    for (let dy = -range; dy <= range; dy++) {
-      for (let dx = -range; dx <= range; dx++) {
-        const nx = p.x + dx;
-        const ny = p.y + dy;
-        if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
-        const tile = this._state.save.map[ny][nx];
-        if (tile.building) {
-          if (tile.building.powerProduced) totalProduced += tile.building.powerProduced;
-          if (tile.building.powerConsumed) totalConsumed += tile.building.powerConsumed;
+  /**
+   * Burn one unit of coal per maxProgress ticks while the generator has fuel.
+   * A generator is "active" (producing power) only while it has coal.
+   */
+  private updateGenerators(): void {
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const tile = this._state.save.map[y][x];
+        if (!tile.building || tile.building.type !== BuildingTypeMap.generator) continue;
+        const b = tile.building;
+        const coal = this.getItemInInventory(b, 'coal');
+        if (coal && coal.amount > 0) {
+          b.active = true;
+          b.progress++;
+          if (b.progress >= b.maxProgress) {
+            b.progress = 0;
+            this.removeItemFromInventory(b, 'coal', 1);
+            b.fuelBurned = (b.fuelBurned ?? 0) + 1;
+          }
+        } else {
+          b.active = false;
+          b.progress = 0;
         }
       }
     }
+  }
+
+  private _power: PowerSummary = { produced: 0, consumed: 0, surplus: 0, enough: false, generatorCount: 0, fueledGenerators: 0, consumerCount: 0 };
+
+  /**
+   * Global power grid. Produced power = active (fueled) generators only.
+   * Consumers are powered when production covers consumption.
+   */
+  private updatePowerGrid(): void {
+    let totalProduced = 0;
+    let totalConsumed = 0;
+    let generatorCount = 0;
+    let fueledGenerators = 0;
+    let consumerCount = 0;
 
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         const tile = this._state.save.map[y][x];
-        if (tile.building) {
-          tile.building.active = tile.building.powerProduced
-            ? true
-            : totalProduced >= totalConsumed;
+        if (!tile.building) continue;
+        const b = tile.building;
+        if (b.powerProduced) {
+          generatorCount++;
+          if (b.active) {
+            totalProduced += b.powerProduced;
+            fueledGenerators++;
+          }
+        } else if (b.powerConsumed > 0) {
+          totalConsumed += b.powerConsumed;
+          consumerCount++;
         }
       }
     }
+
+    const enough = totalProduced >= totalConsumed || (generatorCount === 0 && consumerCount === 0);
+    this._power = {
+      produced: totalProduced,
+      consumed: totalConsumed,
+      surplus: totalProduced - totalConsumed,
+      enough,
+      generatorCount,
+      fueledGenerators,
+      consumerCount,
+    };
+
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const tile = this._state.save.map[y][x];
+        if (!tile.building) continue;
+        const b = tile.building;
+        if (b.powerProduced) {
+          // Generators: leave active as set by updateGenerators (fuel-driven)
+        } else if (b.powerConsumed > 0) {
+          b.active = enough;
+        } else {
+          b.active = true; // passive storage/chest
+        }
+      }
+    }
+  }
+
+  getPowerSummary(): PowerSummary {
+    this.updatePowerGrid();
+    return { ...this._power };
   }
 
   private updateBuildings(): void {
@@ -309,7 +377,6 @@ export class GameEngine {
           case BuildingTypeMap.smelter:
           case BuildingTypeMap.steel_smelter: this.updateSmelter(x, y, tile); break;
           case BuildingTypeMap.assembler: this.updateAssembler(x, y, tile); break;
-          case BuildingTypeMap.generator: this.updateGenerator(x, y, tile); break;
         }
       }
     }
@@ -403,17 +470,6 @@ export class GameEngine {
     return null;
   }
 
-  private updateGenerator(_x: number, _y: number, tile: Tile): void {
-    const b = tile.building!;
-    const coal = this.getItemInInventory(b, 'coal');
-    if (coal && coal.amount > 0) {
-      b.active = true;
-      this.removeItemFromInventory(b, 'coal', 1);
-    } else {
-      b.active = false;
-    }
-  }
-
   private updateConveyors(): void {
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
@@ -422,69 +478,155 @@ export class GameEngine {
 
         const b = tile.building;
         const invItem = b.inventory[0];
-        if (invItem && invItem.amount > 0) {
-          b.progress++;
-          if (b.progress >= b.maxProgress) {
-            b.progress = 0;
-            const dir = b.direction;
-            const nextX = x + (dir === 1 ? 1 : dir === 3 ? -1 : 0);
-            const nextY = y + (dir === 0 ? -1 : dir === 2 ? 1 : 0);
 
-            if (nextX >= 0 && nextX < MAP_SIZE && nextY >= 0 && nextY < MAP_SIZE) {
-              const nextTile = this._state.save.map[nextY][nextX];
-              if (nextTile.building && nextTile.building.type !== BuildingTypeMap.conveyor) {
-                if (this.canAddToInventory(nextTile.building, invItem.type)) {
-                  this.addToInventory(nextTile.building, { type: invItem.type, amount: 1 });
-                  invItem.amount--;
-                }
-              }
-            }
-          }
+        // Compute blocked state while holding an item
+        if (invItem && invItem.amount > 0) {
+          const handoff = this.conveyorCanOutput(x, y, b, invItem.type);
+          b.blocked = !handoff.ok;
+          b.statusReason = handoff.ok ? undefined : handoff.reason;
+        } else {
+          b.blocked = false;
+          b.statusReason = undefined;
+        }
+
+        if (!invItem || invItem.amount <= 0) {
+          b.progress = 0;
+          continue;
+        }
+        if (!b.active) {
+          b.progress = 0;
+          continue;
+        }
+        if (b.blocked) {
+          continue; // belt is stalled; do not advance
+        }
+
+        b.progress++;
+        if (b.progress >= b.maxProgress) {
+          b.progress = 0;
+          this.transferConveyorItem(x, y, b, invItem);
         }
       }
     }
+  }
+
+  /**
+   * Can the item on this conveyor move to the tile in front of it next tick?
+   */
+  private conveyorCanOutput(x: number, y: number, b: Building, itemType: string): { ok: boolean; reason?: string } {
+    const dir = b.direction;
+    const nx = x + DELTA[dir].x;
+    const ny = y + DELTA[dir].y;
+    if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) {
+      return { ok: false, reason: 'Belt ends at the map edge' };
+    }
+    const nextTile = this._state.save.map[ny][nx];
+    if (!nextTile.building) {
+      return { ok: false, reason: 'Nothing ahead — belt ends' };
+    }
+    if (nextTile.building.type === BuildingTypeMap.conveyor) {
+      const nextDir = nextTile.building.direction;
+      if (nextDir === oppositeDirection(dir)) {
+        return { ok: false, reason: 'Next belt points back — head-on conflict' };
+      }
+      if (this.canAddToInventory(nextTile.building, itemType)) {
+        return { ok: true };
+      }
+      return { ok: false, reason: 'Next belt already full' };
+    }
+    if (this.canBuildingAccept(nextTile.building, itemType)) {
+      return { ok: true };
+    }
+    return { ok: false, reason: `${BUILDING_NAMES[nextTile.building.type] ?? nextTile.building.type} will not accept items here` };
+  }
+
+  private transferConveyorItem(x: number, y: number, b: Building, invItem: Item): void {
+    const dir = b.direction;
+    const nx = x + DELTA[dir].x;
+    const ny = y + DELTA[dir].y;
+    if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) return;
+
+    const nextTile = this._state.save.map[ny][nx];
+    if (!nextTile.building) return;
+
+    if (nextTile.building.type === BuildingTypeMap.conveyor) {
+      const nextDir = nextTile.building.direction;
+      if (nextDir === oppositeDirection(dir)) return; // head-on safe-guard
+      if (this.canAddToInventory(nextTile.building, invItem.type)) {
+        this.addToInventory(nextTile.building, { type: invItem.type, amount: 1 });
+        this.consumeOne(b, invItem);
+      }
+      return;
+    }
+
+    if (this.canBuildingAccept(nextTile.building, invItem.type)) {
+      this.addToInventory(nextTile.building, { type: invItem.type, amount: 1 });
+      this.consumeOne(b, invItem);
+    }
+  }
+
+  private consumeOne(building: Building, item: Item): void {
+    item.amount--;
+    if (item.amount <= 0) {
+      building.inventory = building.inventory.filter(i => i !== item && i.amount > 0);
+    }
+  }
+
+  /**
+   * Whether a building can receive a given item type (has room and accepts it).
+   */
+  private canBuildingAccept(building: Building, itemType: string): boolean {
+    if (!this.canAddToInventory(building, itemType)) return false;
+    switch (building.type) {
+      case BuildingTypeMap.storage:
+      case BuildingTypeMap.chest:
+        return true;
+      case BuildingTypeMap.generator:
+        return itemType === 'coal';
+      case BuildingTypeMap.smelter:
+      case BuildingTypeMap.steel_smelter:
+        return !!building.consumesItems?.some(c => c.type === itemType);
+      case BuildingTypeMap.assembler:
+        return ['copper', 'iron_ingot', 'copper_wire', 'steel_plate', 'gear'].includes(itemType);
+      case BuildingTypeMap.miner:
+      case BuildingTypeMap.conveyor:
+        return false;
+    }
+    return false;
   }
 
   private tryOutputToAdjacent(x: number, y: number, tile: Tile): void {
     const b = tile.building!;
     const dirs: DirectionValue[] = b.outputDirection ? [b.outputDirection] : [1, 2, 3, 0];
 
+    // Prefer pushing the produced item out, then anything else stored.
+    const prefer = b.producesItem ? this.getItemInInventory(b, b.producesItem) : undefined;
+    const invItem = (prefer && prefer.amount > 0 ? prefer : this.getFirstItem(b)) ?? undefined;
+    if (!invItem || invItem.amount <= 0) return;
+
     for (const dir of dirs) {
-      const nx = x + (dir === 1 ? 1 : dir === 3 ? -1 : 0);
-      const ny = y + (dir === 0 ? -1 : dir === 2 ? 1 : 0);
+      const nx = x + DELTA[dir].x;
+      const ny = y + DELTA[dir].y;
       if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
 
       const nextTile = this._state.save.map[ny][nx];
-      const invItem = this.getFirstItem(b);
-      if (!invItem || invItem.amount <= 0) return;
+      if (!nextTile.building) continue;
 
-      if (nextTile.building && nextTile.building.type === BuildingTypeMap.conveyor) {
+      if (nextTile.building.type === BuildingTypeMap.conveyor) {
+        // Don't push into a conveyor facing back at us (would bounce).
+        if (nextTile.building.direction === oppositeDirection(dir)) continue;
         if (this.canAddToInventory(nextTile.building, invItem.type)) {
           this.addToInventory(nextTile.building, { type: invItem.type, amount: 1 });
-          invItem.amount--;
+          this.consumeOne(b, invItem);
           return;
         }
         continue;
       }
 
-      if (nextTile.building && (nextTile.building.type === BuildingTypeMap.storage || nextTile.building.type === BuildingTypeMap.chest)) {
-        if (this.canAddToInventory(nextTile.building, invItem.type)) {
-          this.addToInventory(nextTile.building, { type: invItem.type, amount: 1 });
-          invItem.amount--;
-          return;
-        }
-        continue;
-      }
-
-      if (nextTile.building && (nextTile.building.type === BuildingTypeMap.smelter || nextTile.building.type === BuildingTypeMap.steel_smelter || nextTile.building.type === BuildingTypeMap.assembler)) {
-        if (nextTile.building.consumesItems?.some(c => c.type === invItem.type)) {
-          if (this.canAddToInventory(nextTile.building, invItem.type)) {
-            this.addToInventory(nextTile.building, { type: invItem.type, amount: 1 });
-            invItem.amount--;
-            return;
-          }
-        }
-        continue;
+      if (this.canBuildingAccept(nextTile.building, invItem.type)) {
+        this.addToInventory(nextTile.building, { type: invItem.type, amount: 1 });
+        this.consumeOne(b, invItem);
+        return;
       }
     }
   }
@@ -629,6 +771,11 @@ export class GameEngine {
     }
 
     const building = createBuilding(buildingType);
+    // Apply the currently selected build direction (conveyor route preview).
+    const buildDir = this._state.save.player._buildDirection;
+    if (buildDir !== undefined) {
+      building.direction = buildDir;
+    }
     tile.building = building;
     
     // Move player off the tile if they were standing on it
@@ -662,6 +809,10 @@ export class GameEngine {
     }
 
     const building = createBuilding(buildingType);
+    const buildDir = this._state.save.player._buildDirection;
+    if (buildDir !== undefined) {
+      building.direction = buildDir;
+    }
     tile.building = building;
     return true;
   }
@@ -701,7 +852,7 @@ export class GameEngine {
           const invItem = this.getFirstItem(tile.building);
           if (invItem && invItem.amount > 0) {
             this.addToPlayerInventory({ type: invItem.type, amount: 1 });
-            invItem.amount--;
+            this.consumeOne(tile.building, invItem);
             return true;
           }
         }
@@ -712,6 +863,306 @@ export class GameEngine {
 
   setBuildDirection(direction: DirectionValue): void {
     this._state.save.player._buildDirection = direction;
+  }
+
+  getBuildDirection(): DirectionValue {
+    return this._state.save.player._buildDirection ?? Dir.Down;
+  }
+
+  // ==================== BUILDING OBSERVABILITY ====================
+
+  /**
+   * Whether a building can be placed at (tx,ty) given terrain/building occupancy.
+   * Does not check cost or player proximity.
+   */
+  canPlaceAt(buildingType: BuildingTypeValue, tx: number, ty: number): { ok: boolean; reason?: string } {
+    if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) {
+      return { ok: false, reason: 'Outside the map' };
+    }
+    const tile = this._state.save.map[ty][tx];
+    const p = this._state.save.player;
+    const isPlayerTile = p.x === tx && p.y === ty;
+    if (tile.building) return { ok: false, reason: 'Tile already has a building' };
+    if (!isPlayerTile && (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'forest')) {
+      return { ok: false, reason: 'Cannot build on terrain' };
+    }
+    if (!this.canAfford(BUILDING_DEFS[buildingType].cost)) {
+      return { ok: false, reason: 'Not enough resources' };
+    }
+    return { ok: true };
+  }
+
+  /**
+   * Connection info for the tile in front of a conveyor (following its direction).
+   */
+  private getOutConnection(x: number, y: number, b: Building): ConveyorConnection {
+    const dir = b.direction;
+    const nx = x + DELTA[dir].x;
+    const ny = y + DELTA[dir].y;
+    if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) {
+      return { kind: 'none', label: 'Open end (map edge)' };
+    }
+    const nextTile = this._state.save.map[ny][nx];
+    if (!nextTile.building) {
+      return { kind: 'none', label: 'Open end' };
+    }
+    if (nextTile.building.type === BuildingTypeMap.conveyor) {
+      const nd = nextTile.building.direction;
+      if (nd === dir) return { kind: 'straight', label: 'Straight on' };
+      if (nd === oppositeDirection(dir)) return { kind: 'headon', label: 'Points back at this belt — blocked' };
+      return {
+        kind: 'turn',
+        label: `Turns ${DIR_NAMES[nd].toLowerCase()}`,
+        toDir: nd,
+      };
+    }
+    return {
+      kind: 'machine',
+      label: BUILDING_NAMES[nextTile.building.type] ?? nextTile.building.type,
+      machineType: nextTile.building.type,
+    };
+  }
+
+  /**
+   * Connection info for what feeds into this conveyor:
+   *  - a belt behind pointing the same way (straight through)
+   *  - a belt on the left/right pointing into this tile (turn / elbow)
+   *  - a machine anywhere adjacent that can push items in
+   */
+  private getInConnection(x: number, y: number, b: Building): ConveyorConnection | null {
+    const dir = b.direction;
+    const back = oppositeDirection(dir);
+    const bx = x + DELTA[back].x;
+    const by = y + DELTA[back].y;
+
+    // Same-direction belt directly behind (straight feed)
+    if (bx >= 0 && bx < MAP_SIZE && by >= 0 && by < MAP_SIZE) {
+      const tile = this._state.save.map[by][bx];
+      if (tile.building?.type === BuildingTypeMap.conveyor) {
+        const bd = tile.building.direction;
+        if (bd === dir) return { kind: 'straight', label: 'Straight feed from behind' };
+        if (bd === back) return { kind: 'headon', label: 'Belt behind points at this belt' };
+      }
+    }
+
+    // A perpendicular belt to the left/right whose forward tile is this one = elbow entry
+    for (const side of [Dir.Left, Dir.Right]) {
+      const sx = x + DELTA[side].x;
+      const sy = y + DELTA[side].y;
+      if (sx < 0 || sx >= MAP_SIZE || sy < 0 || sy >= MAP_SIZE) continue;
+      const tile = this._state.save.map[sy][sx];
+      if (tile.building?.type !== BuildingTypeMap.conveyor) continue;
+      const sd = tile.building.direction;
+      const fx = sx + DELTA[sd].x;
+      const fy = sy + DELTA[sd].y;
+      if (fx === x && fy === y) {
+        return { kind: 'turn', label: `Enters via a turn from ${DIR_NAMES[sd].toLowerCase()}`, toDir: sd };
+      }
+    }
+
+    // Any adjacent machine can feed into this belt
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
+        const tile = this._state.save.map[ny][nx];
+        if (tile.building && tile.building.type !== BuildingTypeMap.conveyor) {
+          return { kind: 'machine', label: `Feeds from nearby ${BUILDING_NAMES[tile.building.type] ?? 'building'}`, machineType: tile.building.type };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Per-building status reason used by the inspection panel (and stored each tick).
+   */
+  private computeBuildingStatus(x: number, y: number, b: Building): { status: string; statusColor: 'ok' | 'warn' | 'bad' } {
+    const total = b.inventory.reduce((s, i) => s + i.amount, 0);
+
+    switch (b.type) {
+      case BuildingTypeMap.generator: {
+        const coal = this.getItemInInventory(b, 'coal');
+        if (!coal || coal.amount <= 0) return { status: 'No Fuel', statusColor: 'bad' };
+        return { status: `Producing ${b.powerProduced ?? 0} power`, statusColor: 'ok' };
+      }
+      case BuildingTypeMap.miner: {
+        const tile = this._state.save.map[y][x];
+        if (!b.active) return { status: 'No Power', statusColor: 'bad' };
+        if (!tile.resource || tile.resource.amount <= 0) return { status: 'No Resource Below', statusColor: 'warn' };
+        if (total >= b.maxInventory) return { status: 'Output Blocked (inventory full)', statusColor: 'bad' };
+        return { status: 'Mining', statusColor: 'ok' };
+      }
+      case BuildingTypeMap.conveyor: {
+        if (!b.active) return { status: 'No Power', statusColor: 'bad' };
+        const invItem = b.inventory[0];
+        if (!invItem || invItem.amount <= 0) return { status: 'Idle — waiting for item', statusColor: 'warn' };
+        if (b.blocked) return { status: b.statusReason ?? 'Blocked', statusColor: 'bad' };
+        return { status: 'Transporting', statusColor: 'ok' };
+      }
+      case BuildingTypeMap.smelter:
+      case BuildingTypeMap.steel_smelter: {
+        if (!b.active) return { status: 'No Power', statusColor: 'bad' };
+        if (!b.consumesItems) return { status: 'Idle', statusColor: 'warn' };
+        const missing = b.consumesItems.filter(c => {
+          const inv = this.getItemInInventory(b, c.type);
+          return !inv || inv.amount < c.amount;
+        });
+        if (missing.length > 0) {
+          const names = missing.map(c => `${c.amount}x ${ITEM_DISPLAY_NAMES[c.type] ?? c.type}`);
+          return { status: `Waiting for Input (${names.join(', ')})`, statusColor: 'warn' };
+        }
+        if (b.producesItem && !this.canAddToInventory(b, b.producesItem)) {
+          return { status: 'Output Blocked (full)', statusColor: 'bad' };
+        }
+        return { status: 'Smelting', statusColor: 'ok' };
+      }
+      case BuildingTypeMap.assembler: {
+        if (!b.active) return { status: 'No Power', statusColor: 'bad' };
+        // Determine what the next craftable recipe needs.
+        const recipes: { inputs: { type: string; amount: number }[]; output: string }[] = [
+          { inputs: [{ type: 'copper', amount: 1 }], output: 'copper_wire' },
+          { inputs: [{ type: 'iron_ingot', amount: 2 }, { type: 'copper_wire', amount: 2 }], output: 'gear' },
+          { inputs: [{ type: 'steel_plate', amount: 1 }, { type: 'gear', amount: 1 }, { type: 'copper_wire', amount: 2 }], output: 'engine' },
+        ];
+        const ready = recipes.find(r => {
+          const has = r.inputs.every(c => {
+            const inv = this.getItemInInventory(b, c.type);
+            return inv && inv.amount >= c.amount;
+          });
+          return has && this.canAddToInventory(b, r.output);
+        });
+        if (!ready) {
+          const needed = recipes.filter(r => r.inputs.every(c => {
+            const inv = this.getItemInInventory(b, c.type);
+            return inv && inv.amount >= c.amount;
+          }));
+          if (needed.length > 0) {
+            return { status: 'Output Blocked (output full)', statusColor: 'bad' };
+          }
+          const want = recipes[0].inputs.map(c => `${c.amount}x ${ITEM_DISPLAY_NAMES[c.type as ItemType] ?? c.type}`).join(', ');
+          return { status: `Waiting for Input (e.g. ${want})`, statusColor: 'warn' };
+        }
+        return { status: 'Crafting', statusColor: 'ok' };
+      }
+      case BuildingTypeMap.storage:
+      case BuildingTypeMap.chest:
+        return { status: total > 0 ? `${total} / ${b.maxInventory} items stored` : 'Empty', statusColor: 'ok' };
+    }
+    return { status: 'Idle', statusColor: 'warn' };
+  }
+
+  /** Refresh statusReason/blocked on every building each tick (kept fresh for UI). */
+  private updateStatusReasons(): void {
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const tile = this._state.save.map[y][x];
+        if (!tile.building) continue;
+        const b = tile.building;
+        const { status } = this.computeBuildingStatus(x, y, b);
+        b.statusReason = status;
+        if (b.type === BuildingTypeMap.conveyor && b.inventory[0]) {
+          b.blocked = b.blocked ?? false;
+        }
+      }
+    }
+  }
+
+  getConnections(x: number, y: number): { incoming: ConveyorConnection | null; outgoing: ConveyorConnection } | null {
+    const tile = this._state.save.map[y]?.[x];
+    if (!tile?.building || tile.building.type !== BuildingTypeMap.conveyor) return null;
+    return {
+      incoming: this.getInConnection(x, y, tile.building),
+      outgoing: this.getOutConnection(x, y, tile.building),
+    };
+  }
+
+  inspectBuilding(x: number, y: number): BuildingInspection | null {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return null;
+    const tile = this._state.save.map[y][x];
+    if (!tile.building) return null;
+    const b = tile.building;
+    const def = BUILDING_DEFS[b.type];
+    const { status, statusColor } = this.computeBuildingStatus(x, y, b);
+    const totalItems = b.inventory.reduce((s, i) => s + i.amount, 0);
+    const p = this._state.save.player;
+
+    const data: BuildingInspection = {
+      x,
+      y,
+      type: b.type,
+      name: def.name,
+      direction: b.direction,
+      directionLabel: `${DIR_NAMES[b.direction]} ${['\u25B2', '\u25B6', '\u25BC', '\u25C0'][b.direction]}`,
+      active: b.active,
+      status,
+      statusColor,
+      blocked: !!b.blocked,
+      inventory: b.inventory.map(i => ({ ...i })),
+      usedSlots: totalItems,
+      maxInventory: b.maxInventory,
+      progress: b.progress,
+      maxProgress: b.maxProgress,
+      progressPct: b.maxProgress > 1 ? Math.min(100, Math.floor((b.progress / b.maxProgress) * 100)) : 0,
+      powerConsumed: b.powerConsumed,
+      powerProduced: b.powerProduced ?? 0,
+      producesItem: b.producesItem ? RESOURCE_NAMES[b.producesItem as ResourceTypeValue] ?? b.producesItem : undefined,
+      consumesItems: b.consumesItems?.map(c => ({ ...c })),
+      isPlayerStanding: p.x === x && p.y === y,
+    };
+
+    if (b.type === BuildingTypeMap.miner) {
+      if (tile.resource) {
+        data.resourceOnTile = { type: RESOURCE_NAMES[tile.resource.type] ?? tile.resource.type, amount: tile.resource.amount };
+      }
+    }
+
+    if (b.type === BuildingTypeMap.generator) {
+      const coal = this.getItemInInventory(b, 'coal');
+      data.fuelCoal = coal?.amount ?? 0;
+      data.fuelPct = b.maxProgress > 1 ? Math.min(100, Math.floor(((b.maxProgress - b.progress) / b.maxProgress) * 100)) : 0;
+      data.fuelBurned = b.fuelBurned ?? 0;
+    }
+
+    if (b.type === BuildingTypeMap.conveyor) {
+      data.connection = {
+        incoming: this.getInConnection(x, y, b),
+        outgoing: this.getOutConnection(x, y, b),
+      };
+      data.beltItem = b.inventory[0]?.amount > 0 ? (ITEM_DISPLAY_NAMES[b.inventory[0].type as ItemType] ?? b.inventory[0].type) : null;
+    }
+
+    return data;
+  }
+
+  /**
+   * Deposit one item of `type` from the player's inventory into a building they can reach (inspected).
+   */
+  depositItemToBuilding(x: number, y: number, type: string): boolean {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
+    const tile = this._state.save.map[y][x];
+    if (!tile.building) return false;
+    const p = this._state.save.player;
+    const nearby = Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1;
+    if (!nearby) return false;
+
+    if (!this.canBuildingAccept(tile.building, type)) return false;
+    if (!this.canAddToInventory(tile.building, type)) return false;
+    const playerItem = this.getItemInPlayerInventory(type);
+    if (!playerItem || playerItem.amount <= 0) return false;
+
+    this.addToInventory(tile.building, { type: type as ItemType, amount: 1 });
+    this.removeItemFromPlayerInventory(type, 1);
+    return true;
+  }
+
+  buildingAcceptsItem(x: number, y: number, type: string): boolean {
+    const tile = x >= 0 && x < MAP_SIZE && y >= 0 && y < MAP_SIZE ? this._state.save.map[y][x] : undefined;
+    if (!tile?.building) return false;
+    return this.canBuildingAccept(tile.building, type) && this.canAddToInventory(tile.building, type);
   }
 
   // ==================== INVENTORY HELPERS ====================

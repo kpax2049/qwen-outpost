@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../engine/GameEngine';
 import { BUILDING_DEFS, MAP_SIZE, ITEM_DISPLAY_NAMES, Dir } from '../types';
-import type { BuildingTypeValue } from '../types';
+import type { BuildingTypeValue, DirectionValue } from '../types';
 
 // Helper: give player resources to build anything
 function fundPlayer(engine: GameEngine) {
@@ -232,26 +232,85 @@ describe('GameEngine - Conveyor Belts', () => {
     const engine = new GameEngine(42);
     fundPlayer(engine);
     engine.placeBuilding('conveyor');
-    expect(engine.getTile(60, 60)!.building!.maxProgress).toBe(20);
+    expect(engine.getTile(60, 60)!.building!.maxProgress).toBe(12);
   });
 
-  it('conveyor transfers item when active', () => {
+  it('conveyor transfers item when powered and active', () => {
     const engine = new GameEngine(42);
     fundPlayer(engine);
+    // A fueled generator provides power for the belt (grid is global).
+    engine.placeBuilding('generator');
+    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 50 });
+    engine.movePlayer(0, 1);
     engine.placeBuilding('conveyor');
     engine.movePlayer(0, 1);
     engine.placeBuilding('storage');
-    engine.movePlayer(0, -1);
 
-    const conveyor = engine.getTile(60, 60)!.building!;
+    const conveyor = engine.getTile(60, 61)!.building!;
     conveyor.inventory = [{ type: 'stone', amount: 3 }];
-    conveyor.active = true;
 
     for (let i = 0; i < 25; i++) engine.tick();
 
     const remaining = conveyor.inventory.find(i => i.type === 'stone');
-    // Item should have moved (either 0 or fewer than 3)
+    // After 25 ticks at maxProgress 12 the belt should have pushed at least one item off.
     if (remaining) expect(remaining.amount).toBeLessThan(3);
+
+    // Storage should have received the pushed stone.
+    const storage = engine.getTile(60, 62)!.building!;
+    const stored = storage.inventory.find(i => i.type === 'stone');
+    expect(stored).toBeDefined();
+    if (stored) expect(stored.amount).toBeGreaterThan(1); // starter stone + delivered stone
+  });
+
+  it('conveyor holds an item when the belt ahead points back (head-on block)', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('generator');
+    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const placeBelt = (x: number, y: number, direction: DirectionValue) => {
+      engine.map[y][x].terrain = 'grass';
+      engine.map[y][x].building = {
+        type: 'conveyor', direction, active: false, powerConsumed: 1,
+        powerProduced: undefined, inventory: [], maxInventory: 1,
+        progress: 0, maxProgress: 12, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
+      };
+    };
+    placeBelt(60, 61, Dir.Down); // faces Down into...
+    placeBelt(60, 62, Dir.Up); // faces Up (back at the first belt) — head-on
+    engine.map[61][60].building!.inventory = [{ type: 'stone', amount: 1 }];
+    engine.player.x = 60; engine.player.y = 63;
+
+    for (let i = 0; i < 40; i++) engine.tick();
+
+    // Item must NOT transfer into the head-on belt.
+    expect(engine.map[61][60].building!.inventory[0]?.amount).toBe(1);
+    expect(engine.map[62][60].building!.inventory.length).toBe(0);
+    expect(engine.map[61][60].building!.blocked).toBe(true);
+  });
+
+  it('conveyor items can turn a 90-degree corner', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('generator');
+    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const placeBelt = (x: number, y: number, direction: DirectionValue) => {
+      engine.map[y][x].terrain = 'grass';
+      engine.map[y][x].building = {
+        type: 'conveyor', direction, active: false, powerConsumed: 1,
+        powerProduced: undefined, inventory: [], maxInventory: 1,
+        progress: 0, maxProgress: 12, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
+      };
+    };
+    // Belt A points Right into belt B pointing Down — a corner.
+    placeBelt(60, 61, Dir.Right);
+    placeBelt(61, 61, Dir.Down);
+    engine.map[61][60].building!.inventory = [{ type: 'stone', amount: 1 }];
+
+    for (let i = 0; i < 12; i++) engine.tick();
+    expect(engine.map[61][60].building!.inventory.length).toBe(0);
+    expect(engine.map[61][61].building!.inventory[0]?.type).toBe('stone');
   });
 });
 
@@ -641,5 +700,149 @@ describe('GameEngine - Harvesting Model', () => {
     engine.placeBuilding('conveyor');
     expect(engine.countBuildings('conveyor')).toBe(1);
     expect(engine.countBuildings('miner')).toBe(0);
+  });
+});
+
+describe('GameEngine - Power Grid & Observability', () => {
+  it('only counts fueled generators as producing power', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('generator');
+
+    const empty = engine.getPowerSummary();
+    expect(empty.generatorCount).toBe(1);
+    expect(empty.fueledGenerators).toBe(0);
+    expect(empty.produced).toBe(0);
+
+    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 10 });
+    engine.tick();
+    const fueled = engine.getPowerSummary();
+    expect(fueled.fueledGenerators).toBe(1);
+    expect(fueled.produced).toBe(50);
+    expect(fueled.enough).toBe(true);
+  });
+
+  it('burns one coal per maxProgress ticks and tracks fuelBurned', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('generator');
+    const gen = engine.getTile(60, 60)!.building!;
+    gen.inventory.push({ type: 'coal', amount: 10 });
+    for (let i = 0; i < 60; i++) engine.tick();
+    const coal = gen.inventory.find(i => i.type === 'coal');
+    expect(coal).toBeDefined();
+    if (coal) expect(coal.amount).toBe(9);
+    expect(gen.fuelBurned).toBe(1);
+  });
+
+  it('deposits coal from the player into a nearby generator', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuildingAt('generator', 60, 61);
+    expect(engine.buildingAcceptsItem(60, 61, 'coal')).toBe(true);
+    expect(engine.buildingAcceptsItem(60, 61, 'stone')).toBe(false);
+    expect(engine.depositItemToBuilding(60, 61, 'coal')).toBe(true);
+    const coal = engine.getTile(60, 61)!.building!.inventory.find(i => i.type === 'coal');
+    expect(coal?.amount).toBe(1);
+    expect(engine.player.inventory.find(i => i.type === 'coal')!.amount).toBe(49);
+  });
+
+  it('inspects a building with status, inventory and connections', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.setBuildDirection(Dir.Right);
+    engine.placeBuilding('conveyor');
+    engine.setBuildDirection(Dir.Down);
+    engine.placeBuildingAt('conveyor', 61, 60);
+    engine.placeBuildingAt('conveyor', 61, 61);
+
+    const info = engine.inspectBuilding(60, 60)!;
+    expect(info.type).toBe('conveyor');
+    expect(info.name).toBe('Conveyor Belt');
+    expect(info.directionLabel).toContain('▶');
+    expect(info.blocked).toBe(false);
+    expect(info.maxProgress).toBe(12);
+    expect(info.connection!.outgoing!.kind).toBe('turn');
+    expect(info.connection!.incoming).toBeNull();
+    expect(engine.getConnections(61, 60)!.incoming!.kind).toBe('turn');
+  });
+
+  it('inspects a generator showing fuel state', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuildingAt('generator', 60, 61);
+    engine.depositItemToBuilding(60, 61, 'coal');
+    engine.tick();
+
+    const info = engine.inspectBuilding(60, 61)!;
+    expect(info.type).toBe('generator');
+    expect(info.fuelCoal).toBe(1);
+    expect(info.status).toContain('Producing');
+    expect(info.active).toBe(true);
+  });
+
+  it('applies the selected build direction when placing conveyors', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    expect(engine.getBuildDirection()).toBe(Dir.Down);
+
+    engine.setBuildDirection(Dir.Right);
+    expect(engine.getBuildDirection()).toBe(Dir.Right);
+    engine.placeBuilding('conveyor');
+    expect(engine.getTile(60, 60)!.building!.direction).toBe(Dir.Right);
+
+    engine.setBuildDirection(Dir.Up);
+    engine.placeBuildingAt('conveyor', 60, 61);
+    expect(engine.getTile(60, 61)!.building!.direction).toBe(Dir.Up);
+  });
+});
+
+describe('GameEngine - Coal Chain (miner -> belts -> generator)', () => {
+  it('carries mined coal around a 90-degree turn into the generator and burns it', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    // Deterministic terrain/resource for every tile the build touches.
+    const setTile = (x: number, y: number) => {
+      engine.map[y][x].terrain = 'grass';
+    };
+    setTile(60, 59); setTile(61, 59); setTile(62, 59); setTile(62, 60); setTile(62, 61);
+    engine.map[59][60].resource = { type: 'coal', amount: 20 };
+
+    // Miner at (60,59) pushes East; belt turns South at (62,59), runs to a generator further south.
+    engine.setBuildDirection(Dir.Right);
+    engine.placeBuildingAt('miner', 60, 59);
+    engine.placeBuildingAt('conveyor', 61, 59);
+    engine.setBuildDirection(Dir.Down);
+    engine.placeBuildingAt('conveyor', 62, 59);
+    engine.placeBuildingAt('conveyor', 62, 60);
+    engine.placeBuildingAt('generator', 62, 61);
+
+    // Bootstrap the generator so the network is powered, then let the chain feed it.
+    engine.player.x = 62; engine.player.y = 60;
+    for (let i = 0; i < 5; i++) {
+      expect(engine.depositItemToBuilding(62, 61, 'coal')).toBe(true);
+    }
+    for (let i = 0; i < 160; i++) engine.tick();
+
+    const gen = engine.getTile(62, 61)!.building!;
+    const genCoal = gen.inventory.find(i => i.type === 'coal');
+    expect(genCoal).toBeDefined();
+    if (genCoal) expect(genCoal.amount).toBeGreaterThan(5); // bootstrap + delivered coal
+    expect(gen.fuelBurned).toBeGreaterThan(0);
+
+    const power = engine.getPowerSummary();
+    expect(power.fueledGenerators).toBe(1);
+    expect(power.produced).toBe(50);
+    expect(power.enough).toBe(true);
+
+    // The turn belt must have carried coal through the corner.
+    expect(engine.map[59][61].building!.inventory.length).toBeLessThanOrEqual(1);
+    expect(engine.map[59][62].building!.inventory.length).toBeLessThanOrEqual(1);
+    expect(engine.map[59][61].building!.blocked).toBe(false);
+    expect(engine.map[59][62].building!.blocked).toBe(false);
+
+    // The miner actually consumed its deposit.
+    expect(engine.map[59][60].resource!.amount).toBeLessThan(20);
   });
 });

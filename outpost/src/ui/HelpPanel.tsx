@@ -24,10 +24,29 @@ export const HelpPanel: React.FC = () => (
       <div>&nbsp;&nbsp;- Trees → Wood, Rocks → Stone, Ore deposits → their ore</div>
       <div><strong>R</strong> - Rotate building on current tile</div>
       <div><strong>Q</strong> - Remove building (get half refund)</div>
+      <div><strong>Left-Click a building</strong> - Inspect it (status, power, storage, deposits)</div>
     </div>
 
     <div style={{ color: '#ddd', fontSize: 12, marginBottom: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
-      <div style={{ color: '#ffaa00', fontWeight: 'bold' }}>Simulation</div>
+      <div style={{ color: '#ffaa00', fontWeight: 'bold' }}>Build Mode</div>
+      <div>Press <strong>B</strong>, pick a building, hover to preview, click to place</div>
+      <div><strong>A/S/W/D or Arrow keys</strong> - Set conveyor direction before placing</div>
+      <div><strong>R</strong> - Rotate the conveyor direction</div>
+      <div><strong>Enter/click</strong> - Place on the highlighted tile</div>
+    </div>
+
+    <div style={{ color: '#ddd', fontSize: 12, marginBottom: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
+      <div style={{ color: '#ff66ff', fontWeight: 'bold' }}>Power & Conveyors</div>
+      <div>• Conveyors face a direction — arrows animate the direction items travel</div>
+      <div>• Elbows (corners) are drawn as curves; items follow the bend automatically</div>
+      <div>• A red gate + pulsing red glow means the belt is <strong>blocked</strong> (e.g. two belts facing each other)</div>
+      <div>• Generators burn 1 Coal every 50 ticks and need Coal to produce power</div>
+      <div>• All machines share one power grid — watch the POWER GRID panel top-right</div>
+      <div>• Click a building to inspect; use "Give" buttons to deposit fuel/ore nearby</div>
+    </div>
+
+    <div style={{ color: '#ddd', fontSize: 12, marginBottom: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
+      <div style={{ color: '#ffcc00', fontWeight: 'bold' }}>Simulation</div>
       <div><strong>Space</strong> - Pause / Resume</div>
       <div><strong>+/-</strong> - Adjust simulation speed</div>
       <div><strong>0-3</strong> - Quick speed presets (x1, x5, x10, x20)</div>
@@ -43,16 +62,13 @@ export const HelpPanel: React.FC = () => (
     </div>
 
     <div style={{ color: '#ddd', fontSize: 11, marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, lineHeight: 1.6 }}>
-      <div style={{ color: '#ffcc00', fontWeight: 'bold', marginBottom: 4 }}>Tips</div>
-      <div>• Face a tree or rock and press E to gather Wood / Stone (they're obstacles — stand next to them)</div>
-      <div>• Stand on or face an ore deposit (coal, iron, copper, gold) and press E to mine it</div>
-      <div>• The orange highlight shows what pressing E will harvest</div>
-      <div>• Place miners on resource deposits to automate gathering</div>
-      <div>• Use conveyors to transport items between buildings</div>
-      <div>• Smelters need ore + coal to make ingots</div>
-      <div>• Assemblers craft advanced items from ingots and wires</div>
-      <div>• Buildings need power from generators to operate</div>
-      <div>• Place buildings adjacent to each other for connections</div>
+      <div style={{ color: '#ffcc00', fontWeight: 'bold', marginBottom: 4 }}>Building your first power line</div>
+      <div>1. Place a Coal Generator on grass</div>
+      <div>2. Inspect it and give it Coal (or mine coal and stand near it to hand it in)</div>
+      <div>3. Put a Miner on a coal deposit</div>
+      <div>4. Lay a Conveyor line from the Miner toward the Generator — use A/S/W/D or R so belts point the right way and turn at corners</div>
+      <div>5. Watch the POWER GRID panel: surplus should stay positive</div>
+      <div>6. If a belt glows red it's blocked — check its direction and the building it leads into</div>
     </div>
   </div>
 );

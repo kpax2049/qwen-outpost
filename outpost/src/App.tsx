@@ -3,13 +3,14 @@ import { GameEngine } from './engine/GameEngine';
 import { Renderer } from './rendering/Renderer';
 import type { Camera } from './rendering/Renderer';
 import { Dir, BUILDING_COLORS } from './types';
-import type { BuildingTypeValue } from './types';
+import type { BuildingTypeValue, PowerSummary } from './types';
 import { HUD } from './ui/HUD';
 import { BuildMenu } from './ui/BuildMenu';
 import { InventoryPanel } from './ui/InventoryPanel';
 import { HelpPanel } from './ui/HelpPanel';
 import { ObjectivesPanel } from './ui/ObjectivesPanel';
 import { Tutorial } from './ui/Tutorial';
+import { InspectionPanel, type InspectionData } from './ui/InspectionPanel';
 import type { TutorialStep } from './ui/Tutorial';
 
 const SAVE_KEY = 'outpost-save';
@@ -49,6 +50,7 @@ const App: React.FC = () => {
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const cameraStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectedTileRef = useRef<{ x: number; y: number } | null>(null);
+  const inspectedRef = useRef<{ x: number; y: number } | null>(null);
   const showWinRef = useRef(false);
 
   const [showBuildMenu, setShowBuildMenu] = useState(false);
@@ -60,6 +62,8 @@ const App: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [nearbyBuildings, setNearbyBuildings] = useState<import('./types').Tile[]>([]);
   const [, setRenderTick] = useState(0);
+  const [powerState, setPowerState] = useState<PowerSummary | null>(null);
+  const [inspectedData, setInspectedData] = useState<InspectionData | null>(null);
 
   const [tutorialDismissed, setTutorialDismissed] = useState<boolean>(() => {
     try { return localStorage.getItem('outpost-tutorial-done') === '1'; } catch { return false; }
@@ -129,6 +133,7 @@ const App: React.FC = () => {
 
     (window as unknown as { __outpost?: unknown }).__outpost = {
       get engine() { return engineRef.current; },
+      get camera() { return cameraRef.current; },
     };
 
     return () => {
@@ -142,14 +147,20 @@ const App: React.FC = () => {
       const engine = engineRef.current;
       const bt = buildTypeRef.current;
 
-      if (bt && ['q', 'w', 'e', 'r'].includes(e.key.toLowerCase())) {
-        switch (e.key.toLowerCase()) {
-          case 'q': engine.setBuildDirection(Dir.Up); break;
-          case 'w': engine.setBuildDirection(Dir.Right); break;
-          case 'e': engine.setBuildDirection(Dir.Down); break;
-          case 'r': engine.setBuildDirection(Dir.Left); break;
+      if (bt) {
+        const k = e.key.toLowerCase();
+        if (k === 'w' || k === 'arrowup') { engine.setBuildDirection(Dir.Up); setRenderTick(t => t + 1); return; }
+        if (k === 's' || k === 'arrowdown') { engine.setBuildDirection(Dir.Down); setRenderTick(t => t + 1); return; }
+        if (k === 'a' || k === 'arrowleft') { engine.setBuildDirection(Dir.Left); setRenderTick(t => t + 1); return; }
+        if (k === 'd' || k === 'arrowright') { engine.setBuildDirection(Dir.Right); setRenderTick(t => t + 1); return; }
+        if (k === 'r') {
+          engine.setBuildDirection(((engine.getBuildDirection() + 1) % 4) as import('./types').DirectionValue);
+          setRenderTick(t => t + 1); return;
         }
-        return;
+        if (k === 'q') {
+          engine.setBuildDirection(((engine.getBuildDirection() + 3) % 4) as import('./types').DirectionValue);
+          setRenderTick(t => t + 1); return;
+        }
       }
 
       switch (e.key.toLowerCase()) {
@@ -282,6 +293,20 @@ const App: React.FC = () => {
         setNearbyBuildings(buildings);
       }
 
+      if (frameCount % 6 === 0) {
+        setPowerState(engine.getPowerSummary());
+        const ip = inspectedRef.current;
+        if (ip) {
+          setInspectedData({
+            building: engine.inspectBuilding(ip.x, ip.y),
+            power: engine.getPowerSummary(),
+            playerItems: engine.player.inventory
+              .filter(i => i.amount > 0)
+              .map(i => ({ type: i.type as string, amount: i.amount })),
+          });
+        }
+      }
+
       const bt = buildTypeRef.current;
       const mouseW = mousePosRef.current;
       const selTile = selectedTileRef.current;
@@ -291,6 +316,7 @@ const App: React.FC = () => {
 
       let previewTile: { x: number; y: number } | null = null;
       let previewColor: string | undefined;
+      let previewValid: boolean | undefined;
       if (bt && mouseW) {
         const mouseWCam = {
           x: (mouseW.x - cameraRef.current.x) / cameraRef.current.zoom,
@@ -301,6 +327,7 @@ const App: React.FC = () => {
         if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
           previewTile = { x: tx, y: ty };
           previewColor = BUILDING_COLORS[bt];
+          previewValid = engine.canPlaceAt(bt, tx, ty).ok;
         }
       }
 
@@ -312,6 +339,9 @@ const App: React.FC = () => {
           selectedTile: selTile,
           buildPreview: previewTile,
           buildColor: previewColor,
+          buildValid: previewValid,
+          buildDirection: bt === 'conveyor' ? engine.getBuildDirection() : undefined,
+          inspectedTile: inspectedRef.current,
           interactiveTile,
           interactiveLabel,
           facing: engine.getFacing(),
@@ -385,6 +415,27 @@ const App: React.FC = () => {
           setRenderTick(t => t + 1);
         }
       }
+      return;
+    }
+
+    // Not in build mode: left click inspects the tile at the cursor.
+    const worldX = (mx - cameraRef.current.x) / cameraRef.current.zoom;
+    const worldY = (my - cameraRef.current.y) / cameraRef.current.zoom;
+    const tx = Math.floor(worldX / TILE_SIZE);
+    const ty = Math.floor(worldY / TILE_SIZE);
+    if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
+      selectedTileRef.current = { x: tx, y: ty };
+      inspectedRef.current = { x: tx, y: ty };
+      const engine = engineRef.current;
+      const building = engine.inspectBuilding(tx, ty);
+      setInspectedData({
+        building,
+        power: engine.getPowerSummary(),
+        playerItems: engine.player.inventory
+          .filter(i => i.amount > 0)
+          .map(i => ({ type: i.type as string, amount: i.amount })),
+      });
+      setRenderTick(t => t + 1);
     }
   }, []);
 
@@ -421,6 +472,33 @@ const App: React.FC = () => {
     }
   };
 
+  const closeInspection = useCallback(() => {
+    inspectedRef.current = null;
+    setInspectedData(null);
+    setRenderTick(t => t + 1);
+  }, []);
+
+  const handleDeposit = useCallback((type: string) => {
+    const ip = inspectedRef.current;
+    const engine = engineRef.current;
+    if (!ip) return;
+    engine.depositItemToBuilding(ip.x, ip.y, type);
+    setRenderTick(t => t + 1);
+    setInspectedData({
+      building: engine.inspectBuilding(ip.x, ip.y),
+      power: engine.getPowerSummary(),
+      playerItems: engine.player.inventory
+        .filter(i => i.amount > 0)
+        .map(i => ({ type: i.type as string, amount: i.amount })),
+    });
+  }, []);
+
+  const canDeposit = useCallback((type: string): boolean => {
+    const ip = inspectedRef.current;
+    if (!ip) return false;
+    return engineRef.current.buildingAcceptsItem(ip.x, ip.y, type);
+  }, []);
+
   const eng = engineRef.current;
   const playerInv = eng.player.inventory;
   const cMove = eng.player.x !== 60 || eng.player.y !== 60;
@@ -428,11 +506,16 @@ const App: React.FC = () => {
   const cStone = (playerInv.find(i => i.type === 'stone')?.amount ?? 0) > 5 || eng.player.stats.stonesMined >= 2;
   const cBuild = showBuildMenu || showInventory || showHelp;
   const cPlace = eng.countBuildings() >= 1;
+  const cBelt = eng.countBuildings('conveyor') >= 3;
+  const powerNow = eng.getPowerSummary();
+  const cPower = powerNow.fueledGenerators >= 1 && powerNow.produced > 0;
+  const cInspect = !!inspectedData?.building;
 
   useEffect(() => {
     setTutorialDoneMap(prev => {
       const completions: [string, boolean][] = [
         ['move', cMove], ['wood', cWood], ['stone', cStone], ['build', cBuild], ['place', cPlace],
+        ['belt', cBelt], ['power', cPower], ['inspect', cInspect],
       ];
       let change = false;
       const next = { ...prev };
@@ -441,11 +524,14 @@ const App: React.FC = () => {
       }
       return change ? next : prev;
     });
-  }, [cMove, cWood, cStone, cBuild, cPlace]);
+  }, [cMove, cWood, cStone, cBuild, cPlace, cBelt, cPower, cInspect]);
 
   // Effective done = fresh condition OR already sticky-completed (never regresses)
   const effectiveDone: Record<string, boolean> = { ...tutorialDoneMap };
-  for (const [k, v] of [['move', cMove], ['wood', cWood], ['stone', cStone], ['build', cBuild], ['place', cPlace]] as [string, boolean][]) {
+  for (const [k, v] of [
+    ['move', cMove], ['wood', cWood], ['stone', cStone], ['build', cBuild], ['place', cPlace],
+    ['belt', cBelt], ['power', cPower], ['inspect', cInspect],
+  ] as [string, boolean][]) {
     if (v) effectiveDone[k] = true;
   }
   const seenNext = !!manualDone['next'];
@@ -473,12 +559,27 @@ const App: React.FC = () => {
     },
     {
       id: 'place', title: 'Place a Building',
-      body: 'Pick a building, walk near an open tile, and click to place it. Try a Chest (3 Stone) or Conveyor (2 Stone). Press R to rotate, Q to remove.',
+      body: 'Pick a building, walk near an open tile, and click to place it. Try a Chest (3 Stone) or Conveyor (2 Stone). Conveyors face a direction — use A/S/W/D or R while placing so the belt points where items should flow.',
       done: effectiveDone.place,
     },
     {
-      id: 'next', title: 'Power & Automation',
-      body: 'Place a Coal Generator (needs iron, copper, stone) and feed it Coal to produce power, then put a Miner on an ore deposit to automate gathering. Conveyors move items between buildings. Smelters and assemblers craft advanced parts. Work toward crafting 5 engines!',
+      id: 'belt', title: 'Chain Conveyors',
+      body: 'Place 3+ Conveyor Belts so they point into each other (items flow belt-to-belt — this even works around corners). Belts that face each other get blocked and glow red. Click any building to inspect its status.',
+      done: effectiveDone.belt,
+    },
+    {
+      id: 'power', title: 'Power Your Grid',
+      body: 'Place a Coal Generator and give it Coal (click it, then "Coal +1"), so it produces 50 power. Machines and belts stop without power — check the POWER GRID panel top-right.',
+      done: effectiveDone.power,
+    },
+    {
+      id: 'inspect', title: 'Inspect a Building',
+      body: 'Click any building to open its inspector: status, power, inventory, belt connections and fuel left. Blocked belts show a red gate — clicking them explains why.',
+      done: effectiveDone.inspect,
+    },
+    {
+      id: 'next', title: 'Automate A Coal Line',
+      body: 'Now build a working line: Miner on a coal deposit → Conveyors (bending 90° if needed) → Coal Generator. Keep the surplus positive, then use Smelters and Assemblers to craft 5 engines!',
       done: seenNext, manual: true,
     },
   ];
@@ -538,8 +639,10 @@ const App: React.FC = () => {
         onLoad={handleLoad}
         onNewGame={handleNewGame}
         buildType={buildType}
+        buildDirection={buildType === 'conveyor' ? engineRef.current.getBuildDirection() : undefined}
         onDeselectBuild={() => { setBuildType(null); buildTypeRef.current = null; }}
         saveStatus={saveStatus}
+        power={powerState ?? undefined}
       />
 
       {showBuildMenu && (
@@ -560,6 +663,15 @@ const App: React.FC = () => {
 
       {showHelp && <HelpPanel />}
       {showObjectives && <ObjectivesPanel enginesCrafted={engineRef.current.player.stats.enginesCrafted} stonesMined={engineRef.current.player.stats.stonesMined} />}
+
+      {inspectedData && (buildType === null) && (
+        <InspectionPanel
+          data={inspectedData}
+          onClose={closeInspection}
+          onDeposit={handleDeposit}
+          canDeposit={canDeposit}
+        />
+      )}
 
       <Tutorial
         steps={tutorialSteps}

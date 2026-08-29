@@ -21,7 +21,10 @@ const TUTORIAL_COLORS: Record<string, string> = {
   stone: '#8a8a8a',
   build: '#ffaa00',
   place: '#ffaa00',
-  next: '#cc4400',
+  belt: '#888888',
+  power: '#cc4400',
+  inspect: '#88ccff',
+  next: '#44cc44',
 };
 
 export const Tutorial: React.FC<TutorialProps> = ({ steps, dismissed, onDismiss, onManualNext }) => {

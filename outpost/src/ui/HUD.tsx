@@ -1,5 +1,5 @@
 import React from 'react';
-import type { BuildingTypeValue } from '../types';
+import type { BuildingTypeValue, DirectionValue, PowerSummary } from '../types';
 
 interface HUDProps {
   tickRate: number;
@@ -16,17 +16,21 @@ interface HUDProps {
   onLoad: () => void;
   onNewGame: () => void;
   buildType: BuildingTypeValue | null;
+  buildDirection?: DirectionValue;
   onDeselectBuild: () => void;
   saveStatus: { message: string; type: 'success' | 'error' | 'info' } | null;
+  power?: PowerSummary;
 }
+
+const DIR_HINT: Record<number, string> = { 0: 'Up ▲', 1: 'Right ▶', 2: 'Down ▼', 3: 'Left ◀' };
 
 export const HUD: React.FC<HUDProps> = ({
   tickRate, paused,
   onTogglePause, onIncreaseSpeed, onDecreaseSpeed, onResetSpeed,
   onToggleBuildMenu, onToggleInventory, onToggleHelp, onToggleObjectives,
   onSave, onLoad, onNewGame,
-  buildType, onDeselectBuild,
-  saveStatus,
+  buildType, buildDirection, onDeselectBuild,
+  saveStatus, power,
 }) => {
   return (
     <>
@@ -132,6 +136,11 @@ export const HUD: React.FC<HUDProps> = ({
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <span>Building: {buildType}</span>
+          {buildDirection !== undefined && (
+            <span style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 3, padding: '2px 7px', fontSize: 12 }}>
+              {DIR_HINT[buildDirection] ?? 'Wait'}
+            </span>
+          )}
           <button onClick={onDeselectBuild} style={{
             background: 'rgba(0,0,0,0.2)', color: '#000', border: 'none',
             borderRadius: 2, cursor: 'pointer', padding: '2px 6px', fontSize: 11,
@@ -141,13 +150,52 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       )}
 
+      {buildType === 'conveyor' && (
+        <div style={{
+          position: 'absolute', top: 80, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(20,20,40,0.8)', color: '#ddd', padding: '5px 12px',
+          borderRadius: 4, fontSize: 11, zIndex: 10,
+        }}>
+          A/S/W/D or Arrow keys set direction · R rotates · click to place
+        </div>
+      )}
+
+      {power && (
+        <div style={{
+          position: 'absolute', right: 8, top: 52,
+          background: 'rgba(20,20,40,0.85)', border: `1px solid ${power.enough ? 'rgba(68,204,68,0.4)' : 'rgba(255,68,68,0.5)'}`,
+          borderRadius: 5, padding: '7px 10px', fontSize: 11, zIndex: 10, minWidth: 190,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+            <span style={{ color: '#aaa', fontWeight: 'bold', letterSpacing: 1 }}>POWER GRID</span>
+            <span style={{ color: power.enough ? '#44cc44' : '#ff4444', fontWeight: 'bold' }}>
+              {power.enough ? 'OK' : 'LOW'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#ddd' }}>{power.produced} ⚡ produced</span>
+            <span style={{ color: '#ddd' }}>{power.consumed} ⚡ used</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, color: power.surplus >= 0 ? '#88cc88' : '#ff8888' }}>
+            <span>Surplus {power.surplus >= 0 ? '+' : ''}{power.surplus}</span>
+            <span>{power.fueledGenerators}/{power.generatorCount} generators fueled</span>
+          </div>
+          {!power.enough && power.generatorCount > 0 && (
+            <div style={{ color: '#ffaa55', marginTop: 3 }}>
+              Add Coal to generators or remove machines.
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{
         position: 'absolute', bottom: 8, left: 8,
         background: 'rgba(20,20,40,0.7)', borderRadius: 4, padding: '6px 10px',
         color: '#666', fontSize: 10, lineHeight: 1.6, zIndex: 10,
       }}>
         <div>WASD/Arrows: Move | E: Harvest (facing tile) | R: Rotate | Q: Remove</div>
-        <div>Alt+Click: Pan | Scroll: Zoom | Space: Pause</div>
+        <div>Alt+Click: Pan | Scroll: Zoom | Space: Pause | Click building: Inspect</div>
+        <div>In build mode: A/S/W/D set conveyor direction | R rotates direction</div>
       </div>
 
       {saveStatus && (

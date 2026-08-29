@@ -7,7 +7,11 @@ import {
   type TerrainValue,
   type ResourceTypeValue,
   type DirectionValue,
+  type ItemType,
   RESOURCE_COLORS,
+  ITEM_COLORS,
+  oppositeDirection,
+  directionVector,
   Dir,
 } from '../types';
 
@@ -19,8 +23,12 @@ export interface Camera {
 
 export interface RenderOptions {
   selectedTile: { x: number; y: number } | null;
+  /** Preview tile for placement, with a validity flag for coloring. */
   buildPreview: { x: number; y: number } | null;
   buildColor?: string;
+  buildValid?: boolean;
+  buildDirection?: DirectionValue;
+  inspectedTile?: { x: number; y: number } | null;
   interactiveTile?: { x: number; y: number } | null;
   interactiveLabel?: string;
   facing?: DirectionValue;
@@ -213,7 +221,7 @@ export class Renderer {
     this.waterTime += 0.05;
 
     const { ctx } = this;
-    const { selectedTile, buildPreview, buildColor, interactiveTile, interactiveLabel, facing } = options;
+    const { selectedTile, buildPreview, buildColor, buildValid, buildDirection, inspectedTile, interactiveTile, interactiveLabel, facing } = options;
 
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -330,6 +338,31 @@ export class Renderer {
       ctx.restore();
     }
 
+    // Highlight the currently inspected tile
+    if (inspectedTile) {
+      ctx.save();
+      ctx.translate(camera.x, camera.y);
+      ctx.scale(camera.zoom, camera.zoom);
+
+      ctx.fillStyle = 'rgba(120, 190, 255, 0.10)';
+      ctx.fillRect(
+        inspectedTile.x * TILE_SIZE,
+        inspectedTile.y * TILE_SIZE,
+        TILE_SIZE,
+        TILE_SIZE
+      );
+      ctx.strokeStyle = 'rgba(140, 200, 255, 0.95)';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(
+        inspectedTile.x * TILE_SIZE - 2,
+        inspectedTile.y * TILE_SIZE - 2,
+        TILE_SIZE + 4,
+        TILE_SIZE + 4
+      );
+
+      ctx.restore();
+    }
+
     // Highlight the tile E will interact with
     if (interactiveTile) {
       ctx.save();
@@ -374,16 +407,42 @@ export class Renderer {
       ctx.restore();
     }
 
-    if (buildPreview && buildColor) {
+    if (buildPreview) {
       ctx.save();
       ctx.translate(camera.x, camera.y);
       ctx.scale(camera.zoom, camera.zoom);
 
       const { x, y } = buildPreview;
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = buildColor;
-      ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-      ctx.globalAlpha = 1.0;
+      const boostX = x * TILE_SIZE;
+      const boostY = y * TILE_SIZE;
+
+      if (buildColor) {
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = buildColor;
+        ctx.fillRect(boostX, boostY, TILE_SIZE, TILE_SIZE);
+        ctx.globalAlpha = 1.0;
+      }
+
+      if (buildValid === false) {
+        ctx.fillStyle = 'rgba(255, 40, 40, 0.28)';
+        ctx.fillRect(boostX, boostY, TILE_SIZE, TILE_SIZE);
+        ctx.strokeStyle = '#ff4444';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(boostX + 2, boostY + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      } else if (buildColor) {
+        ctx.strokeStyle = 'rgba(180, 255, 180, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(boostX + 2, boostY + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      }
+
+      // Show the direction the new conveyor will face.
+      if (buildDirection !== undefined) {
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.beginPath();
+        ctx.arc(boostX + TILE_SIZE / 2, boostY + TILE_SIZE / 2, 9, 0, Math.PI * 2);
+        ctx.fill();
+        this.drawArrow(boostX + TILE_SIZE / 2, boostY + TILE_SIZE / 2, buildDirection, 10);
+      }
 
       ctx.restore();
     }
@@ -485,7 +544,7 @@ export class Renderer {
     }
   }
 
-  private drawBuilding(gx: number, gy: number, building: Building, _map: Tile[][]): void {
+  private drawBuilding(gx: number, gy: number, building: Building, map: Tile[][]): void {
     const { ctx } = this;
     const cx = gx * TILE_SIZE + TILE_SIZE / 2;
     const cy = gy * TILE_SIZE + TILE_SIZE / 2;
@@ -548,17 +607,8 @@ export class Renderer {
         break;
       }
       case 'arrow': {
-        // Animated conveyor
-        const key = `${gx},${gy}`;
-        if (!this.conveyorAnims.has(key)) {
-          this.conveyorAnims.set(key, { offset: 0 });
-        }
-        const anim = this.conveyorAnims.get(key)!;
-        if (building.active) {
-          anim.offset = (anim.offset + 1) % 12;
-        }
-
-        this.drawConveyor(gx, gy, building.direction, anim.offset);
+        // Conveyor belt — full direction/connection/blocked/item rendering.
+        this.drawConveyor(gx, gy, building, map);
         break;
       }
     }
@@ -583,9 +633,9 @@ export class Renderer {
       ctx.fillRect(barX, barY, barWidth * progress, 1);
     }
 
-    // Inventory count with background
+    // Inventory count with background (sprites are drawn per-belt instead)
     const totalItems = building.inventory.reduce((sum, i) => sum + i.amount, 0);
-    if (totalItems > 0) {
+    if (totalItems > 0 && building.type !== 'conveyor') {
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.beginPath();
       ctx.arc(cx, cy + 8, 8, 0, Math.PI * 2);
@@ -598,8 +648,8 @@ export class Renderer {
     }
     ctx.textBaseline = 'alphabetic';
 
-    // Direction indicator for conveyors and miners
-    if (building.type === 'conveyor' || building.type === 'miner') {
+    // Direction indicator for miners (conveyors show chevrons instead)
+    if (building.type === 'miner') {
       this.drawArrow(cx, cy - 2, building.direction, 6);
     }
 
@@ -623,35 +673,257 @@ export class Renderer {
     }
   }
 
-  private drawConveyor(gx: number, gy: number, direction: DirectionValue, animOffset: number): void {
+  private drawConveyor(gx: number, gy: number, building: Building, map: Tile[][]): void {
     const { ctx } = this;
-    const inset = 10;
-    ctx.fillStyle = '#444444';
-    ctx.fillRect(gx * TILE_SIZE + inset, gy * TILE_SIZE + inset, TILE_SIZE - inset * 2, TILE_SIZE - inset * 2);
+    const dir = building.direction;
+    const key = `${gx},${gy}`;
+    if (!this.conveyorAnims.has(key)) {
+      this.conveyorAnims.set(key, { offset: 0 });
+    }
+    const anim = this.conveyorAnims.get(key)!;
+    const moving = building.active && !building.blocked;
+    if (moving) {
+      anim.offset = (anim.offset + 1) % 12;
+    }
+    const phase = (anim.offset % 12) / 12;
 
-    // Animated lines
-    ctx.strokeStyle = 'rgba(100, 100, 100, 0.6)';
-    ctx.lineWidth = 1.5;
-    const lineCount = 4;
-    for (let i = 0; i < lineCount; i++) {
-      let offset = (i * (TILE_SIZE / lineCount) + animOffset) % TILE_SIZE;
-      offset -= 10;
+    const inset = 6;
+    const bx = gx * TILE_SIZE;
+    const by = gy * TILE_SIZE;
+    ctx.fillStyle = '#2f2f36';
+    ctx.fillRect(bx + inset, by + inset, TILE_SIZE - inset * 2, TILE_SIZE - inset * 2);
 
-      ctx.beginPath();
-      switch (direction) {
-        case Dir.Up:
-        case Dir.Down:
-          ctx.moveTo(gx * TILE_SIZE + TILE_SIZE / 2, gy * TILE_SIZE + offset);
-          ctx.lineTo(gx * TILE_SIZE + TILE_SIZE / 2, gy * TILE_SIZE + offset + 8);
-          break;
-        case Dir.Right:
-        case Dir.Left:
-          ctx.moveTo(gx * TILE_SIZE + offset, gy * TILE_SIZE + TILE_SIZE / 2);
-          ctx.lineTo(gx * TILE_SIZE + offset + 8, gy * TILE_SIZE + TILE_SIZE / 2);
-          break;
+    // Cut dark gaps on every side that does NOT connect to a neighboring conveyor,
+    // so belts visually chain together and show clear open ends.
+    const sideHasBelt: Partial<Record<DirectionValue, boolean>> = {};
+    for (const side of [Dir.Up, Dir.Right, Dir.Down, Dir.Left] as DirectionValue[]) {
+      const nx = gx + directionVector(side).x;
+      const ny = gy + directionVector(side).y;
+      const isConnected =
+        nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE &&
+        map[ny][nx].building?.type === 'conveyor';
+      sideHasBelt[side] = isConnected;
+      if (!isConnected) {
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        if (side === Dir.Up) ctx.fillRect(bx + inset, by, TILE_SIZE - inset * 2, inset);
+        if (side === Dir.Down) ctx.fillRect(bx + inset, by + TILE_SIZE - inset, TILE_SIZE - inset * 2, inset);
+        if (side === Dir.Left) ctx.fillRect(bx, by + inset, inset, TILE_SIZE - inset * 2);
+        if (side === Dir.Right) ctx.fillRect(bx + TILE_SIZE - inset, by + inset, inset, TILE_SIZE - inset * 2);
       }
+    }
+
+    const isBlocked = !!building.blocked;
+
+    // Belt path used by chevrons + items; entry reflects how items arrive.
+    const entry = this.beltEntryPoint(gx, gy, dir, map);
+    const exit = this.beltExitPoint(gx, gy, dir);
+    const path = this.beltPath(entry, exit);
+
+    const chevronColor = isBlocked ? 'rgba(255, 80, 80, 0.9)' : 'rgba(235, 235, 235, 0.75)';
+    const chevronCount = 5;
+    for (let i = 0; i < chevronCount; i++) {
+      let t = (i + phase) / chevronCount;
+      t = t + 0.06;
+      if (t > 1) t -= 1;
+      const p = this.beltPoint(path, t);
+      const tangent = this.beltTangent(path, t);
+      this.drawBeltChevron(p.x, p.y, tangent.x, tangent.y, chevronColor, isBlocked);
+    }
+
+    // Elbow connection band — visually "wires" a corner between two belts.
+    const inConn = this.incomingConnectionKind(gx, gy, dir, map);
+    if (inConn === 'turn') {
+      ctx.strokeStyle = 'rgba(190, 190, 205, 0.18)';
+      ctx.lineWidth = 6;
+      this.traceBeltPath(path);
       ctx.stroke();
     }
+
+    // Blocked gate + red wash when the belt is jammed.
+    if (isBlocked) {
+      ctx.fillStyle = 'rgba(255, 40, 40, 0.12)';
+      ctx.fillRect(bx + inset, by + inset, TILE_SIZE - inset * 2, TILE_SIZE - inset * 2);
+
+      const ex = exit.x;
+      const ey = exit.y;
+      ctx.strokeStyle = '#ff4444';
+      ctx.lineWidth = 4;
+      const perp = { x: directionVector(dir).y, y: directionVector(dir).x };
+      ctx.beginPath();
+      ctx.moveTo(ex - perp.x * 9, ey - perp.y * 9);
+      ctx.lineTo(ex + perp.x * 9, ey + perp.y * 9);
+      ctx.stroke();
+      const pulse = Math.sin(this.frameCount * 0.15) * 0.35 + 0.55;
+      ctx.strokeStyle = `rgba(255, 68, 68, ${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx + inset - 1, by + inset - 1, TILE_SIZE - inset * 2 + 2, TILE_SIZE - inset * 2 + 2);
+    }
+
+    this.drawBeltItem(building, path);
+  }
+
+  /** Local-space (tile-relative) midpoint of the edge a direction points at. */
+  private edgeMid(dir: DirectionValue): { x: number; y: number } {
+    const h = TILE_SIZE / 2;
+    switch (dir) {
+      case Dir.Up: return { x: h, y: 0 };
+      case Dir.Down: return { x: h, y: TILE_SIZE };
+      case Dir.Left: return { x: 0, y: h };
+      case Dir.Right: return { x: TILE_SIZE, y: h };
+    }
+  }
+
+  /** World-space point where an item enters this belt (or the tile center if none). */
+  private beltEntryPoint(gx: number, gy: number, dir: DirectionValue, map: Tile[][]): { x: number; y: number } {
+    const back = oppositeDirection(dir);
+    const at = (d: DirectionValue) => {
+      const nx = gx + directionVector(d).x;
+      const ny = gy + directionVector(d).y;
+      return nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE && map[ny][nx].building?.type === 'conveyor'
+        ? map[ny][nx].building!
+        : null;
+    };
+
+    // Same-axis feeder behind us.
+    const backBelt = at(back);
+    if (backBelt && (backBelt.direction === dir || backBelt.direction === back)) {
+      const m = this.edgeMid(back);
+      return { x: gx * TILE_SIZE + m.x, y: gy * TILE_SIZE + m.y };
+    }
+
+    // Perpendicular belt pointing into this tile (elbow entry).
+    for (const side of [Dir.Left, Dir.Right] as DirectionValue[]) {
+      const sideBelt = at(side);
+      if (!sideBelt) continue;
+      const sx = gx + directionVector(side).x;
+      const sy = gy + directionVector(side).y;
+      const fwd = directionVector(sideBelt.direction);
+      if (sx + fwd.x === gx && sy + fwd.y === gy) {
+        const m = this.edgeMid(side);
+        return { x: gx * TILE_SIZE + m.x, y: gy * TILE_SIZE + m.y };
+      }
+    }
+
+    return { x: gx * TILE_SIZE + TILE_SIZE / 2, y: gy * TILE_SIZE + TILE_SIZE / 2 };
+  }
+
+  /** World-space point where items leave the belt (midpoint of the forward edge). */
+  private beltExitPoint(gx: number, gy: number, dir: DirectionValue): { x: number; y: number } {
+    const m = this.edgeMid(dir);
+    return { x: gx * TILE_SIZE + m.x, y: gy * TILE_SIZE + m.y };
+  }
+
+  /** Whether the entry path curves (elbow) — an incoming side belt makes a corner. */
+  private incomingConnectionKind(gx: number, gy: number, dir: DirectionValue, map: Tile[][]): 'straight' | 'turn' | 'none' {
+    const back = oppositeDirection(dir);
+    const backPos = { x: gx + directionVector(back).x, y: gy + directionVector(back).y };
+    if (backPos.x >= 0 && backPos.x < MAP_SIZE && backPos.y >= 0 && backPos.y < MAP_SIZE) {
+      const b = map[backPos.y][backPos.x].building;
+      if (b?.type === 'conveyor' && (b.direction === dir || b.direction === back)) return 'straight';
+    }
+    for (const side of [Dir.Left, Dir.Right] as DirectionValue[]) {
+      const sp = { x: gx + directionVector(side).x, y: gy + directionVector(side).y };
+      if (sp.x < 0 || sp.x >= MAP_SIZE || sp.y < 0 || sp.y >= MAP_SIZE) continue;
+      const b = map[sp.y][sp.x].building;
+      if (b?.type === 'conveyor') {
+        const fwd = directionVector(b.direction);
+        if (sp.x + fwd.x === gx && sp.y + fwd.y === gy) return 'turn';
+      }
+    }
+    return 'none';
+  }
+
+  /**
+   * Cubic path from entry to exit. Straight entries stay on-axis; corner entries
+   * get a smooth bezier with tangent-extended control points.
+   */
+  private beltPath(p0: { x: number; y: number }, p1: { x: number; y: number }): {
+    p0: { x: number; y: number };
+    p1: { x: number; y: number };
+    c1: { x: number; y: number };
+    c2: { x: number; y: number };
+  } {
+    const k = TILE_SIZE / 4;
+    const straight = p0.x === p1.x || p0.y === p1.y;
+    if (straight) {
+      return { p0, p1, c1: p0, c2: p1 };
+    }
+    // Corner: control points extend the in/out tangents.
+    const a: { x: number; y: number } = { x: p0.x, y: p0.y };
+    const b: { x: number; y: number } = { x: p1.x, y: p1.y };
+    if (p0.y === 0) { a.x += (p1.x > p0.x ? k : -k); a.y += k; }
+    if (p0.y === TILE_SIZE) { a.x += (p1.x > p0.x ? k : -k); a.y -= k; }
+    if (p0.x === 0) { a.y += (p1.y > p0.y ? k : -k); a.x += k; }
+    if (p0.x === TILE_SIZE) { a.x -= k; a.y += (p1.y > p0.y ? k : -k); }
+    if (p1.y === 0) { b.x += (p1.x > p0.x ? k : -k); b.y -= k; }
+    if (p1.y === TILE_SIZE) { b.x += (p1.x > p0.x ? k : -k); b.y += k; }
+    if (p1.x === 0) { b.y += (p1.y > p0.y ? k : -k); b.x -= k; }
+    if (p1.x === TILE_SIZE) { b.x += k; b.y += (p1.y > p0.y ? k : -k); }
+    return { p0, p1, c1: a, c2: b };
+  }
+
+  private beltPoint(path: { p0: { x: number; y: number }; p1: { x: number; y: number }; c1: { x: number; y: number }; c2: { x: number; y: number } }, t: number): { x: number; y: number } {
+    const { p0, p1, c1, c2 } = path;
+    if (p0.x === p1.x || p0.y === p1.y) {
+      return { x: p0.x + (p1.x - p0.x) * t, y: p0.y + (p1.y - p0.y) * t };
+    }
+    const u = 1 - t;
+    const x = u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p1.x;
+    const y = u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p1.y;
+    return { x, y };
+  }
+
+  private beltTangent(path: { p0: { x: number; y: number }; p1: { x: number; y: number }; c1: { x: number; y: number }; c2: { x: number; y: number } }, t: number): { x: number; y: number } {
+    const a = this.beltPoint(path, Math.max(0, t - 0.02));
+    const b = this.beltPoint(path, Math.min(1, t + 0.02));
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    return { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+  }
+
+  private traceBeltPath(path: { p0: { x: number; y: number }; p1: { x: number; y: number }; c1: { x: number; y: number }; c2: { x: number; y: number } }): void {
+    const { ctx } = this;
+    const { p0, c1, c2, p1 } = path;
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, p1.x, p1.y);
+  }
+
+  private drawBeltChevron(x: number, y: number, tx: number, ty: number, color: string, blocked: boolean): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.translate(x, y);
+    const ang = Math.atan2(ty, tx);
+    ctx.rotate(ang);
+    ctx.fillStyle = color;
+    const w = blocked ? 7 : 6;
+    ctx.beginPath();
+    ctx.moveTo(w - 3, 0);
+    ctx.lineTo(-3, -3.5);
+    ctx.lineTo(-3, 3.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  private drawBeltItem(building: Building, path: { p0: { x: number; y: number }; p1: { x: number; y: number }; c1: { x: number; y: number }; c2: { x: number; y: number } }): void {
+    const { ctx } = this;
+    const invItem = building.inventory[0];
+    if (!invItem || invItem.amount <= 0) return;
+    const t = building.blocked ? 1 : Math.min(0.97, building.maxProgress > 0 ? building.progress / building.maxProgress : 0);
+    const p = this.beltPoint(path, t);
+    const color = ITEM_COLORS[invItem.type as ItemType] ?? '#dddddd';
+
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.arc(p.x + 1, p.y + 2, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
   }
 
   private drawArrow(cx: number, cy: number, direction: DirectionValue, size: number): void {
