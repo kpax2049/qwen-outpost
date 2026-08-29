@@ -37,6 +37,15 @@ export interface RenderOptions {
   facing?: DirectionValue;
   /** Hide the bottom-right minimap (used by the dev-only visual showcase). */
   showMinimap?: boolean;
+  /**
+   * Hide the player sprite (defaults to shown).
+   *
+   * Used by the dev-only Visual Showcase to keep isolated asset boards
+   * (terrain / resource / building swatches) free of the player sprite so each
+   * swatch demonstrates exactly one asset/state. Production gameplay never
+   * sets this, so the player renders as usual.
+   */
+  showPlayer?: boolean;
 }
 
 interface Particle {
@@ -54,6 +63,21 @@ interface ConveyorAnim {
   offset: number;
 }
 
+/** Deterministic Park-Miller LCG (same scheme as the game-world PRNG). */
+class LcgRandom {
+  private seed: number;
+
+  constructor(seed: number) {
+    this.seed = seed % 2147483647;
+    if (this.seed <= 0) this.seed += 2147483646;
+  }
+
+  next(): number {
+    this.seed = (this.seed * 16807) % 2147483647;
+    return (this.seed - 1) / 2147483646;
+  }
+}
+
 export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -63,6 +87,19 @@ export class Renderer {
   private lastTickBuildings: Map<string, boolean> = new Map();
   private conveyorAnims: Map<string, ConveyorAnim> = new Map();
   private waterTime = 0;
+
+  /**
+   * Deterministic PRNG used ONLY for cosmetic terrain-tile texture generation
+   * (grass/sand base shade + speckles). Gameplay is unaffected; this makes each
+   * Renderer instance produce identical tile art so screenshots are reproducible.
+   */
+  private terrainRand = new LcgRandom(987654321);
+
+  /**
+   * Deterministic PRNG for cosmetic particle spawns (velocities, life, size).
+   * Gameplay feel is unchanged while keeping render output bit-reproducible.
+   */
+  private particleRand = new LcgRandom(135797531);
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -81,12 +118,12 @@ export class Renderer {
 
       switch (terrain) {
         case 'grass': {
-          const shade = Math.random() * 0.15;
+          const shade = this.terrainRand.next() * 0.15;
           ctx.fillStyle = `rgb(${50 + shade * 100}, ${120 + shade * 80}, ${40 + shade * 60})`;
           ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
           for (let i = 0; i < 8; i++) {
-            ctx.fillStyle = `rgba(${30 + Math.random() * 30}, ${100 + Math.random() * 50}, ${20 + Math.random() * 30}, 0.3)`;
-            ctx.fillRect(Math.random() * TILE_SIZE, Math.random() * TILE_SIZE, 2, 4);
+            ctx.fillStyle = `rgba(${30 + this.terrainRand.next() * 30}, ${100 + this.terrainRand.next() * 50}, ${20 + this.terrainRand.next() * 30}, 0.3)`;
+            ctx.fillRect(this.terrainRand.next() * TILE_SIZE, this.terrainRand.next() * TILE_SIZE, 2, 4);
           }
           ctx.strokeStyle = 'rgba(0,0,0,0.1)';
           ctx.lineWidth = 0.5;
@@ -115,9 +152,9 @@ export class Renderer {
           ctx.fillStyle = '#c4a35a';
           ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
           for (let i = 0; i < 5; i++) {
-            ctx.fillStyle = `rgba(${180 + Math.random() * 40}, ${160 + Math.random() * 30}, ${80 + Math.random() * 40}, 0.3)`;
+            ctx.fillStyle = `rgba(${180 + this.terrainRand.next() * 40}, ${160 + this.terrainRand.next() * 30}, ${80 + this.terrainRand.next() * 40}, 0.3)`;
             ctx.beginPath();
-            ctx.arc(Math.random() * TILE_SIZE, Math.random() * TILE_SIZE, 2, 0, Math.PI * 2);
+            ctx.arc(this.terrainRand.next() * TILE_SIZE, this.terrainRand.next() * TILE_SIZE, 2, 0, Math.PI * 2);
             ctx.fill();
           }
           ctx.strokeStyle = 'rgba(0,0,0,0.1)';
@@ -170,12 +207,12 @@ export class Renderer {
       this.particles.push({
         x,
         y,
-        vx: (Math.random() - 0.5) * 2,
-        vy: -Math.random() * 2 - 0.5,
-        life: 30 + Math.random() * 20,
+        vx: (this.particleRand.next() - 0.5) * 2,
+        vy: -this.particleRand.next() * 2 - 0.5,
+        life: 30 + this.particleRand.next() * 20,
         maxLife: 50,
         color,
-        size: 1 + Math.random() * 2,
+        size: 1 + this.particleRand.next() * 2,
       });
     }
   }
@@ -305,8 +342,10 @@ export class Renderer {
     // the machines they power. Makes the shared-grid concept tangible.
     this.drawPowerLinks(map, startTileX, startTileY, endTileX, endTileY);
 
-    // Render player
-    this.drawPlayer(player.x, player.y, facing ?? player.facing);
+    // Render player (hidden on the dev-only isolated asset boards via showPlayer:false)
+    if (options.showPlayer !== false) {
+      this.drawPlayer(player.x, player.y, facing ?? player.facing);
+    }
 
     // Render particles
     this.drawParticles();

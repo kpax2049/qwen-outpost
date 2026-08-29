@@ -21,8 +21,52 @@ const SCENES = [
   { key: 'help', file: '10-tutorial-objectives-help.png' },
 ];
 
+// Which scenarios must keep the player sprite OFF (isolated asset boards)?
+const ISOLATED_SCENES = new Set(['atlas', 'terrain', 'resources', 'machines', 'conveyors']);
+// Which scenarios must keep the player sprite ON (gameplay-style scenes)?
+const PLAYER_SCENES = new Set(['gameplay', 'construction', 'hud', 'inspection']);
+
+// Verifies (deterministically, from canvas config) that isolated asset boards
+// were actually rendered WITHOUT the player, and gameplay scenes WITH it.
+async function verifyPlayerIsolation(page, key) {
+  const report = await page.evaluate((scenario) => {
+    const section = document.querySelector(`[data-scenario="${scenario}"]`);
+    if (!section) return { found: false };
+    const canvases = [...section.querySelectorAll('canvas')];
+    const players = canvases.map((c) => c.dataset.showPlayer);
+    const playerExampleCanvas = section.querySelector('[data-player-example] canvas');
+    const playerExample = playerExampleCanvas?.dataset.showPlayer ?? null;
+    const playerExampleIndex = playerExampleCanvas ? canvases.indexOf(playerExampleCanvas) : -1;
+    return { found: true, players, playerExample, playerExampleIndex };
+  }, key);
+  return report;
+}
+
+// All isolated canvases must be player-free, excluding any labeled player-example
+// canvas (only the atlas scenario has one).
+function allIsolatedHidden(report) {
+  const bad = [];
+  for (let i = 0; i < report.players.length; i++) {
+    const p = report.players[i];
+    if (p === undefined) continue; // not a WorldCanvas (e.g. HUD internals)
+    if (i === report.playerExampleIndex) continue; // deliberately rendered
+    if (p !== 'false') bad.push(`${i}:${p}`);
+  }
+  return bad;
+}
+
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
+
+  // Optional filter: CAPTURE="atlas,terrain,resources,machines"
+  const only = new Set(
+    (process.env.CAPTURE || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  const scenes = only.size ? SCENES.filter((s) => only.has(s.key)) : SCENES;
+  const skipped = SCENES.filter((s) => !scenes.some((x) => x.key === s.key)).map((s) => s.file);
 
   const errors = [];
   const browser = await chromium.launch();
@@ -42,15 +86,41 @@ async function main() {
   }
 
   const results = [];
-  for (const { key, file } of SCENES) {
+  const isolationFails = [];
+  for (const { key, file } of scenes) {
     await page.evaluate((k) => window.__showcase.show(k), key);
     await page.waitForTimeout(250);
+
+    // ---- Deterministic isolation verification (not just pixel checks) ----
+    const rep = await verifyPlayerIsolation(page, key);
+    if (!rep.found) {
+      isolationFails.push(`[${key}] scenario section not found in DOM`);
+    } else if (ISOLATED_SCENES.has(key)) {
+      const offenders = allIsolatedHidden(rep);
+      if (offenders.length) {
+        isolationFails.push(`[${key}] isolated canvases rendered the player: ${JSON.stringify(offenders)}`);
+      }
+      if (key === 'atlas') {
+        if (rep.playerExample === null) {
+          isolationFails.push(`[atlas] labeled player example missing ([data-player-example] canvas not found)`);
+        } else if (rep.playerExample !== 'true') {
+          isolationFails.push(`[atlas] player example did not render the player (data-show-player=${rep.playerExample})`);
+        }
+      } else if (rep.playerExample !== null) {
+        isolationFails.push(`[${key}] unexpected player-example marker in an isolated section`);
+      }
+    } else if (PLAYER_SCENES.has(key)) {
+      const allShown = rep.players.filter((p) => p !== undefined).every((p) => p === 'true');
+      if (!allShown) {
+        isolationFails.push(`[${key}] gameplay canvases did not render the player: ${JSON.stringify(rep.players)}`);
+      }
+    }
+
     const out = path.join(OUT_DIR, file);
     await page.screenshot({ path: out, fullPage: true });
-    const stat = fs.statSync(out);
     const buf = fs.readFileSync(out);
     const validPng = buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
-    results.push({ file, bytes: stat.size, validPng });
+    results.push({ file, bytes: buf.length, validPng });
   }
 
   await browser.close();
@@ -60,6 +130,17 @@ async function main() {
     const status = r.validPng && r.bytes > 0 ? 'OK' : 'FAIL';
     if (status === 'FAIL') ok = false;
     console.log(`${status.padEnd(4)} ${r.file} (${r.bytes} bytes)`);
+  }
+  if (skipped.length) {
+    console.log(`SKIP ${skipped.join(', ')} (preserved — not regenerated this run)`);
+  }
+
+  if (isolationFails.length) {
+    ok = false;
+    console.log('\nPlayer-isolation verification failures:');
+    for (const f of isolationFails) console.log('  - ' + f);
+  } else {
+    console.log('\nPlayer-isolation verification OK (isolated boards player-free, gameplay keeps player).');
   }
 
   if (errors.length) {

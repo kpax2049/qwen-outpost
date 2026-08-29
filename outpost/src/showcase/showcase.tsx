@@ -27,6 +27,8 @@ import {
   frameBoard,
   frameTile,
   showcaseOptions,
+  isolatedOptions,
+  gameplayOptions,
 } from './scenes';
 import { Dir, BUILDING_NAMES, BUILDING_DEFS, ITEM_COLORS } from '../types';
 import type { Item, PowerSummary, DirectionValue } from '../types';
@@ -62,7 +64,11 @@ function WorldCanvas({
     canvas.height = height;
     const renderer = new Renderer(canvas);
     const { engine, camera, options } = buildScene();
-    renderer.render(engine.map, engine.player, camera, options ?? showcaseOptions());
+    const resolved = options ?? showcaseOptions();
+    renderer.render(engine.map, engine.player, camera, resolved);
+    // Deterministic marker for the screenshot script / QA: records whether this
+    // canvas rendered the player (true) or is an isolated asset board (false).
+    canvas.dataset.showPlayer = String(resolved.showPlayer !== false);
   }, [width, height, buildScene]);
   return <canvas ref={ref} style={{ display: 'block', imageRendering: 'pixelated' }} />;
 }
@@ -74,17 +80,19 @@ function Swatch({
   width = 150,
   height = 150,
   zoom = 2.4,
+  options,
 }: {
   build: (e: GameEngine) => void;
   caption: string;
   width?: number;
   height?: number;
   zoom?: number;
+  options?: RenderOptions;
 }) {
   const scene = () => {
     const e = makeEngine();
     build(e);
-    return { engine: e, camera: frameTile(60, 60, zoom, width, height), options: showcaseOptions() };
+    return { engine: e, camera: frameTile(60, 60, zoom, width, height), options: isolatedOptions(options) };
   };
   return (
     <figure style={{ margin: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -117,7 +125,7 @@ function TileBoard({
     const e = makeEngine();
     clearBox(e, origin.x, origin.y, cols, rows);
     setup(e);
-    return { engine: e, camera, options: { ...showcaseOptions(), ...(options ?? {}) } };
+    return { engine: e, camera, options: isolatedOptions(options) };
   };
   return (
     <figure style={{ margin: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -158,7 +166,7 @@ function Stage({
       }}
     >
       {scene && (
-        <WorldCanvas buildScene={() => ({ engine: scene.engine, camera: scene.camera, options: showcaseOptions() })} width={width} height={height} />
+        <WorldCanvas buildScene={() => ({ engine: scene.engine, camera: scene.camera, options: gameplayOptions() })} width={width} height={height} />
       )}
       {children}
     </div>
@@ -178,11 +186,11 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-function SwatchRow({ items }: { items: { caption: string; build: (e: GameEngine) => void; zoom?: number; width?: number; height?: number }[] }) {
+function SwatchRow({ items }: { items: { caption: string; build: (e: GameEngine) => void; zoom?: number; width?: number; height?: number; options?: RenderOptions }[] }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18 }}>
       {items.map((it, i) => (
-        <Swatch key={i} build={it.build} caption={it.caption} zoom={it.zoom} width={it.width} height={it.height} />
+        <Swatch key={i} build={it.build} caption={it.caption} zoom={it.zoom} width={it.width} height={it.height} options={it.options} />
       ))}
     </div>
   );
@@ -359,7 +367,7 @@ function ConveyorLegendRow() {
         const scene = () => {
           const e = makeEngine();
           put(e, x, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: d, maxProgress: 12, progress: 6, inventory: [{ type: 'stone', amount: 1 }] }));
-          return { engine: e, camera: frameTile(x, 60, 2.4, 150, 150), options: showcaseOptions() };
+          return { engine: e, camera: frameTile(x, 60, 2.4, 150, 150), options: isolatedOptions() };
         };
         return (
           <figure key={i} style={{ margin: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -419,7 +427,7 @@ function Showcase() {
     return {
       engine: e,
       camera: frameTile(56, 56, 1.6, CONSTRUCTION_W, CONSTRUCTION_H),
-      options: { ...showcaseOptions(), buildPreview: { x: 56, y: 56 }, buildColor: BUILDING_DEFS['miner'].color, buildValid: true, buildDirection: Dir.Down },
+      options: gameplayOptions({ buildPreview: { x: 56, y: 56 }, buildColor: BUILDING_DEFS['miner'].color, buildValid: true, buildDirection: Dir.Down }),
     };
   };
 
@@ -431,13 +439,12 @@ function Showcase() {
     return {
       engine: e,
       camera: frameTile(56, 56, 1.6, CONSTRUCTION_W, CONSTRUCTION_H),
-      options: {
-        ...showcaseOptions(),
+      options: gameplayOptions({
         buildPreview: { x: 56, y: 56 },
         buildColor: BUILDING_DEFS['miner'].color,
         buildValid: false,
         buildDirection: Dir.Down,
-      },
+      }),
     };
   };
 
@@ -451,7 +458,7 @@ function Showcase() {
     put(e, 56, 56, makeBuilding('assembler', { active: true, powerConsumed: 15, maxProgress: 80, progress: 22, inventory: [{ type: 'copper', amount: 4 }] }));
     const origin = { x: 52, y: 52 };
     const { camera, width, height } = frameBoard(origin, 6, 6, 1.4, 24);
-    return { engine: e, camera, width: Math.round(width), height: Math.round(height) };
+    return { engine: e, camera, width: Math.round(width), height: Math.round(height), options: gameplayOptions() };
   };
 
   const terrainBoard = () => {
@@ -470,7 +477,7 @@ function Showcase() {
     for (const { x, y, terrain } of t) setTerrain(e, x, y, terrain);
     const origin = { x: 54, y: 55 };
     const { camera, width, height } = frameBoard(origin, 4, 9, 1.6, 20);
-    return { engine: e, camera, width: Math.round(width), height: Math.round(height) };
+    return { engine: e, camera, width: Math.round(width), height: Math.round(height), options: isolatedOptions() };
   };
 
   const resourceBoard = () => {
@@ -486,7 +493,7 @@ function Showcase() {
     for (const d of deposits) setResource(e, d.x, d.y, d.type, d.amount);
     const origin = { x: 53, y: 55 };
     const { camera, width, height } = frameBoard(origin, 6, 10, 1.5, 20);
-    return { engine: e, camera, width: Math.round(width), height: Math.round(height) };
+    return { engine: e, camera, width: Math.round(width), height: Math.round(height), options: isolatedOptions() };
   };
 
 
@@ -580,6 +587,21 @@ function Showcase() {
               {it.name}
             </span>
           ))}
+        </div>
+        <GroupTitle>Player (only shown here + in gameplay scenes)</GroupTitle>
+        <div data-player-example>
+          <SwatchRow
+            items={[
+              {
+                caption: 'Player — default skin, facing down',
+                options: { showPlayer: true },
+                build: (e) => {
+                  // The player sprite is placed at the board centre by makeEngine.
+                  void e;
+                },
+              },
+            ]}
+          />
         </div>
       </Section>
 

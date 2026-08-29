@@ -110,3 +110,20 @@ export function frameTile(x: number, y: number, zoom: number, width: number, hei
 export function showcaseOptions(): RenderOptions {
   return { showMinimap: false };
 }
+
+/**
+ * Render options for an ISOLATED asset board (a terrain / resource / building /
+ * machine-state swatch). The player sprite is disabled so each swatch shows exactly
+ * the one asset/state it is labelled with and is never covered by the player.
+ */
+export function isolatedOptions(extra: RenderOptions = {}): RenderOptions {
+  return { ...showcaseOptions(), showPlayer: false, ...extra };
+}
+
+/**
+ * Render options for a GAMEPLAY-style scene (populated base, construction mode,
+ * inspection, HUD). The player sprite is enabled, exactly as in normal play.
+ */
+export function gameplayOptions(extra: RenderOptions = {}): RenderOptions {
+  return { ...showcaseOptions(), showPlayer: true, ...extra };
+}
