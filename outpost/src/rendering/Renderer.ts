@@ -22,9 +22,9 @@ export interface Camera {
 }
 
 export interface RenderOptions {
-  selectedTile: { x: number; y: number } | null;
+  selectedTile?: { x: number; y: number } | null;
   /** Preview tile for placement, with a validity flag for coloring. */
-  buildPreview: { x: number; y: number } | null;
+  buildPreview?: { x: number; y: number } | null;
   buildColor?: string;
   buildValid?: boolean;
   /** Multi-tile conveyor route being dragged. */
@@ -35,6 +35,8 @@ export interface RenderOptions {
   interactiveTile?: { x: number; y: number } | null;
   interactiveLabel?: string;
   facing?: DirectionValue;
+  /** Hide the bottom-right minimap (used by the dev-only visual showcase). */
+  showMinimap?: boolean;
 }
 
 interface Particle {
@@ -504,8 +506,10 @@ export class Renderer {
 
     ctx.restore();
 
-    // Minimap
-    this.drawMinimap(map, player ? { x: player.x, y: player.y } : undefined);
+    // Minimap (kept for normal gameplay; the dev showcase may hide it)
+    if (options.showMinimap !== false) {
+      this.drawMinimap(map, player ? { x: player.x, y: player.y } : undefined);
+    }
 
     this.updateParticles();
   }
