@@ -11,6 +11,7 @@ import { HelpPanel } from './ui/HelpPanel';
 import { ObjectivesPanel } from './ui/ObjectivesPanel';
 
 const SAVE_KEY = 'outpost-save';
+const TILE_SIZE = 48;
 
 function saveGame(engine: GameEngine): string {
   const data = engine.save();
@@ -39,20 +40,24 @@ const App: React.FC = () => {
   const rendererRef = useRef<Renderer | null>(null);
   const tickAccumulatorRef = useRef<number>(0);
 
-  const [selectedTile, setSelectedTile] = useState<{ x: number; y: number } | null>(null);
-  const [buildType, setBuildType] = useState<BuildingTypeValue | null>(null);
+  const cameraRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
+  const mousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const buildTypeRef = useRef<BuildingTypeValue | null>(null);
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const cameraStartRef = useRef<{ x: number; y: number } | null>(null);
+  const selectedTileRef = useRef<{ x: number; y: number } | null>(null);
+  const showWinRef = useRef(false);
+
   const [showBuildMenu, setShowBuildMenu] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showObjectives, setShowObjectives] = useState(true);
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
-  const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, zoom: 1 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
-  const [cameraStart, setCameraStart] = useState<{ x: number; y: number } | null>(null);
+  const [buildType, setBuildType] = useState<BuildingTypeValue | null>(null);
   const [showWinMessage, setShowWinMessage] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [nearbyBuildings, setNearbyBuildings] = useState<import('./types').Tile[]>([]);
+  const [, setRenderTick] = useState(0);
 
   const handleSave = useCallback(() => {
     try {
@@ -77,24 +82,6 @@ const App: React.FC = () => {
     setTimeout(() => setSaveStatus(null), 2000);
   }, []);
 
-  // Stable refs for the game loop so the effect is never torn down by React state changes
-  const cameraRef = useRef(camera);
-  const mousePosRef = useRef(mousePos);
-  const buildTypeRef = useRef(buildType);
-  const selectedTileRef = useRef(selectedTile);
-  const showWinRef = useRef(showWinMessage);
-  const setShowWinRef = useRef(setShowWinMessage);
-  const handleSaveRef = useRef(handleSave);
-  const handleLoadRef = useRef(handleLoad);
-
-  // Sync refs with state (no effect restart because nothing is in the dep array)
-  useEffect(() => { cameraRef.current = camera; });
-  useEffect(() => { mousePosRef.current = mousePos; });
-  useEffect(() => { buildTypeRef.current = buildType; });
-  useEffect(() => { selectedTileRef.current = selectedTile; });
-  useEffect(() => { showWinRef.current = showWinMessage; });
-  useEffect(() => { setShowWinRef.current = setShowWinMessage; });
-
   const handleNewGame = useCallback(() => {
     if (confirm('Start a new game? Current progress will be lost (use Save to keep it).')) {
       clearSave();
@@ -113,9 +100,9 @@ const App: React.FC = () => {
       canvas.height = window.innerHeight;
       const engine = engineRef.current;
       const pos = engine.getPlayerPosition();
-      const camX = pos.x * 48 - canvas.width / (2 * 1.2);
-      const camY = pos.y * 48 - canvas.height / (2 * 1.2);
-      setCamera({ x: camX, y: camY, zoom: 1.2 });
+      const zoom = cameraRef.current.zoom;
+      cameraRef.current.x = canvas.width / 2 - pos.x * TILE_SIZE * zoom;
+      cameraRef.current.y = canvas.height / 2 - pos.y * TILE_SIZE * zoom;
     };
 
     resize();
@@ -128,40 +115,51 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Consolidated single keydown handler reading from refs
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const engine = engineRef.current;
+      const bt = buildTypeRef.current;
+
+      if (bt && ['q', 'w', 'e', 'r'].includes(e.key.toLowerCase())) {
+        switch (e.key.toLowerCase()) {
+          case 'q': engine.setBuildDirection(Dir.Up); break;
+          case 'w': engine.setBuildDirection(Dir.Right); break;
+          case 'e': engine.setBuildDirection(Dir.Down); break;
+          case 'r': engine.setBuildDirection(Dir.Left); break;
+        }
+        return;
+      }
 
       switch (e.key.toLowerCase()) {
         case 'w': case 'arrowup':
-          e.preventDefault();
-          engine.movePlayer(0, -1);
+          if (!bt) { e.preventDefault(); engine.movePlayer(0, -1); }
           break;
         case 's': case 'arrowdown':
-          e.preventDefault();
-          engine.movePlayer(0, 1);
+          if (!bt) { e.preventDefault(); engine.movePlayer(0, 1); }
           break;
         case 'a': case 'arrowleft':
-          e.preventDefault();
-          engine.movePlayer(-1, 0);
+          if (!bt) { e.preventDefault(); engine.movePlayer(-1, 0); }
           break;
         case 'd': case 'arrowright':
-          e.preventDefault();
-          engine.movePlayer(1, 0);
+          if (!bt) { e.preventDefault(); engine.movePlayer(1, 0); }
           break;
         case 'e':
-          engine.mineResource();
+          if (!bt) { engine.mineResource(); }
           break;
         case 'r':
-          engine.rotateBuilding();
+          if (!bt) { engine.rotateBuilding(); }
           break;
         case 'q':
-          engine.removeBuilding();
+          if (!bt) { engine.removeBuilding(); }
           break;
         case ' ':
           e.preventDefault();
           engine.setPaused(!engine.getConfig().paused);
           break;
+      }
+
+      switch (e.key.toLowerCase()) {
         case '=': case '+':
           engine.setTickRate(engine.getConfig().tickRate + 1);
           break;
@@ -172,44 +170,53 @@ const App: React.FC = () => {
         case '1': engine.setTickRate(5); break;
         case '2': engine.setTickRate(10); break;
         case '3': engine.setTickRate(20); break;
+      }
+
+      switch (e.key.toLowerCase()) {
         case 'b':
-          setShowBuildMenu(prev => !prev);
-          setShowInventory(false);
-          setShowHelp(false);
+          setShowBuildMenu(prev => { setShowInventory(false); setShowHelp(false); return !prev; });
           break;
         case 'i':
-          setShowInventory(prev => !prev);
-          setShowBuildMenu(false);
-          setShowHelp(false);
+          setShowInventory(prev => { setShowBuildMenu(false); setShowHelp(false); return !prev; });
           break;
         case 'h':
-          setShowHelp(prev => !prev);
-          setShowBuildMenu(false);
-          setShowInventory(false);
+          setShowHelp(prev => { setShowBuildMenu(false); setShowInventory(false); return !prev; });
           break;
         case 'o':
           setShowObjectives(prev => !prev);
           break;
-        case 'escape':
-          setBuildType(null);
-          setShowBuildMenu(false);
-          setShowInventory(false);
-          setShowHelp(false);
-          break;
-        case 'f5':
-          e.preventDefault();
-          handleSaveRef.current();
-          break;
-        case 'f9':
-          e.preventDefault();
-          handleLoadRef.current();
-          break;
+      }
+
+      if (e.key.toLowerCase() === 'escape') {
+        setBuildType(null);
+        buildTypeRef.current = null;
+        setShowBuildMenu(false);
+        setShowInventory(false);
+        setShowHelp(false);
+      }
+
+      if (e.key.toLowerCase() === 'f5') {
+        e.preventDefault();
+        handleSave();
+      }
+      if (e.key.toLowerCase() === 'f9') {
+        e.preventDefault();
+        handleLoad();
+      }
+
+      if (e.ctrlKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+      if (e.ctrlKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        handleLoad();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleSave, handleLoad]);
 
   // Stable game loop - no volatile state in deps
   useEffect(() => {
@@ -217,10 +224,12 @@ const App: React.FC = () => {
     if (!canvas || !rendererRef.current) return;
 
     let lastTime = performance.now();
+    let frameCount = 0;
 
     const gameLoop = (time: number) => {
       const delta = (time - lastTime) / 1000;
       lastTime = time;
+      frameCount++;
 
       const engine = engineRef.current;
       const renderer = rendererRef.current!;
@@ -234,27 +243,26 @@ const App: React.FC = () => {
       }
 
       if (engine.getWinState() && !showWinRef.current) {
-        setShowWinRef.current(true);
+        showWinRef.current = true;
         setShowWinMessage(true);
       }
 
       const pos = engine.getPlayerPosition();
-      setCamera(prev => {
-        const targetX = pos.x * 48 - canvas.width / (2 * prev.zoom);
-        const targetY = pos.y * 48 - canvas.height / (2 * prev.zoom);
-        return {
-          ...prev,
-          x: prev.x + (targetX - prev.x) * 0.1,
-          y: prev.y + (targetY - prev.y) * 0.1,
-        };
-      });
 
-      // Update nearby buildings periodically
-      const buildings = engine.getNearbyBuildings(pos.x, pos.y, 3);
-      setNearbyBuildings(buildings);
+      if (!isDraggingRef.current) {
+        const targetX = canvas.width / 2 - pos.x * TILE_SIZE * cameraRef.current.zoom;
+        const targetY = canvas.height / 2 - pos.y * TILE_SIZE * cameraRef.current.zoom;
+        cameraRef.current.x += (targetX - cameraRef.current.x) * 0.1;
+        cameraRef.current.y += (targetY - cameraRef.current.y) * 0.1;
+      }
 
-      const mouseW = mousePosRef.current;
+      if (frameCount % 30 === 0) {
+        const buildings = engine.getNearbyBuildings(pos.x, pos.y, 3);
+        setNearbyBuildings(buildings);
+      }
+
       const bt = buildTypeRef.current;
+      const mouseW = mousePosRef.current;
       const selTile = selectedTileRef.current;
 
       let previewTile: { x: number; y: number } | null = null;
@@ -264,8 +272,8 @@ const App: React.FC = () => {
           x: (mouseW.x - cameraRef.current.x) / cameraRef.current.zoom,
           y: (mouseW.y - cameraRef.current.y) / cameraRef.current.zoom,
         };
-        const tx = Math.floor(mouseWCam.x / 48);
-        const ty = Math.floor(mouseWCam.y / 48);
+        const tx = Math.floor(mouseWCam.x / TILE_SIZE);
+        const ty = Math.floor(mouseWCam.y / TILE_SIZE);
         if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
           previewTile = { x: tx, y: ty };
           previewColor = BUILDING_COLORS[bt];
@@ -282,11 +290,12 @@ const App: React.FC = () => {
           buildColor: previewColor,
         }
       );
+
+      requestAnimationFrame(gameLoop);
     };
 
-    const rafId = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(rafId);
-  }, []); // Empty deps = never restarts
+    requestAnimationFrame(gameLoop);
+  }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -296,93 +305,94 @@ const App: React.FC = () => {
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
 
-    setMousePos({ x: mx, y: my });
+    mousePosRef.current = { x: mx, y: my };
 
-    if (isDragging && dragStart && cameraStart) {
-      setCamera(prev => ({
-        ...prev,
-        x: cameraStart.x + (mx - dragStart.x),
-        y: cameraStart.y + (my - dragStart.y),
-      }));
+    if (isDraggingRef.current && dragStartRef.current && cameraStartRef.current) {
+      cameraRef.current.x = cameraStartRef.current.x + (mx - dragStartRef.current.x);
+      cameraRef.current.y = cameraStartRef.current.y + (my - dragStartRef.current.y);
       return;
     }
 
     const worldX = (mx - cameraRef.current.x) / cameraRef.current.zoom;
     const worldY = (my - cameraRef.current.y) / cameraRef.current.zoom;
-    const tx = Math.floor(worldX / 48);
-    const ty = Math.floor(worldY / 48);
+    const tx = Math.floor(worldX / TILE_SIZE);
+    const ty = Math.floor(worldY / TILE_SIZE);
 
     if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
-      setSelectedTile({ x: tx, y: ty });
+      selectedTileRef.current = { x: tx, y: ty };
     }
-  }, [isDragging, dragStart, cameraStart]);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX, y: e.clientY });
-      setCameraStart({ x: cameraRef.current.x, y: cameraRef.current.y });
+      isDraggingRef.current = true;
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
+      cameraStartRef.current = { x: cameraRef.current.x, y: cameraRef.current.y };
+      e.preventDefault();
       return;
     }
 
     const bt = buildTypeRef.current;
-    const st = selectedTileRef.current;
-    if (bt && st) {
-      const engine = engineRef.current;
-      const player = engine.player;
-      const dx = Math.abs(st.x - player.x);
-      const dy = Math.abs(st.y - player.y);
+    if (bt) {
+      const worldX = (mx - cameraRef.current.x) / cameraRef.current.zoom;
+      const worldY = (my - cameraRef.current.y) / cameraRef.current.zoom;
+      const tx = Math.floor(worldX / TILE_SIZE);
+      const ty = Math.floor(worldY / TILE_SIZE);
+      selectedTileRef.current = { x: tx, y: ty };
 
-      if (dx <= 1 && dy <= 1) {
-        engine.placeBuilding(bt);
+      if (tx >= 0 && tx < 120 && ty >= 0 && ty < 120) {
+        const engine = engineRef.current;
+        const player = engine.player;
+        const dx = Math.abs(tx - player.x);
+        const dy = Math.abs(ty - player.y);
+
+        if (dx <= 1 && dy <= 1) {
+          engine.placeBuildingAt(bt, tx, ty);
+          setRenderTick(t => t + 1);
+        }
       }
     }
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-    setDragStart(null);
-    setCameraStart(null);
+    isDraggingRef.current = false;
+    dragStartRef.current = null;
+    cameraStartRef.current = null;
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    setCamera(prev => {
-      const newZoom = Math.max(0.3, Math.min(3, prev.zoom - e.deltaY * 0.001));
-      return { ...prev, zoom: newZoom };
-    });
+    e.preventDefault();
+    const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+    const newZoom = Math.max(0.3, Math.min(3, cameraRef.current.zoom + zoomDelta));
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect) {
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const worldX = (mx - cameraRef.current.x) / cameraRef.current.zoom;
+      const worldY = (my - cameraRef.current.y) / cameraRef.current.zoom;
+      cameraRef.current.x = mx - worldX * newZoom;
+      cameraRef.current.y = my - worldY * newZoom;
+    }
+    cameraRef.current.zoom = newZoom;
   }, []);
 
   const handleBuildSelect = (type: BuildingTypeValue) => {
     if (buildType === type) {
       setBuildType(null);
+      buildTypeRef.current = null;
     } else {
       setBuildType(type);
+      buildTypeRef.current = type;
     }
   };
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (buildType && ['q', 'w', 'e', 'r'].includes(e.key.toLowerCase())) {
-        const engine = engineRef.current;
-        switch (e.key.toLowerCase()) {
-          case 'q': engine.setBuildDirection(Dir.Up); break;
-          case 'w': engine.setBuildDirection(Dir.Right); break;
-          case 'e': engine.setBuildDirection(Dir.Down); break;
-          case 'r': engine.setBuildDirection(Dir.Left); break;
-        }
-      }
-      if (e.ctrlKey && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        handleSaveRef.current();
-      }
-      if (e.ctrlKey && e.key.toLowerCase() === 'l') {
-        e.preventDefault();
-        handleLoadRef.current();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [buildType]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#1a1a2e', position: 'relative', userSelect: 'none' }}>
@@ -391,8 +401,9 @@ const App: React.FC = () => {
         onMouseMove={handleMouseMove}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
+        onContextMenu={e => e.preventDefault()}
         onWheel={handleWheel}
-        style={{ cursor: buildType ? 'crosshair' : 'default' }}
+        style={{ width: '100%', height: '100%', display: 'block' }}
       />
 
       {showWinMessage && (
@@ -410,6 +421,7 @@ const App: React.FC = () => {
           <button
             onClick={() => {
               setShowWinMessage(false);
+              showWinRef.current = false;
               engineRef.current.resetWinState();
             }}
             style={{
@@ -437,7 +449,7 @@ const App: React.FC = () => {
         onLoad={handleLoad}
         onNewGame={handleNewGame}
         buildType={buildType}
-        onDeselectBuild={() => setBuildType(null)}
+        onDeselectBuild={() => { setBuildType(null); buildTypeRef.current = null; }}
         saveStatus={saveStatus}
       />
 

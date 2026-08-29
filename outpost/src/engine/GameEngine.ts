@@ -526,6 +526,41 @@ export class GameEngine {
     return false;
   }
 
+  placeBuildingAt(buildingType: BuildingTypeValue, tx: number, ty: number): boolean {
+    if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) return false;
+    const tile = this._state.save.map[ty][tx];
+    const p = this._state.save.player;
+    const isPlayerTile = p.x === tx && p.y === ty;
+    if (tile.building || (!isPlayerTile && (tile.terrain === 'water' || tile.terrain === 'rock'))) return false;
+
+    const def = BUILDING_DEFS[buildingType];
+    if (!this.canAfford(def.cost)) return false;
+
+    for (const cost of def.cost) {
+      this.removeItemFromPlayerInventory(cost.resource, cost.amount);
+    }
+
+    const building = createBuilding(buildingType);
+    tile.building = building;
+    
+    // Move player off the tile if they were standing on it
+    if (isPlayerTile) {
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const nx = tx + dx;
+        const ny = ty + dy;
+        if (nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE) {
+          const ntile = this._state.save.map[ny][nx];
+          if (!ntile.building && ntile.terrain !== 'water' && ntile.terrain !== 'rock') {
+            p.x = nx;
+            p.y = ny;
+            break;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
   placeBuilding(buildingType: BuildingTypeValue): boolean {
     const p = this._state.save.player;
     const tile = this._state.save.map[p.y][p.x];
