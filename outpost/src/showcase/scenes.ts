@@ -127,3 +127,50 @@ export function isolatedOptions(extra: RenderOptions = {}): RenderOptions {
 export function gameplayOptions(extra: RenderOptions = {}): RenderOptions {
   return { ...showcaseOptions(), showPlayer: true, ...extra };
 }
+
+// ====================================================================
+// Coal-chain bootstrap scene: Miner → belts → Generator (passive)
+// ====================================================================
+
+/**
+ * A deterministic coal-chain bootstrap scene.
+ * Layout (vertical column, top to bottom):
+ *   (60,57) — Miner (coal deposit underneath, active)
+ *   (60,58) — Conveyor (Down)
+ *   (60,59) — Conveyor (Down)
+ *   (60,60) — Conveyor (Down)
+ *   (60,61) — Generator (passive belt feeds coal in)
+ *
+ * The player is hidden. Conveyors have powerConsumed: 0.
+ * After enough ticks, mined coal travels the belt chain and fuels the generator.
+ */
+export function makeCoalChainScene(): { engine: GameEngine; camera: Camera; width: number; height: number } {
+  const e = new GameEngine(42);
+  clearBox(e, 58, 55, 5, 9);
+
+  // Miner with coal deposit.
+  setResource(e, 60, 57, 'coal', 100);
+  put(e, 60, 57, makeBuilding('miner', {
+    active: true, powerConsumed: 5, direction: Dir.Down,
+    maxProgress: 30, progress: 12,
+    inventory: [{ type: 'coal', amount: 2 }],
+  }));
+
+  // 3 passive conveyors.
+  put(e, 60, 58, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 6, inventory: [{ type: 'coal', amount: 1 }] }));
+  put(e, 60, 59, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 3 }));
+  put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 9, inventory: [{ type: 'coal', amount: 1 }] }));
+
+  // Generator at the bottom (receives coal from belt chain).
+  put(e, 60, 61, makeBuilding('generator', { active: false, powerProduced: 50, maxProgress: 50, progress: 0, inventory: [] }));
+
+  e.player.x = 100; // move player off-board so it doesn't obscure the scene.
+  e.player.y = 100;
+
+  const { camera, width, height } = frameBoard({ x: 60, y: 58 }, 5, 1, 1.8, 32);
+  return { engine: e, camera, width, height };
+}
+
+export function coalChainOptions(): RenderOptions {
+  return { ...isolatedOptions(), showPlayer: false };
+}

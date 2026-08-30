@@ -30,6 +30,7 @@ import {
   showcaseOptions,
   isolatedOptions,
   gameplayOptions,
+  makeCoalChainScene,
 } from './scenes';
 import { Dir, BUILDING_NAMES, BUILDING_DEFS, ITEM_COLORS } from '../types';
 import type { Item, PowerSummary, DirectionValue } from '../types';
@@ -415,6 +416,12 @@ function ConveyorLegendRow() {
 
 function Showcase() {
   const gameplay = useMemo(() => buildGameplayBase(), []);
+  const coalChain = useMemo(() => {
+    const s = makeCoalChainScene();
+    // Run a few ticks so the belt animation progresses.
+    for (let i = 0; i < 12; i++) s.engine.tick();
+    return s;
+  }, []);
 
   // Tutorial steps mirroring the real game (some completed, some pending).
   const tutorialSteps: TutorialStep[] = [
@@ -849,6 +856,22 @@ function Showcase() {
           />
         </div>
 
+        <GroupTitle>All 8 directed elbows (output direction × entry direction)</GroupTitle>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          {/* Up elbows */}
+          <TileBoard rows={2} cols={1} origin={{ x: 42, y: 40 }} zoom={2.0} caption="Right→Up elbow" setup={(e) => { put(e, 42, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Up, maxProgress: 12, progress: 8 })); put(e, 42, 40, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 3, inventory: [{ type: 'stone', amount: 1 }] })); }} />
+          <TileBoard rows={2} cols={1} origin={{ x: 44, y: 40 }} zoom={2.0} caption="Left→Up elbow" setup={(e) => { put(e, 44, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Up, maxProgress: 12, progress: 8 })); put(e, 45, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Left, maxProgress: 12, progress: 3 })); }} />
+          {/* Right elbows */}
+          <TileBoard rows={1} cols={2} origin={{ x: 46, y: 40 }} zoom={2.0} caption="Up→Right elbow" setup={(e) => { put(e, 46, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 3 })); put(e, 47, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 8 })); }} />
+          <TileBoard rows={1} cols={2} origin={{ x: 48, y: 42 }} zoom={2.0} caption="Down→Right elbow" setup={(e) => { put(e, 48, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 3, inventory: [{ type: 'iron_ingot', amount: 1 }] })); put(e, 48, 42, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 8 })); }} />
+          {/* Down elbows */}
+          <TileBoard rows={2} cols={1} origin={{ x: 50, y: 40 }} zoom={2.0} caption="Left→Down elbow" setup={(e) => { put(e, 50, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 8 })); put(e, 49, 40, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Left, maxProgress: 12, progress: 3 })); }} />
+          <TileBoard rows={2} cols={1} origin={{ x: 52, y: 40 }} zoom={2.0} caption="Right→Down elbow" setup={(e) => { put(e, 52, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 8 })); put(e, 53, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 3 })); }} />
+          {/* Left elbows */}
+          <TileBoard rows={1} cols={2} origin={{ x: 54, y: 40 }} zoom={2.0} caption="Down→Left elbow" setup={(e) => { put(e, 54, 40, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Left, maxProgress: 12, progress: 3 })); put(e, 54, 41, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Up, maxProgress: 12, progress: 8 })); }} />
+          <TileBoard rows={1} cols={2} origin={{ x: 56, y: 40 }} zoom={2.0} caption="Up→Left elbow" setup={(e) => { put(e, 56, 40, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Left, maxProgress: 12, progress: 3 })); put(e, 56, 39, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 8 })); }} />
+        </div>
+
         <GroupTitle>Placement preview (valid green / invalid red)</GroupTitle>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
           <TileBoard
@@ -919,6 +942,18 @@ function Showcase() {
             caption="Circuit Board on belt (R-item-circuit sprite, 16×16 → 32px)"
             setup={(e) => put(e, 68, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'circuit', amount: 1 }] }))}
           />
+        </div>
+      </Section>
+
+      {/* 05b — Coal-chain Bootstrap (miner → belts → generator) */}
+      <Section id="coal-chain" title="05b · Coal-chain Bootstrap (miner → passive belts → generator)">
+        <Stage scene={{ engine: coalChain.engine, camera: coalChain.camera }} width={coalChain.width} height={coalChain.height}>
+          <></>
+        </Stage>
+        <div style={{ color: '#7f8aa6', fontSize: 11, marginTop: 8 }}>
+          A coal chain: Miner (seeded with coal) → 3 passive conveyors (powerConsumed: 0) → Generator.
+          The chain runs with zero grid power — belts are always active. After enough ticks, mined coal travels the belt chain and fuels the generator, which then powers downstream machines.
+          This is the bootstrap workflow for a zero-power grid.
         </div>
       </Section>
 

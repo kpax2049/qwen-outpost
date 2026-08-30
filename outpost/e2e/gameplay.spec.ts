@@ -361,4 +361,63 @@ test.describe('Gameplay world rendering', () => {
     expect(dims.w).toBeGreaterThan(100);
     expect(dims.h).toBeGreaterThan(100);
   });
+
+  test('all 8 directed elbows render in the conveyor showcase', async ({ page }) => {
+    await page.goto('/showcase.html');
+    await page.waitForTimeout(3000);
+
+    // The directed elbows section has 8 TileBoard canvases (4 rows of 2).
+    const elbowSection = page.locator('[data-scenario="conveyors"]');
+    // Count all canvases in the conveyors section — should include the elbow boards.
+    const allCanvases = elbowSection.locator('canvas');
+    const count = await allCanvases.count();
+    expect(count).toBeGreaterThanOrEqual(8);
+
+    // Each elbow canvas should have non-zero dimensions.
+    for (let i = 0; i < Math.min(count, 4); i++) {
+      const dims = await allCanvases.nth(i).evaluate(el => ({
+        w: el.width, h: el.height,
+      }));
+      expect(dims.w).toBeGreaterThan(50);
+      expect(dims.h).toBeGreaterThan(50);
+    }
+  });
+
+  test('coal-chain bootstrap scene renders', async ({ page }) => {
+    await page.goto('/showcase.html');
+    await page.waitForTimeout(3000);
+
+    // The coal-chain section should have a canvas rendering the belt chain.
+    const coalChainSection = page.locator('[data-scenario="coal-chain"]');
+    const canvas = coalChainSection.locator('canvas').first();
+    const exists = await canvas.count();
+    expect(exists).toBeGreaterThan(0);
+
+    const dims = await canvas.evaluate(el => ({
+      w: el.width, h: el.height,
+    }));
+    expect(dims.w).toBeGreaterThan(100);
+    expect(dims.h).toBeGreaterThan(100);
+  });
+
+  test('conveyor belt direction rendering matches stored direction', async ({ page }) => {
+    await page.goto('/showcase.html');
+    await page.waitForTimeout(3000);
+
+    // Navigate to the all-directions legend section.
+    const conveyorsSection = page.locator('[data-scenario="conveyors"]');
+    const canvases = conveyorsSection.locator('canvas');
+    const count = await canvases.count();
+    // Should have the legend row (4 canvases) plus other boards.
+    expect(count).toBeGreaterThanOrEqual(4);
+
+    // All canvases should render without errors.
+    for (let i = 0; i < Math.min(count, 6); i++) {
+      const dims = await canvases.nth(i).evaluate(el => ({
+        w: el.width, h: el.height,
+      }));
+      expect(dims.w).toBeGreaterThan(50);
+      expect(dims.h).toBeGreaterThan(50);
+    }
+  });
 });

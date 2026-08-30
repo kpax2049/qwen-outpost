@@ -317,9 +317,9 @@ export const BUILDING_DEFS: Record<BuildingTypeValue, BuildingDefinition> = {
   conveyor: {
     type: 'conveyor',
     name: 'Conveyor Belt',
-    description: 'Transports items in the facing direction.',
+    description: 'Passive logistics. Transports items in the facing direction without consuming power.',
     cost: [{ resource: 'stone', amount: 2 }],
-    powerConsumed: 1,
+    powerConsumed: 0,
     maxInventory: 1,
     maxProgress: 12,
     color: '#444444',

@@ -306,6 +306,10 @@ export class GameEngine {
   /**
    * Global power grid. Produced power = active (fueled) generators only.
    * Consumers are powered when production covers consumption.
+   *
+   * Conveyor Belts are PASSIVE LOGISTICS — they do NOT consume or count
+   * toward grid power. They are always active and run regardless of the
+   * grid state. Only Miner / Smelter / Furnace / Assembler draw power.
    */
   private updatePowerGrid(): void {
     let totalProduced = 0;
@@ -319,6 +323,10 @@ export class GameEngine {
         const tile = this._state.save.map[y][x];
         if (!tile.building) continue;
         const b = tile.building;
+
+        // Conveyors are passive — never count toward power.
+        if (b.type === BuildingTypeMap.conveyor) continue;
+
         if (b.powerProduced) {
           generatorCount++;
           if (b.active) {
@@ -348,6 +356,13 @@ export class GameEngine {
         const tile = this._state.save.map[y][x];
         if (!tile.building) continue;
         const b = tile.building;
+
+        // Conveyors: always active (passive logistics).
+        if (b.type === BuildingTypeMap.conveyor) {
+          b.active = true;
+          continue;
+        }
+
         if (b.powerProduced) {
           // Generators: leave active as set by updateGenerators (fuel-driven)
         } else if (b.powerConsumed > 0) {
@@ -997,7 +1012,6 @@ export class GameEngine {
         return { status: 'Mining', statusColor: 'ok' };
       }
       case BuildingTypeMap.conveyor: {
-        if (!b.active) return { status: 'No Power', statusColor: 'bad' };
         const invItem = b.inventory[0];
         if (!invItem || invItem.amount <= 0) return { status: 'Idle — waiting for item', statusColor: 'warn' };
         if (b.blocked) return { status: b.statusReason ?? 'Blocked', statusColor: 'bad' };

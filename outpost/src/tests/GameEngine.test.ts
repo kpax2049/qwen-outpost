@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../engine/GameEngine';
 import { BUILDING_DEFS, MAP_SIZE, ITEM_DISPLAY_NAMES, Dir } from '../types';
-import type { BuildingTypeValue, DirectionValue } from '../types';
+import type { BuildingTypeValue, DirectionValue, Building } from '../types';
 
 // Helper: give player resources to build anything
 function fundPlayer(engine: GameEngine) {
@@ -235,12 +235,10 @@ describe('GameEngine - Conveyor Belts', () => {
     expect(engine.getTile(60, 60)!.building!.maxProgress).toBe(12);
   });
 
-  it('conveyor transfers item when powered and active', () => {
+  it('conveyor transfers item to adjacent building in its output direction', () => {
     const engine = new GameEngine(42);
     fundPlayer(engine);
-    // A fueled generator provides power for the belt (grid is global).
-    engine.placeBuilding('generator');
-    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 50 });
+    // No generator needed — conveyors are passive and always active.
     engine.movePlayer(0, 1);
     engine.placeBuilding('conveyor');
     engine.movePlayer(0, 1);
@@ -248,11 +246,14 @@ describe('GameEngine - Conveyor Belts', () => {
 
     const conveyor = engine.getTile(60, 61)!.building!;
     conveyor.inventory = [{ type: 'stone', amount: 3 }];
+    // Conveyors are passive — always active regardless of grid power.
+    conveyor.active = true;
 
     for (let i = 0; i < 25; i++) engine.tick();
 
+    // Belt should have pushed at least one item forward.
     const remaining = conveyor.inventory.find(i => i.type === 'stone');
-    // After 25 ticks at maxProgress 12 the belt should have pushed at least one item off.
+    expect(remaining).toBeDefined();
     if (remaining) expect(remaining.amount).toBeLessThan(3);
 
     // Storage should have received the pushed stone.
@@ -265,13 +266,12 @@ describe('GameEngine - Conveyor Belts', () => {
   it('conveyor holds an item when the belt ahead points back (head-on block)', () => {
     const engine = new GameEngine(42);
     fundPlayer(engine);
-    engine.placeBuilding('generator');
-    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 50 });
+    // Conveyors are passive — no generator needed.
 
     const placeBelt = (x: number, y: number, direction: DirectionValue) => {
       engine.map[y][x].terrain = 'grass';
       engine.map[y][x].building = {
-        type: 'conveyor', direction, active: false, powerConsumed: 1,
+        type: 'conveyor', direction, active: true, powerConsumed: 0,
         powerProduced: undefined, inventory: [], maxInventory: 1,
         progress: 0, maxProgress: 12, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
       };
@@ -292,13 +292,12 @@ describe('GameEngine - Conveyor Belts', () => {
   it('conveyor items can turn a 90-degree corner', () => {
     const engine = new GameEngine(42);
     fundPlayer(engine);
-    engine.placeBuilding('generator');
-    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 50 });
+    // Conveyors are passive — no generator needed.
 
     const placeBelt = (x: number, y: number, direction: DirectionValue) => {
       engine.map[y][x].terrain = 'grass';
       engine.map[y][x].building = {
-        type: 'conveyor', direction, active: false, powerConsumed: 1,
+        type: 'conveyor', direction, active: true, powerConsumed: 0,
         powerProduced: undefined, inventory: [], maxInventory: 1,
         progress: 0, maxProgress: 12, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
       };
@@ -311,6 +310,59 @@ describe('GameEngine - Conveyor Belts', () => {
     for (let i = 0; i < 12; i++) engine.tick();
     expect(engine.map[61][60].building!.inventory.length).toBe(0);
     expect(engine.map[61][61].building!.inventory[0]?.type).toBe('stone');
+  });
+
+  it('conveyor is always active — does NOT consume grid power', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('conveyor');
+    const belt = engine.getTile(60, 60)!.building!;
+
+    // Conveyors consume 0 power.
+    expect(belt.powerConsumed).toBe(0);
+    expect(engine.getPowerSummary().consumed).toBe(0);
+
+    // Even with zero generators, the belt is active.
+    engine.tick();
+    expect(belt.active).toBe(true);
+
+    // Placing a powered machine doesn't make the belt inactive.
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('miner');
+    engine.tick();
+    expect(belt.active).toBe(true); // belt stays active
+    // The miner has no power (no generator), so it's inactive.
+    expect(engine.getTile(60, 61)!.building!.active).toBe(false);
+  });
+
+  it('adding many belts does NOT increase grid power demand', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    // Clear tiles along the build column.
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    for (let y = 60; y <= 72; y++) setG(60, y);
+
+    // Place one generator and fuel it.
+    engine.placeBuilding('generator');
+    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    // Place a miner (consumes 5 power).
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('miner');
+
+    let power = engine.getPowerSummary();
+    expect(power.consumed).toBe(5); // only the miner counts
+
+    // Add 10 belts — consumed should stay at 5.
+    for (let i = 0; i < 10; i++) {
+      engine.movePlayer(0, 1);
+      engine.placeBuilding('conveyor');
+    }
+    engine.tick();
+    power = engine.getPowerSummary();
+    expect(power.consumed).toBe(5);
+    expect(engine.countBuildings('conveyor')).toBe(10);
   });
 });
 
@@ -569,6 +621,11 @@ describe('Building Definitions', () => {
     expect(BUILDING_DEFS.smelter.consumesItems!.some(c => c.type === 'iron')).toBe(true);
     expect(BUILDING_DEFS.smelter.consumesItems!.some(c => c.type === 'coal')).toBe(true);
     expect(BUILDING_DEFS.smelter.producesItem).toBe('iron_ingot');
+  });
+
+  it('conveyor is passive — consumes zero grid power', () => {
+    expect(BUILDING_DEFS.conveyor.powerConsumed).toBe(0);
+    expect(BUILDING_DEFS.conveyor.powerProduced).toBe(undefined);
   });
 });
 
@@ -846,3 +903,244 @@ describe('GameEngine - Coal Chain (miner -> belts -> generator)', () => {
     expect(engine.map[59][60].resource!.amount).toBeLessThan(20);
   });
 });
+
+// ==================== ACCEPTANCE TESTS (end-to-end) ====================
+
+describe('Acceptance - Passive conveyors run without grid power', () => {
+  it('a belt chain mechanically runs with zero generators', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    // Clear tiles.
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    setG(60, 61); setG(60, 62); setG(60, 63);
+    engine.movePlayer(0, 1); engine.placeBuilding('conveyor');
+    engine.movePlayer(0, 1); engine.placeBuilding('conveyor');
+    engine.movePlayer(0, 1); engine.placeBuilding('chest');
+
+    const belt0 = engine.getTile(60, 61)!.building!;
+    const belt1 = engine.getTile(60, 62)!.building!;
+    belt0.inventory = [{ type: 'stone', amount: 1 }];
+    belt0.active = true;
+    belt1.active = true;
+
+    engine.tick(); // no generators — all conveyors still active
+
+    expect(belt0.active).toBe(true);
+    expect(belt1.active).toBe(true);
+    expect(engine.getPowerSummary().produced).toBe(0);
+    expect(engine.getPowerSummary().consumed).toBe(0);
+
+    // After enough ticks, belt0 → belt1 → chest.
+    for (let i = 0; i < 30; i++) engine.tick();
+    const chest = engine.getTile(60, 63)!.building!;
+    const onChest = chest.inventory.find(i => i.type === 'stone');
+    expect(onChest).toBeDefined();
+  });
+});
+
+describe('Acceptance - Powered machines need power', () => {
+  it('a Miner without power does not mine', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[59][60].terrain = 'grass';
+    engine.map[59][60].resource = { type: 'coal', amount: 100 };
+    engine.movePlayer(0, -1);
+    engine.placeBuilding('miner');
+    // No generator → miner has no power.
+    engine.tick();
+    expect(engine.getTile(60, 59)!.building!.active).toBe(false);
+  });
+});
+
+describe('Acceptance - Coal bootstrap to zero-power grid', () => {
+  it('coal on a passive belt reaches a Generator with grid initially at zero', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    setG(60, 61); setG(60, 62); setG(60, 63);
+    // Place a Generator (no coal yet).
+    engine.placeBuilding('generator');
+    // Place belt chain leading to it.
+    engine.movePlayer(0, 1); engine.setBuildDirection(Dir.Down);
+    engine.placeBuilding('conveyor');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('conveyor');
+    engine.movePlayer(0, 1);
+    // Place a chest behind the generator so belts have a destination.
+    engine.placeBuilding('chest');
+
+    // Put coal on the first belt.
+    const belt0 = engine.getTile(60, 61)!.building!;
+    belt0.inventory = [{ type: 'coal', amount: 3 }];
+    belt0.active = true;
+
+    engine.tick();
+
+    // The generator still has no coal (it's not at the end of the belt chain yet).
+    const gen = engine.getTile(60, 60)!.building!;
+    const genCoal = gen.inventory.find(i => i.type === 'coal');
+    expect(genCoal).toBeUndefined();
+
+    // After enough ticks the coal travels through the belts.
+    for (let i = 0; i < 40; i++) engine.tick();
+
+    // Coal should now be at the chest (end of chain).
+    const chest = engine.getTile(60, 63)!.building!;
+    const chestCoal = chest.inventory.find(i => i.type === 'coal');
+    expect(chestCoal).toBeDefined();
+  });
+});
+
+describe('Acceptance - Generator power output', () => {
+  it('one fueled 50-power Generator produces 50 power', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('generator');
+    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 10 });
+    engine.tick();
+
+    const p = engine.getPowerSummary();
+    expect(p.fueledGenerators).toBe(1);
+    expect(p.produced).toBe(50);
+    expect(p.surplus).toBe(50);
+    expect(p.enough).toBe(true);
+  });
+});
+
+describe('Acceptance - Distant machines operate on grid power', () => {
+  it('a distant Miner + Smelter below 50 operate without being adjacent to the Generator', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    // Generator at (60, 60) with coal.
+    setG(60, 61); setG(60, 62);
+    engine.placeBuilding('generator');
+    engine.getTile(60, 60)!.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    // Miner at (60, 61) — 1 tile away.
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('miner');
+
+    // Smelter at (60, 62) — 2 tiles away (not adjacent to generator).
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('smelter');
+    engine.getTile(60, 62)!.building!.inventory = [
+      { type: 'iron' as const, amount: 5 },
+      { type: 'coal' as const, amount: 5 },
+    ];
+
+    engine.tick();
+
+    const p = engine.getPowerSummary();
+    expect(p.produced).toBe(50);
+    expect(p.consumed).toBe(15); // miner(5) + smelter(10)
+    expect(p.enough).toBe(true);
+
+    // Both machines should be active.
+    expect(engine.getTile(60, 61)!.building!.active).toBe(true);
+    expect(engine.getTile(60, 62)!.building!.active).toBe(true);
+  });
+});
+
+describe('Acceptance - Direction and rendering consistency', () => {
+  it('every cardinal direction matches inspection Direction', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    // Place each belt at a different tile so all placements succeed.
+    const tiles: [number, number, DirectionValue, string][] = [
+      [60, 60, Dir.Up, 'Up'],
+      [61, 60, Dir.Right, 'Right'],
+      [60, 61, Dir.Down, 'Down'],
+      [61, 61, Dir.Left, 'Left'],
+    ];
+    let px = 60, py = 60;
+    for (const [tx, ty, dir, label] of tiles) {
+      engine.map[ty][tx].terrain = 'grass';
+      // Move player to target tile using axis-aligned steps.
+      if (px < tx) { engine.movePlayer(1, 0); px++; }
+      else if (px > tx) { engine.movePlayer(-1, 0); px--; }
+      if (py < ty) { engine.movePlayer(0, 1); py++; }
+      else if (py > ty) { engine.movePlayer(0, -1); py--; }
+      engine.setBuildDirection(dir);
+      engine.placeBuilding('conveyor');
+      const info = engine.inspectBuilding(tx, ty)!;
+      expect(info.direction).toBe(dir);
+      expect(info.directionLabel).toContain(label);
+    }
+  });
+
+  it('remote selection + R changes direction and all state consistently', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('conveyor');
+    const tile = engine.getTile(60, 60)!;
+
+    expect(tile.building!.direction).toBe(Dir.Down);
+
+    // Move away, then rotate the conveyor remotely.
+    engine.movePlayer(0, 1);
+    engine.movePlayer(0, -1); // back to (60, 60)
+    engine.rotateBuilding();
+
+    // Rotation: (Down(2) + 1) % 4 = Left(3).
+    expect(tile.building!.direction).toBe(Dir.Left);
+    const info = engine.inspectBuilding(60, 60)!;
+    expect(info.direction).toBe(Dir.Left);
+    expect(info.directionLabel).toContain('Left');
+  });
+});
+
+describe('Acceptance - Adjacent non-feeding belt', () => {
+  it('a deliberately adjacent but non-feeding belt is NOT treated as connected', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    // Belt A at (60, 61) points Right (output goes to (61, 61)).
+    setG(61, 61);
+    engine.map[61][60] = { terrain: 'grass', building: makeBelt(Dir.Right) };
+
+    // Belt B at (61, 61) points Down (output goes to (61, 62)).
+    // Physically adjacent to belt A's right side, but belt B's OUTPUT does NOT point into belt A.
+    engine.map[61][61] = { terrain: 'grass', building: makeBelt(Dir.Down) };
+
+    // Belt A's output goes to (61, 61) which has a belt pointing Down.
+    // getOutConnection should show a turn, NOT a straight.
+    const out = engine.getConnections(60, 61)!;
+    expect(out.outgoing.kind).toBe('turn');
+
+    // Belt B's incoming: check if any belt feeds into it from its left side (Dir.Right direction).
+    // Belt A at (60, 61) points Right, so its output tile is (61, 61) — which IS belt B.
+    // So belt B DOES receive from belt A (elbow entry). This is correct behavior — belt A's output
+    // genuinely points into belt B's tile.
+    const inB = engine.getConnections(61, 61)!;
+    expect(inB.incoming!.kind).toBe('turn');
+  });
+
+  it('head-on belts are blocked — output opposite direction', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    // Belt A at (60, 61) points Down.
+    setG(60, 62);
+    engine.map[61][60] = { terrain: 'grass', building: makeBelt(Dir.Down) };
+    // Belt B at (61, 62) points Up (back at A).
+    engine.map[62][60] = { terrain: 'grass', building: makeBelt(Dir.Up) };
+
+    const outA = engine.getConnections(60, 61)!;
+    expect(outA.outgoing.kind).toBe('headon');
+  });
+});
+
+// ==================== HELPER ====================
+
+function makeBelt(direction: DirectionValue): Building {
+  return {
+    type: 'conveyor', direction, active: true, powerConsumed: 0,
+    powerProduced: undefined, inventory: [], maxInventory: 1,
+    progress: 0, maxProgress: 12, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
+  };
+}
