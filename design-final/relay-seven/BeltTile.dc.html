@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="{{ box }}">
+  <div style="{{ shadow }}"></div>
+  <div style="{{ frameA }}"><div style="{{ treadA }}"></div></div>
+  <div style="{{ frameB }}"><div style="{{ treadB }}"></div></div>
+  <div style="{{ patch }}"></div>
+  <div style="{{ hatch }}"></div>
+  <div style="{{ arrow }}"></div>
+  <div style="{{ item }}"></div>
+  <div style="{{ gate }}"></div>
+  <div style="{{ collar }}"></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:100,&quot;height&quot;:100},&quot;dir&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;up&quot;,&quot;down&quot;,&quot;left&quot;,&quot;right&quot;],&quot;default&quot;:&quot;right&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;from&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;up&quot;,&quot;down&quot;,&quot;left&quot;,&quot;right&quot;],&quot;default&quot;:null,&quot;tsType&quot;:&quot;string | null&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;moving&quot;,&quot;stopped&quot;,&quot;blocked&quot;,&quot;nopower&quot;],&quot;default&quot;:&quot;moving&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:48,&quot;min&quot;:24,&quot;max&quot;:120,&quot;tsType&quot;:&quot;number&quot;},&quot;item&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#A0522D&quot;,&quot;#B87333&quot;,&quot;#8A8A8A&quot;,&quot;#FFD700&quot;],&quot;default&quot;:null,&quot;tsType&quot;:&quot;string | null&quot;},&quot;gate&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const INK = '#101418';
+const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
+const ST = {
+  moving:  { c: 0,         run: 1, hatch: 0, dim: 0 },
+  stopped: { c: '#767C85', run: 0, hatch: 0, dim: 0 },
+  blocked: { c: '#F6BB45', run: 0, hatch: 0, dim: 0, gate: 1 },
+  nopower: { c: '#98A0A9', run: 0, hatch: 1, dim: 1 }
+};
+const off = (v) => v ? { display: 'none' } : {};
+const horiz = (d) => d === 'left' || d === 'right';
+
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const Z = Number(p.size) || 48;
+    const st = ST[p.state] || ST.moving;
+    const dir = p.dir || 'right';
+    const inEdge = p.from || OPP[dir];
+    const isTurn = inEdge !== OPP[dir];
+    const t = Math.round(Z * 0.58);
+    const edge = Math.round((Z - t) / 2);
+    const ink = Math.max(2, Math.round(Z * 0.042));
+    const rim = Math.max(3, Math.round(Z * 0.075));
+    const tread = st.dim ? '#2A313A' : '#39434E';
+    const dark = '#1B222A';
+    const stepA = Math.max(5, Math.round(Z * 0.13));
+    const stepB = Math.max(2, Math.round(Z * 0.045));
+    const chev = (deg) => 'repeating-linear-gradient(' + deg + 'deg,' + tread + ' 0 ' + stepA + 'px,' + dark + ' ' + stepA + 'px ' + (stepA + stepB) + 'px)';
+    const anim = st.run ? (horiz(dir) ? 'belt' : 'beltv') + ' .9s linear infinite' : 'none';
+
+    // one continuous band for a straight belt; two half-bands for an elbow
+    const half = (e) => {
+      const L = Math.round(Z / 2) + Math.round(t / 2);
+      if (e === 'up')    return { left: edge + 'px', top: 0, width: t + 'px', height: L + 'px', borderLeft: ink + 'px solid ' + INK, borderRight: ink + 'px solid ' + INK };
+      if (e === 'down')  return { left: edge + 'px', bottom: 0, width: t + 'px', height: L + 'px', borderLeft: ink + 'px solid ' + INK, borderRight: ink + 'px solid ' + INK };
+      if (e === 'left')  return { top: edge + 'px', left: 0, height: t + 'px', width: L + 'px', borderTop: ink + 'px solid ' + INK, borderBottom: ink + 'px solid ' + INK };
+      return { top: edge + 'px', right: 0, height: t + 'px', width: L + 'px', borderTop: ink + 'px solid ' + INK, borderBottom: ink + 'px solid ' + INK };
+    };
+    const full = (d) => horiz(d)
+      ? { top: edge + 'px', left: 0, width: Z + 'px', height: t + 'px', borderTop: ink + 'px solid ' + INK, borderBottom: ink + 'px solid ' + INK }
+      : { left: edge + 'px', top: 0, width: t + 'px', height: Z + 'px', borderLeft: ink + 'px solid ' + INK, borderRight: ink + 'px solid ' + INK };
+
+    const frameBase = { position: 'absolute', boxSizing: 'border-box', background: dark, overflow: 'hidden' };
+    const treadFor = (axisHoriz) => ({ position: 'absolute', inset: rim - ink + 'px', background: chev(axisHoriz ? 90 : 180), animation: anim });
+
+    const A = isTurn ? { ...frameBase, ...half(inEdge) } : { ...frameBase, ...full(dir) };
+    const B = isTurn ? { ...frameBase, ...half(dir) } : { display: 'none' };
+
+    const aw = Math.round(Z * 0.28);
+    const arrowClip = { up: 'polygon(50% 0,100% 100%,0 100%)', down: 'polygon(0 0,100% 0,50% 100%)', left: 'polygon(100% 0,100% 100%,0 50%)', right: 'polygon(0 0,0 100%,100% 50%)' }[dir];
+    const gateSide = {
+      up: { top: 0, left: edge + 'px', width: t + 'px', height: Math.max(3, Math.round(Z * 0.09)) + 'px' },
+      down: { bottom: 0, left: edge + 'px', width: t + 'px', height: Math.max(3, Math.round(Z * 0.09)) + 'px' },
+      left: { left: 0, top: edge + 'px', height: t + 'px', width: Math.max(3, Math.round(Z * 0.09)) + 'px' },
+      right: { right: 0, top: edge + 'px', height: t + 'px', width: Math.max(3, Math.round(Z * 0.09)) + 'px' }
+    }[dir];
+
+    return {
+      box: { position: 'relative', width: Z + 'px', height: Z + 'px', flex: '0 0 auto' },
+      shadow: { position: 'absolute', left: edge + 'px', right: edge + 'px', top: edge + Math.round(Z * 0.08) + 'px', height: t + 'px', background: 'rgba(8,12,16,.35)', filter: 'blur(' + Math.round(Z * 0.05) + 'px)' },
+      frameA: A,
+      treadA: treadFor(isTurn ? horiz(inEdge) : horiz(dir)),
+      frameB: B,
+      treadB: isTurn ? treadFor(horiz(dir)) : { display: 'none' },
+      patch: { ...off(!isTurn), position: 'absolute', left: edge + rim + 'px', top: edge + rim + 'px', width: t - rim * 2 + 'px', height: t - rim * 2 + 'px', background: tread },
+      hatch: { ...off(!st.hatch), position: 'absolute', inset: 0, background: 'repeating-linear-gradient(45deg,rgba(16,20,24,.6) 0 3px,rgba(16,20,24,0) 3px 6px)' },
+      arrow: { position: 'absolute', left: '50%', top: '50%', width: aw + 'px', height: aw + 'px', transform: 'translate(-50%,-50%)', background: st.dim ? '#6B737C' : '#9FB0BE', clipPath: arrowClip },
+      item: { ...off(!p.item), position: 'absolute', left: '50%', top: '50%', width: Math.round(Z * 0.3) + 'px', height: Math.round(Z * 0.3) + 'px', transform: 'translate(-50%,-50%)', background: p.item, border: Math.max(2, Math.round(Z * 0.042)) + 'px solid ' + INK, borderRadius: '2px' },
+      gate: { ...off(!(st.gate || p.gate)), position: 'absolute', ...gateSide, background: '#EC6058', boxShadow: '0 0 8px #EC6058AA', animation: 'pulseWarn 1.2s ease-in-out infinite' },
+      collar: { ...off(!st.c), position: 'absolute', inset: '1px', border: Math.max(2, Math.round(Z * 0.042)) + 'px ' + (p.state === 'nopower' ? 'dashed' : 'solid') + ' ' + st.c, borderRadius: '3px', boxSizing: 'border-box', opacity: .85 }
+    };
+  }
+}
+</script>
+</body>
+</html>

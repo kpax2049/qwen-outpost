@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="{{ box }}">
+  <div style="{{ shadow }}"></div>
+  <div style="{{ aura }}"></div>
+  <div style="{{ ink }}">
+    <div style="{{ body }}">
+      <div style="{{ sheen }}"></div>
+      <div style="{{ glyphBox }}">
+        <div style="{{ g0 }}"></div>
+        <div style="{{ g1 }}"></div>
+        <div style="{{ g2 }}"></div>
+      </div>
+      <div style="{{ hatch }}"></div>
+    </div>
+  </div>
+  <div style="{{ collar }}"></div>
+  <div style="{{ dirTab }}"></div>
+  <div style="{{ barTrack }}"><div style="{{ barFill }}"></div></div>
+  <div style="{{ badge }}">
+    <div style="{{ b0 }}"></div>
+    <div style="{{ b1 }}"></div>
+  </div>
+  <div style="{{ countPill }}">{{ count }}</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:120,&quot;height&quot;:120},&quot;type&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;miner&quot;,&quot;generator&quot;,&quot;smelter&quot;,&quot;steel&quot;,&quot;assembler&quot;,&quot;storage&quot;,&quot;chest&quot;,&quot;conveyor&quot;],&quot;default&quot;:&quot;smelter&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;working&quot;,&quot;waiting&quot;,&quot;blocked&quot;,&quot;nopower&quot;,&quot;nofuel&quot;,&quot;idle&quot;,&quot;plain&quot;],&quot;default&quot;:&quot;working&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:56,&quot;min&quot;:24,&quot;max&quot;:160,&quot;tsType&quot;:&quot;number&quot;},&quot;progress&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:0.45,&quot;min&quot;:0,&quot;max&quot;:1,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;},&quot;count&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:null,&quot;tsType&quot;:&quot;number | null&quot;},&quot;dir&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;up&quot;,&quot;down&quot;,&quot;left&quot;,&quot;right&quot;],&quot;default&quot;:&quot;down&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showDir&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const INK = '#101418';
+const T = {
+  miner:     { a: '#E8AE4A', d: '#B0741F', clip: 'polygon(0 0,100% 0,100% 66%,66% 100%,34% 100%,0 66%)', r: '3px' },
+  generator: { a: '#F0774A', d: '#B4401C', clip: 'circle(50% at 50% 50%)', r: '50%' },
+  smelter:   { a: '#E0575C', d: '#9E2B33', clip: 'polygon(0 18%,52% 18%,52% 0,76% 0,76% 18%,100% 18%,100% 100%,0 100%)', r: '3px' },
+  steel:     { a: '#8A88E4', d: '#4A47A8', clip: 'polygon(0 20%,16% 20%,16% 0,38% 0,38% 20%,60% 20%,60% 0,82% 0,82% 20%,100% 20%,100% 100%,0 100%)', r: '3px' },
+  assembler: { a: '#4CBE9A', d: '#1F7A5E', clip: 'polygon(26% 0,74% 0,100% 26%,100% 74%,74% 100%,26% 100%,0 74%,0 26%)', r: '3px' },
+  storage:   { a: '#93A7BC', d: '#5C6E80', clip: 'polygon(0 0,100% 0,100% 100%,0 100%)', r: '4px' },
+  chest:     { a: '#A8B7C6', d: '#6B7C8C', clip: 'polygon(0 0,100% 0,100% 100%,0 100%)', r: '4px', sc: 0.7 },
+  conveyor:  { a: '#39434E', d: '#1E252C', clip: 'polygon(0 0,100% 0,100% 100%,0 100%)', r: '2px' }
+};
+const S = {
+  working: { c: '#5FCB93', ls: 'solid',  bar: 1, bdg: 0,   dim: 0, hatch: 0 },
+  waiting: { c: '#5FAEE0', ls: 'dashed', bar: 0, bdg: 'in',    dim: 0, hatch: 0 },
+  blocked: { c: '#F6BB45', ls: 'solid',  bar: 1, bdg: 'stop',  dim: 0, hatch: 0 },
+  nopower: { c: '#98A0A9', ls: 'dashed', bar: 0, bdg: 'power', dim: 1, hatch: 1 },
+  nofuel:  { c: '#EC6058', ls: 'solid',  bar: 0, bdg: 'fuel',  dim: 1, hatch: 0 },
+  idle:    { c: '#767C85', ls: 'dotted', bar: 0, bdg: 0,   dim: 1, hatch: 0 },
+  plain:   { c: 0,         ls: 'solid',  bar: 0, bdg: 0,   dim: 0, hatch: 0 }
+};
+const off = (v) => v ? { display: 'none' } : {};
+
+function glyph(type, c, w) {
+  const px = Math.max(2, Math.round(w * 0.16));
+  const A = { position: 'absolute' };
+  switch (type) {
+    case 'miner': return [
+      { ...A, left: '14%', top: 0, width: '72%', height: '20%', background: c, borderRadius: 1 },
+      { ...A, left: '28%', top: '26%', width: '44%', height: '74%', background: c, clipPath: 'polygon(0 0,100% 0,50% 100%)' },
+      { display: 'none' }];
+    case 'generator': return [
+      { ...A, inset: 0, border: px + 'px solid ' + c, borderRadius: '50%' },
+      { ...A, left: '30%', top: '18%', width: '40%', height: '64%', background: c, clipPath: 'polygon(58% 0,20% 52%,50% 52%,42% 100%,80% 44%,50% 44%)' },
+      { display: 'none' }];
+    case 'smelter': return [
+      { ...A, left: '6%', top: '6%', width: '88%', height: '56%', background: c, clipPath: 'polygon(0 0,100% 0,74% 100%,26% 100%)' },
+      { ...A, left: '18%', top: '74%', width: '64%', height: '20%', background: c, borderRadius: 1 },
+      { display: 'none' }];
+    case 'steel': return [
+      { ...A, left: '2%', top: '6%', width: '42%', height: '56%', background: c, clipPath: 'polygon(0 0,100% 0,72% 100%,28% 100%)' },
+      { ...A, left: '56%', top: '6%', width: '42%', height: '56%', background: c, clipPath: 'polygon(0 0,100% 0,72% 100%,28% 100%)' },
+      { ...A, left: '10%', top: '74%', width: '80%', height: '20%', background: c, borderRadius: 1 }];
+    case 'assembler': return [
+      { ...A, inset: '4%', border: px + 'px solid ' + c, transform: 'rotate(45deg)' },
+      { ...A, left: '34%', top: '34%', width: '32%', height: '32%', borderRadius: '50%', background: c },
+      { display: 'none' }];
+    case 'conveyor': return [
+      { ...A, left: '10%', top: '30%', width: '80%', height: '40%', background: 'transparent', borderTop: px + 'px solid ' + c, borderBottom: px + 'px solid ' + c },
+      { display: 'none' }, { display: 'none' }];
+    default: return [
+      { ...A, inset: '4%', border: px + 'px solid ' + c, borderRadius: 2 },
+      { ...A, left: '4%', top: '44%', width: '92%', height: px + 'px', background: c },
+      { display: 'none' }];
+  }
+}
+
+function badge(kind, c, w) {
+  const px = Math.max(2, Math.round(w * 0.17));
+  const A = { position: 'absolute' };
+  if (kind === 'in') return [
+    { ...A, left: '40%', top: '12%', width: '20%', height: '40%', background: c },
+    { ...A, left: '22%', top: '46%', width: '56%', height: '40%', background: c, clipPath: 'polygon(0 0,100% 0,50% 100%)' }];
+  if (kind === 'stop') return [
+    { ...A, left: '24%', top: '20%', width: '18%', height: '60%', background: c },
+    { ...A, left: '58%', top: '20%', width: '18%', height: '60%', background: c }];
+  if (kind === 'power') return [
+    { ...A, left: '30%', top: '14%', width: '40%', height: '72%', background: c, clipPath: 'polygon(58% 0,16% 54%,48% 54%,40% 100%,84% 44%,50% 44%)' },
+    { ...A, left: '6%', top: '48%', width: '88%', height: px + 'px', background: c, transform: 'rotate(-42deg)' }];
+  return [
+    { ...A, left: '22%', top: '22%', width: '56%', height: '56%', border: px + 'px solid ' + c, borderRadius: '50%' },
+    { ...A, left: '46%', top: '26%', width: px + 'px', height: '32%', background: c, transformOrigin: 'bottom center', transform: 'rotate(38deg)' }];
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const Z = Number(p.size) || 56;
+    const t = T[p.type] || T.storage;
+    const st = S[p.state] || S.working;
+    const sc = t.sc || 1;
+    const pad = Math.round(Z * (1 - sc) / 2) + Math.round(Z * 0.07);
+    const a = st.dim ? '#7C838C' : t.a;
+    const d = st.dim ? '#4A5158' : t.d;
+    const gw = Math.round(Z * 0.42);
+    const gl = glyph(p.type, INK, gw);
+    const bw = Math.round(Z * 0.3);
+    const bg = st.bdg ? badge(st.bdg, INK, bw) : [{ display: 'none' }, { display: 'none' }];
+    const prog = Math.max(0.04, Math.min(1, p.progress == null ? 0.45 : Number(p.progress)));
+    const dir = p.dir || 'down';
+    const tabSide = { up: { top: '-1px', left: '50%', marginLeft: '-14%' }, down: { bottom: '-1px', left: '50%', marginLeft: '-14%' }, left: { left: '-1px', top: '50%', marginTop: '-14%' }, right: { right: '-1px', top: '50%', marginTop: '-14%' } }[dir];
+    const tabSize = (dir === 'up' || dir === 'down') ? { width: '28%', height: Math.max(3, Z * 0.07) + 'px' } : { height: '28%', width: Math.max(3, Z * 0.07) + 'px' };
+
+    return {
+      count: p.count == null ? '' : p.count,
+      box: { position: 'relative', width: Z + 'px', height: Z + 'px', flex: '0 0 auto' },
+      shadow: { position: 'absolute', left: pad + 'px', right: pad + 'px', top: pad + Math.round(Z * 0.08) + 'px', bottom: Math.max(1, pad - Math.round(Z * 0.05)) + 'px', background: 'rgba(8,12,16,.45)', borderRadius: t.r, filter: 'blur(' + Math.round(Z * 0.045) + 'px)' },
+      aura: { ...off(!(p.state === 'working')), position: 'absolute', inset: Math.round(pad * 0.2) + 'px', borderRadius: t.r, boxShadow: '0 0 ' + Math.round(Z * 0.22) + 'px ' + a + '55' },
+      ink: { position: 'absolute', inset: pad + 'px', background: INK, clipPath: t.clip, borderRadius: t.r },
+      body: { position: 'absolute', inset: Math.max(2, Math.round(Z * 0.045)) + 'px', clipPath: t.clip, borderRadius: t.r, background: 'linear-gradient(160deg,' + a + ' 0%,' + a + ' 46%,' + d + ' 47%,' + d + ' 100%)', overflow: 'hidden' },
+      sheen: { position: 'absolute', left: 0, top: 0, right: 0, height: '30%', background: 'linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0))' },
+      hatch: { ...off(!st.hatch), position: 'absolute', inset: 0, background: 'repeating-linear-gradient(45deg,rgba(16,20,24,.62) 0 ' + Math.round(Z * 0.055) + 'px,rgba(16,20,24,0) ' + Math.round(Z * 0.055) + 'px ' + Math.round(Z * 0.11) + 'px)' },
+      glyphBox: { position: 'absolute', left: '50%', top: '50%', width: gw + 'px', height: gw + 'px', marginLeft: -gw / 2 + 'px', marginTop: -gw / 2 + 'px' },
+      g0: gl[0], g1: gl[1], g2: gl[2],
+      collar: { ...off(!st.c), position: 'absolute', inset: Math.max(0, pad - Math.round(Z * 0.055)) + 'px', border: Math.max(2, Math.round(Z * 0.045)) + 'px ' + st.ls + ' ' + st.c, borderRadius: t.r === '50%' ? '50%' : Math.round(Z * 0.1) + 'px', boxSizing: 'border-box' },
+      dirTab: { ...off(!p.showDir), position: 'absolute', ...tabSide, ...tabSize, background: st.c || a, borderRadius: '2px' },
+      barTrack: { ...off(!(st.bar && p.state !== 'plain')), position: 'absolute', left: pad + 'px', right: pad + 'px', bottom: Math.max(1, pad - Math.round(Z * 0.09)) + 'px', height: Math.max(3, Math.round(Z * 0.085)) + 'px', background: INK, borderRadius: '2px', padding: '1px', boxSizing: 'border-box' },
+      barFill: { width: (prog * 100) + '%', height: '100%', background: st.c, borderRadius: '1px' },
+      badge: { ...off(!st.bdg), position: 'absolute', right: Math.max(0, pad - Math.round(Z * 0.1)) + 'px', top: Math.max(0, pad - Math.round(Z * 0.1)) + 'px', width: bw + 'px', height: bw + 'px', borderRadius: '50%', background: st.c, border: Math.max(1, Math.round(Z * 0.028)) + 'px solid ' + INK, boxSizing: 'border-box' },
+      b0: bg[0], b1: bg[1],
+      countPill: { ...off(p.count == null), position: 'absolute', left: '50%', bottom: Math.max(0, pad - Math.round(Z * 0.24)) + 'px', transform: 'translateX(-50%)', minWidth: Math.round(Z * 0.34) + 'px', padding: '0 ' + Math.round(Z * 0.06) + 'px', height: Math.round(Z * 0.3) + 'px', background: INK, color: '#E8EDF2', border: '1px solid rgba(255,255,255,.18)', borderRadius: '999px', font: '700 ' + Math.max(9, Math.round(Z * 0.2)) + 'px/' + Math.round(Z * 0.3) + 'px "IBM Plex Mono",monospace', textAlign: 'center', boxSizing: 'border-box' }
+    };
+  }
+}
+</script>
+</body>
+</html>

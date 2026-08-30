@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #0B0E12; }
+  a { color: #E8AE4A; text-decoration: none; }
+  a:hover { color: #F6BB45; text-decoration: underline; }
+  @keyframes belt { to { background-position-x: -28px } }
+  @keyframes beltv { to { background-position-y: -28px } }
+  @keyframes pulseWarn { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
+  @keyframes spark { 0% { transform: translateX(0) } 100% { transform: translateX(96px) } }
+  @keyframes sparkRun { 0% { transform: translate(0,0); opacity: 0 } 12% { opacity: 1 } 88% { opacity: 1 } 100% { transform: translate(144px,0); opacity: 0 } }
+  @keyframes sparkDrop { 0% { transform: translate(0,144px); opacity: 0 } 12% { opacity: 1 } 88% { opacity: 1 } 100% { transform: translate(0,0); opacity: 0 } }
+  @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
+</style>
+</helmet>
+
+<div style="width: 1680px; padding: 0 0 80px; background: #0B0E12; color: #E8EDF2; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+
+  <div style="padding: 56px 64px 40px; border-bottom: 1px solid rgba(255,255,255,.08); background: linear-gradient(180deg,#141922,#0B0E12);">
+    <div style="display: flex; align-items: baseline; gap: 16px; font-family: 'Chakra Petch', sans-serif; letter-spacing: .18em; font-size: 12px; color: #94A2B0; text-transform: uppercase;">
+      <span>Outpost</span><span style="color: #E8AE4A;">Visual redesign — phase 1</span><span>Direction for approval</span>
+    </div>
+    <h1 style="margin: 14px 0 0; font-family: 'Chakra Petch', sans-serif; font-size: 62px; line-height: 1.02; font-weight: 700; letter-spacing: -.01em;">FOUNDRY<span style="color: #E8AE4A;">.</span></h1>
+    <p style="margin: 16px 0 0; max-width: 780px; font-size: 17px; line-height: 1.6; color: #B9C6D2; text-wrap: pretty;">A cohesive art direction for Outpost: inked, machined forms on warm dusk terrain, where <strong style="color: #E8EDF2;">every machine is identified by silhouette</strong> and <strong style="color: #E8EDF2;">every state by shape, not just colour</strong>. Same simulation, same costs, same rules — a new visual language wrapped around them.</p>
+  </div>
+
+  <div style="padding: 48px 64px 8px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px;">
+    <div>
+      <div style="font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .16em; color: #E8AE4A; text-transform: uppercase; margin-bottom: 12px;">01 — What's there today</div>
+      <p style="margin: 0; font-size: 14px; line-height: 1.65; color: #A9B7C4;">One Canvas2D surface (<span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">Renderer.ts</span>) draws a 120×120 world at 48px tiles. Terrain is five procedurally-tinted flat tiles from <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">generateTerrainTiles</span> (L73): speckled grass, forest with one trunk and two canopy discs, <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#c4a35a</span> sand, <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#1a4a7a</span> water with an animated shoreline, <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#6a6a6a</span> rock. All eight buildings come out of one <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">drawBuilding</span> (L597) fed only by <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">BUILDING_DEFS[type].color</span> + <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">.shape</span> — four rects, two diamonds, one circle, one arrow. Status lands as a corner dot, a thin bar, a count bubble and a red frame. Seven DOM panels sit on top from <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">App.css</span>: <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#1a1a2e</span> panels on a <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#0f1020</span> backdrop.</p>
+    </div>
+    <div>
+      <div style="font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .16em; color: #E8AE4A; text-transform: uppercase; margin-bottom: 12px;">02 — The real weaknesses</div>
+      <ul style="margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.65; color: #A9B7C4; display: grid; gap: 7px;">
+        <li><strong style="color: #E8EDF2;">Shape collides four ways.</strong> <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">.shape</span> has only four values for eight buildings: Storage, Chest, Smelter and Steel Furnace are all <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">rect</span>; Miner and Assembler are both <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">diamond</span>. Type rests on hue.</li>
+        <li><strong style="color: #E8EDF2;">…and hue collapses into three clusters.</strong> Greens: storage <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#5b7a4f</span>, chest <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#7a9a5f</span>, assembler <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#00aa44</span>. Orange-reds: generator <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#cc4400</span>, smelter <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#ff4400</span>. Blue-violets: miner <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#6666aa</span>, steel <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#4444cc</span>. So the two signals collide on the same pairs.</li>
+        <li><strong style="color: #E8EDF2;">Greens fight the ground.</strong> Storage, chest and assembler are green objects sitting on green grass; the world's most common terrain is the same hue as three buildings.</li>
+        <li><strong style="color: #E8EDF2;">Rich engine states, thin visuals.</strong> The engine already distinguishes Mining / Smelting / Crafting / Transporting, Waiting for Input, Output Blocked, No Power, No Fuel and No Resource Below — but all of it lands as one 6px corner dot in three colours plus an optional red frame.</li>
+        <li><strong style="color: #E8EDF2;">Chrome is a third palette.</strong> <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#1a1a2e</span> panels on <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">#0f1020</span> are a violet-navy that belongs to neither the warm world nor the status colours, and <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">ok/warn/bad</span> double as UI colours.</li>
+      </ul>
+    </div>
+    <div>
+      <div style="font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .16em; color: #E8AE4A; text-transform: uppercase; margin-bottom: 12px;">03 — The direction</div>
+      <p style="margin: 0 0 10px; font-size: 14px; line-height: 1.65; color: #A9B7C4;">Chunky machined objects with a hard 2px ink outline and two-tone flat shading — the discipline of 16-bit sprite work, the weight of stamped industrial hardware, sitting on a warm, hand-layered dusk landscape. Code-drawn primitives only: clip-path silhouettes, flat fills, one bevel, one shadow.</p>
+      <div style="display: grid; gap: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #8DA0B4;">
+        <div><span style="color: #5FCB93;">▸</span> Silhouette carries type. Colour confirms it.</div>
+        <div><span style="color: #5FCB93;">▸</span> State is a collar + a badge shape.</div>
+        <div><span style="color: #5FCB93;">▸</span> Motion only where the sim is moving.</div>
+        <div><span style="color: #5FCB93;">▸</span> World is warm. Chrome is cool. Never mixed.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 44px 64px 0;">
+    <div style="font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .16em; color: #E8AE4A; text-transform: uppercase; margin-bottom: 18px;">04 — Colour system</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px;">
+
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: #94A2B0; margin-bottom: 10px; letter-spacing: .04em;">WORLD / TERRAIN — retuned from source</div>
+        <div style="display: grid; gap: 4px;">
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #3C7A2E; display: grid; place-items: center; color: #0B0E12;">3c7a2e</span><span style="flex: 1; height: 100%; background: #4E7A46; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #0B0E12;"><span>Grass</span><span>#4E7A46</span></span></div>
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #2d5a1e; display: grid; place-items: center; color: #C9DCC7;">2d5a1e</span><span style="flex: 1; height: 100%; background: #2F5637; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #C9DCC7;"><span>Forest</span><span>#2F5637</span></span></div>
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #c4a35a; display: grid; place-items: center; color: #0B0E12;">c4a35a</span><span style="flex: 1; height: 100%; background: #C8A96E; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #0B0E12;"><span>Sand</span><span>#C8A96E</span></span></div>
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #1a4a7a; display: grid; place-items: center; color: #D5E7F2;">1a4a7a</span><span style="flex: 1; height: 100%; background: #2C5C7A; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #D5E7F2;"><span>Water</span><span>#2C5C7A</span></span></div>
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #6a6a6a; display: grid; place-items: center; color: #0B0E12;">6a6a6a</span><span style="flex: 1; height: 100%; background: #6B6F74; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #0B0E12;"><span>Rock</span><span>#6B6F74</span></span></div>
+          <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; line-height: 1.5; color: #7E8C9A; margin-top: 4px;">Terrain hues are held close to source (left chip) and only desaturated a step, so the map reads as the same world. Grass is the mid-point of <span style="font-family: 'IBM Plex Mono', monospace;">generateTerrainTiles</span>' randomised <span style="font-family: 'IBM Plex Mono', monospace;">rgb(50–65, 120–132, 40–49)</span>.</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: #94A2B0; margin-bottom: 10px; letter-spacing: .04em;">MACHINE HUES — <span style="color: #E8AE4A;">reassigned</span> (source → new)</div>
+        <div style="display: grid; gap: 4px;">
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #6666aa; display: grid; place-items: center; color: #0B0E12;">6666aa</span><span style="flex: 1; height: 100%; background: #E8AE4A; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #0B0E12;"><span>Miner</span><span>#E8AE4A</span></span></div>
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #cc4400; display: grid; place-items: center; color: #0B0E12;">cc4400</span><span style="flex: 1; height: 100%; background: #F0774A; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #0B0E12;"><span>Generator</span><span>#F0774A</span></span></div>
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #ff4400; display: grid; place-items: center; color: #0B0E12;">ff4400</span><span style="flex: 1; height: 100%; background: #E0575C; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #0B0E12;"><span>Smelter</span><span>#E0575C</span></span></div>
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #4444cc; display: grid; place-items: center; color: #E8EDF2;">4444cc</span><span style="flex: 1; height: 100%; background: #8A88E4; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #0B0E12;"><span>Steel furnace</span><span>#8A88E4</span></span></div>
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #00aa44; display: grid; place-items: center; color: #0B0E12;">00aa44</span><span style="flex: 1; height: 100%; background: #4CBE9A; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #0B0E12;"><span>Assembler</span><span>#4CBE9A</span></span></div>
+          <div style="display: flex; align-items: center; height: 34px; border-radius: 3px; overflow: hidden; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;"><span style="width: 62px; height: 100%; background: #5b7a4f; display: grid; place-items: center; color: #0B0E12;">5b7a4f</span><span style="flex: 1; height: 100%; background: #93A7BC; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: #0B0E12;"><span>Storage / chest</span><span>#93A7BC</span></span></div>
+          <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; line-height: 1.5; color: #7E8C9A; margin-top: 4px;">Left chip = current <span style="font-family: 'IBM Plex Mono', monospace;">BUILDING_DEFS.color</span>. Miner moves off blue-violet (freeing it for steel) and containers move off green (freeing it for the assembler and the ground), breaking all three collisions.</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: #94A2B0; margin-bottom: 10px; letter-spacing: .04em;">STATUS — maps 1:1 onto statusReason</div>
+        <div style="display: grid; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #5FCB93; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #0B0E12; font-weight: 600;"><span style="flex: 1;">Mining / Smelting / Crafting</span><span>ok</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #5FAEE0; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #0B0E12; font-weight: 600;"><span style="flex: 1;">Waiting for Input</span><span>warn</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #F6BB45; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #0B0E12; font-weight: 600;"><span style="flex: 1;">Output Blocked</span><span>bad</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #EC6058; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #0B0E12; font-weight: 600;"><span style="flex: 1;">No Fuel <span style="opacity: .65;">(generator only)</span></span><span>bad</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #98A0A9; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #0B0E12; font-weight: 600;"><span style="flex: 1;">No Power</span><span>bad</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #767C85; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #0B0E12; font-weight: 600;"><span style="flex: 1;">No Resource Below <span style="opacity: .65;">(miner)</span></span><span>warn</span></div>
+          <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; line-height: 1.5; color: #7E8C9A; margin-top: 4px;">Six visuals for the six reasons the engine emits. The existing <span style="font-family: 'IBM Plex Mono', monospace;">ok/warn/bad</span> triplet is kept as the grouping, but each reason now gets its own collar and badge instead of sharing one dot colour.</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: #94A2B0; margin-bottom: 10px; letter-spacing: .04em;">CHROME — cool, near-neutral</div>
+        <div style="display: grid; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #0B0E12; border: 1px solid rgba(255,255,255,.12); border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2; font-weight: 600; box-sizing: border-box;"><span style="flex: 1;">Backdrop</span><span>#0B0E12</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #141922; border: 1px solid rgba(255,255,255,.12); border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2; font-weight: 600; box-sizing: border-box;"><span style="flex: 1;">Panel</span><span>#141922</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #1D242E; border: 1px solid rgba(255,255,255,.12); border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2; font-weight: 600; box-sizing: border-box;"><span style="flex: 1;">Panel raised</span><span>#1D242E</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #E8EDF2; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #0B0E12; font-weight: 600;"><span style="flex: 1;">Text</span><span>#E8EDF2</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #94A2B0; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #0B0E12; font-weight: 600;"><span style="flex: 1;">Text muted</span><span>#94A2B0</span></div>
+          <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 12px; background: #E8AE4A; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #0B0E12; font-weight: 600;"><span style="flex: 1;">UI accent (only one)</span><span>#E8AE4A</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 26px; padding: 22px 26px; background: #141922; border: 1px solid rgba(255,255,255,.08); border-radius: 4px; display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 40px; align-items: start;">
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: #94A2B0; margin-bottom: 12px; letter-spacing: .04em;">TYPOGRAPHY</div>
+        <div style="font-family: 'Chakra Petch', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: .04em;">OUTPOST POWER GRID</div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #8DA0B4; margin-top: 4px;">Chakra Petch 600/700 — titles, HUD, panel headers. Uppercase, .04–.18em tracking.</div>
+        <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; margin-top: 16px; color: #D2DCE6;">Automatically mines the resource on its tile.</div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #8DA0B4; margin-top: 4px;">IBM Plex Sans 400/500 — descriptions, help, tutorial body. 13–15px.</div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 500; margin-top: 16px; color: #E8EDF2;">50 ⚡ / 64 ⚡ · −14 · 1/2</div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #8DA0B4; margin-top: 4px;">IBM Plex Mono 500 — every number, count, cost, percentage.</div>
+      </div>
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: #94A2B0; margin-bottom: 12px; letter-spacing: .04em;">GEOMETRY &amp; MATERIAL</div>
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: #A9B7C4; display: grid; gap: 5px;">
+          <li>Tile grid 48px. All machine geometry snaps to a 4px sub-grid.</li>
+          <li>Ink outline: 2px at 48px tiles, scaling with zoom, colour <span style="font-family: 'IBM Plex Mono', monospace;">#101418</span>.</li>
+          <li>Two-tone flat shading, hard terminator at 46% on a 160° axis. No gradients in the world beyond this.</li>
+          <li>One drop shadow per object: 8% down, 4.5% blur, <span style="font-family: 'IBM Plex Mono', monospace;">rgba(8,12,16,.45)</span>.</li>
+          <li>Corner radius: 3px machines, 4px containers, full round for generators. Panels 4px.</li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size: 12px; font-weight: 600; color: #94A2B0; margin-bottom: 12px; letter-spacing: .04em;">MOTION LANGUAGE</div>
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: #A9B7C4; display: grid; gap: 5px;">
+          <li><strong style="color: #E8EDF2;">Movement means throughput.</strong> Belt treads scroll only while items advance; a stopped belt is visibly still.</li>
+          <li><strong style="color: #E8EDF2;">Glow means output.</strong> Working machines carry a soft status halo; nothing else glows.</li>
+          <li><strong style="color: #E8EDF2;">Pulse means attention.</strong> 1.2s ease-in-out breathe, reserved for blocked and no-fuel.</li>
+          <li>Power sparks travel generator → consumer at a fixed 1.6s cadence, independent of sim speed.</li>
+          <li>All UI transitions 120ms; no easing tricks, no bounce.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 56px 64px 0;">
+    <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px;">
+      <div style="font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .16em; color: #E8AE4A; text-transform: uppercase;">05 — Gameplay screen</div>
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7E8C9A;">1552 × 864 · 48px tiles · normal play zoom · every state below is a real engine state</div>
+    </div>
+
+    <div data-screen-label="Gameplay" style="position: relative; width: 1552px; height: 864px; background: #0B0E12; border: 1px solid rgba(255,255,255,.1); border-radius: 5px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.5);">
+
+      <div style="position: relative; height: 52px; display: flex; align-items: center; gap: 18px; padding: 0 16px; background: #141922; border-bottom: 1px solid rgba(255,255,255,.09); z-index: 40;">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span style="font-family: 'Chakra Petch', sans-serif; font-size: 19px; font-weight: 700; letter-spacing: .22em; color: #E8EDF2;">OUTPOST</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88;">v1.0</span>
+        </div>
+        <div style="width: 1px; height: 22px; background: rgba(255,255,255,.1);"></div>
+        <div style="display: flex; align-items: center; gap: 2px; padding: 3px; background: #0E131A; border: 1px solid rgba(255,255,255,.09); border-radius: 4px;">
+          <div style="width: 30px; height: 24px; display: grid; place-items: center; border-radius: 3px; background: #E8AE4A;">
+            <div style="display: flex; gap: 3px;"><div style="width: 3px; height: 11px; background: #101418;"></div><div style="width: 3px; height: 11px; background: #101418;"></div></div>
+          </div>
+          <div style="width: 34px; height: 24px; display: grid; place-items: center; border-radius: 3px; background: #1D242E; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: #E8EDF2;">×1</div>
+          <div style="width: 34px; height: 24px; display: grid; place-items: center; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7E8C9A;">×5</div>
+          <div style="width: 36px; height: 24px; display: grid; place-items: center; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7E8C9A;">×10</div>
+          <div style="width: 36px; height: 24px; display: grid; place-items: center; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7E8C9A;">×20</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 0 12px; height: 30px; background: #0E131A; border: 1px solid rgba(255,255,255,.09); border-radius: 4px;">
+          <div style="width: 9px; height: 9px; border-radius: 50%; background: #EC6058; box-shadow: 0 0 8px #EC6058AA; animation: pulseWarn 1.2s ease-in-out infinite;"></div>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: #E8EDF2;">50</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6E7B88;">/</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #B9C6D2;">64</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: #EC6058;">−14</span>
+          <span style="font-family: 'Chakra Petch', sans-serif; font-size: 10px; letter-spacing: .14em; color: #6E7B88;">POWER</span>
+        </div>
+        <div style="flex: 1;"></div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 13px; background: #E8AE4A; border-radius: 4px; font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .1em; color: #101418;">BUILD <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; opacity: .6;">B</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 13px; background: #1D242E; border: 1px solid rgba(255,255,255,.09); border-radius: 4px; font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: .1em; color: #C6D2DE;">INVENTORY <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88;">I</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 13px; background: #1D242E; border: 1px solid rgba(255,255,255,.09); border-radius: 4px; font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: .1em; color: #C6D2DE;">OBJECTIVES <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88;">O</span></div>
+          <div style="width: 30px; height: 30px; display: grid; place-items: center; background: #1D242E; border: 1px solid rgba(255,255,255,.09); border-radius: 4px; font-family: 'Chakra Petch', sans-serif; font-size: 13px; font-weight: 700; color: #C6D2DE;">?</div>
+          <div style="width: 1px; height: 22px; background: rgba(255,255,255,.1); margin: 0 4px;"></div>
+          <div style="width: 30px; height: 30px; display: grid; place-items: center; background: #1D242E; border: 1px solid rgba(255,255,255,.09); border-radius: 4px;"><div style="width: 12px; height: 12px; border: 2px solid #C6D2DE; border-radius: 1px;"></div></div>
+          <div style="width: 30px; height: 30px; display: grid; place-items: center; background: #1D242E; border: 1px solid rgba(255,255,255,.09); border-radius: 4px;"><div style="width: 12px; height: 12px; border: 2px solid #C6D2DE; border-radius: 50%;"></div></div>
+        </div>
+      </div>
+
+      <div style="position: relative; height: 812px; overflow: hidden; background-color: #4E7A46; background-image: radial-gradient(circle at 6px 6px, rgba(63,101,57,.5) 0 2px, rgba(0,0,0,0) 2px), radial-gradient(circle at 18px 14px, rgba(94,142,82,.5) 0 2px, rgba(0,0,0,0) 2px), radial-gradient(circle at 10px 20px, rgba(63,101,57,.32) 0 1.5px, rgba(0,0,0,0) 2px), radial-gradient(720px 520px at 14% 24%, rgba(94,142,82,.4), rgba(94,142,82,0) 70%), radial-gradient(640px 480px at 72% 78%, rgba(63,101,57,.4), rgba(63,101,57,0) 70%), repeating-linear-gradient(90deg, rgba(11,14,18,.08) 0 1px, rgba(0,0,0,0) 1px 48px), repeating-linear-gradient(180deg, rgba(11,14,18,.08) 0 1px, rgba(0,0,0,0) 1px 48px); background-size: 24px 24px, 24px 24px, 24px 24px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;">
+
+        <div style="position: absolute; left: -24px; top: 528px; width: 432px; height: 320px; background: #C8A96E; border-radius: 46% 54% 40% 60%;"></div>
+        <div style="position: absolute; left: -24px; top: 576px; width: 360px; height: 264px; background: #2C5C7A; border-radius: 48% 52% 44% 56%; box-shadow: inset 0 0 0 3px #101418;"></div>
+        <div style="position: absolute; left: 24px; top: 624px; width: 264px; height: 8px; background: rgba(212,232,244,.28); border-radius: 4px;"></div>
+        <div style="position: absolute; left: 60px; top: 684px; width: 192px; height: 8px; background: rgba(212,232,244,.2); border-radius: 4px;"></div>
+        <div style="position: absolute; left: 12px; top: 744px; width: 228px; height: 8px; background: rgba(212,232,244,.24); border-radius: 4px;"></div>
+
+        <div style="position: absolute; left: 1104px; top: 408px; width: 400px; height: 336px; background: #6B6F74; border-radius: 42% 58% 50% 50%; box-shadow: inset 0 0 0 3px #101418;"></div>
+        <div style="position: absolute; left: 1152px; top: 456px; width: 132px; height: 108px; background: #7C8188; clip-path: polygon(12% 0,100% 18%,86% 100%,0 74%);"></div>
+        <div style="position: absolute; left: 1320px; top: 552px; width: 120px; height: 96px; background: #5B6065; clip-path: polygon(0 22%,84% 0,100% 84%,18% 100%);"></div>
+        <div style="position: absolute; left: 1200px; top: 624px; width: 108px; height: 84px; background: #7C8188; clip-path: polygon(6% 10%,100% 0,90% 92%,0 100%);"></div>
+
+        <div style="position: absolute; left: 1056px; top: -24px; width: 520px; height: 300px; background: #2F5637; border-radius: 0 0 46% 54%;"></div>
+        <div style="position: absolute; left: 1080px; top: 0; width: 480px; height: 264px; display: flex; flex-wrap: wrap; gap: 10px; align-content: flex-start; padding: 18px 0 0 18px; box-sizing: border-box;">
+          <div style="width: 62px; height: 62px; background: #3D6B3F; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.18);"></div>
+          <div style="width: 54px; height: 54px; background: #467A47; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.18);"></div>
+          <div style="width: 66px; height: 66px; background: #3D6B3F; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.18);"></div>
+          <div style="width: 50px; height: 50px; background: #467A47; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.18);"></div>
+          <div style="width: 58px; height: 58px; background: #3D6B3F; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.18);"></div>
+          <div style="width: 46px; height: 46px; background: #467A47; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.18);"></div>
+          <div style="width: 60px; height: 60px; background: #3D6B3F; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.18);"></div>
+          <div style="width: 52px; height: 52px; background: #467A47; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.18);"></div>
+          <div style="width: 64px; height: 64px; background: #3D6B3F; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.18);"></div>
+        </div>
+
+        <div style="position: absolute; left: 1176px; top: 480px; display: flex; gap: 5px; align-items: flex-end;">
+          <div style="width: 15px; height: 15px; background: #A0522D; border: 2px solid #101418; transform: rotate(45deg);"></div>
+          <div style="width: 22px; height: 22px; background: #B4643B; border: 2px solid #101418; transform: rotate(45deg);"></div>
+          <div style="width: 13px; height: 13px; background: #A0522D; border: 2px solid #101418; transform: rotate(45deg);"></div>
+        </div>
+        <div style="position: absolute; left: 1344px; top: 576px; display: flex; gap: 5px; align-items: flex-end;">
+          <div style="width: 20px; height: 20px; background: #B87333; border: 2px solid #101418; transform: rotate(45deg);"></div>
+          <div style="width: 14px; height: 14px; background: #C98A46; border: 2px solid #101418; transform: rotate(45deg);"></div>
+        </div>
+        <div style="position: absolute; left: 1224px; top: 648px; display: flex; gap: 5px; align-items: flex-end;">
+          <div style="width: 18px; height: 18px; background: #23262A; border: 2px solid #101418; border-radius: 50%;"></div>
+          <div style="width: 24px; height: 24px; background: #2E3237; border: 2px solid #101418; border-radius: 50%;"></div>
+          <div style="width: 15px; height: 15px; background: #23262A; border: 2px solid #101418; border-radius: 50%;"></div>
+        </div>
+
+        <div style="position: absolute; left: 599px; top: 216px; width: 2px; height: 144px; background: repeating-linear-gradient(180deg,#5FCB93 0 6px,rgba(0,0,0,0) 6px 12px); opacity: .55;"></div>
+        <div style="position: absolute; left: 600px; top: 215px; width: 144px; height: 2px; background: repeating-linear-gradient(90deg,#5FCB93 0 6px,rgba(0,0,0,0) 6px 12px); opacity: .55;"></div>
+        <div style="position: absolute; left: 596px; top: 212px; width: 8px; height: 8px; border-radius: 50%; background: #5FCB93; box-shadow: 0 0 9px #5FCB93; animation: sparkRun 1.6s linear infinite;"></div>
+        <div style="position: absolute; left: 596px; top: 212px; width: 8px; height: 8px; border-radius: 50%; background: #5FCB93; box-shadow: 0 0 9px #5FCB93; animation: sparkDrop 1.6s linear infinite;"></div>
+
+        <div style="position: absolute; left: 384px; top: 192px;"><dc-import name="MachineTile" type="miner" state="working" size="{{ 48 }}" progress="{{ 0.7 }}" showDir="{{ true }}" dir="right" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 432px; top: 192px;"><dc-import name="BeltTile" dir="right" state="moving" item="#A0522D" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 480px; top: 192px;"><dc-import name="BeltTile" dir="right" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 528px; top: 192px;"><dc-import name="BeltTile" dir="right" state="moving" item="#A0522D" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 576px; top: 192px;"><dc-import name="MachineTile" type="smelter" state="working" size="{{ 48 }}" progress="{{ 0.55 }}" count="{{ 3 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 624px; top: 192px;"><dc-import name="BeltTile" dir="right" state="moving" item="#C6CDD4" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 672px; top: 192px;"><dc-import name="BeltTile" dir="right" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 720px; top: 192px;"><dc-import name="MachineTile" type="assembler" state="waiting" size="{{ 48 }}" count="{{ 1 }}" hint-size="48px,48px"></dc-import></div>
+
+        <div style="position: absolute; left: 864px; top: 192px;"><dc-import name="MachineTile" type="steel" state="blocked" size="{{ 48 }}" progress="{{ 1 }}" count="{{ 20 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 864px; top: 240px;"><dc-import name="BeltTile" dir="down" state="stopped" item="#8A88E4" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 864px; top: 288px;"><dc-import name="BeltTile" dir="down" state="stopped" item="#8A88E4" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 864px; top: 336px;"><dc-import name="BeltTile" dir="right" from="up" state="stopped" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 912px; top: 336px;"><dc-import name="BeltTile" dir="right" state="blocked" item="#8A88E4" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 960px; top: 336px;"><dc-import name="MachineTile" type="storage" state="plain" size="{{ 48 }}" count="{{ 100 }}" hint-size="48px,48px"></dc-import></div>
+
+        <div style="position: absolute; left: 576px; top: 336px;"><dc-import name="MachineTile" type="generator" state="working" size="{{ 48 }}" progress="{{ 0.6 }}" count="{{ 4 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 720px; top: 336px;"><dc-import name="MachineTile" type="generator" state="nofuel" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 480px; top: 384px;"><dc-import name="MachineTile" type="chest" state="plain" size="{{ 48 }}" count="{{ 8 }}" hint-size="48px,48px"></dc-import></div>
+        <div style="position: absolute; left: 384px; top: 336px;"><dc-import name="MachineTile" type="miner" state="nopower" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+
+        <div style="position: absolute; left: 480px; top: 288px; width: 48px; height: 48px;">
+          <div style="position: absolute; inset: 0; border: 2px solid rgba(232,237,242,.35); border-radius: 3px;"></div>
+          <div style="position: absolute; left: 6px; top: 10px; width: 36px; height: 36px; background: rgba(8,12,16,.4); border-radius: 50%; filter: blur(4px);"></div>
+          <div style="position: absolute; left: 7px; top: 5px; width: 34px; height: 34px; background: #5FAEE0; border: 3px solid #101418; border-radius: 50%; animation: bob 2.4s ease-in-out infinite;">
+            <div style="position: absolute; left: 5px; top: 4px; width: 12px; height: 10px; background: rgba(255,255,255,.4); border-radius: 50%;"></div>
+            <div style="position: absolute; left: 8px; bottom: -2px; width: 12px; height: 10px; background: #E8AE4A; border: 2px solid #101418; clip-path: polygon(0 0,100% 0,50% 100%);"></div>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 24px; top: 24px; width: 296px; background: #141922; border: 1px solid rgba(255,255,255,.1); border-radius: 5px; box-shadow: 0 18px 44px rgba(0,0,0,.55); z-index: 30; overflow: hidden;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #1D242E; border-bottom: 1px solid rgba(255,255,255,.08);">
+            <span style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2;">BUILD</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88;">ESC to close</span>
+          </div>
+          <div style="padding: 8px; display: grid; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; background: #1F2732; border: 1px solid #E8AE4A; border-radius: 4px;">
+              <dc-import name="MachineTile" type="miner" state="plain" size="{{ 40 }}" hint-size="40px,40px"></dc-import>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: 'Chakra Petch', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .06em; color: #E8EDF2;">MINER</div>
+                <div style="display: flex; gap: 6px; margin-top: 5px; font-family: 'IBM Plex Mono', monospace; font-size: 10px;">
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #C6CDD4;">3 IRON</span>
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #C6CDD4;">2 STONE</span>
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #5FCB93;">−5 ⚡</span>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; background: #171D26; border: 1px solid rgba(255,255,255,.07); border-radius: 4px;">
+              <dc-import name="BeltTile" dir="right" state="stopped" size="{{ 40 }}" hint-size="40px,40px"></dc-import>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: 'Chakra Petch', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .06em; color: #E8EDF2;">CONVEYOR BELT</div>
+                <div style="display: flex; gap: 6px; margin-top: 5px; font-family: 'IBM Plex Mono', monospace; font-size: 10px;">
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #C6CDD4;">2 STONE</span>
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #5FCB93;">−1 ⚡</span>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; background: #171D26; border: 1px solid rgba(255,255,255,.07); border-radius: 4px;">
+              <dc-import name="MachineTile" type="smelter" state="plain" size="{{ 40 }}" hint-size="40px,40px"></dc-import>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: 'Chakra Petch', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .06em; color: #E8EDF2;">SMELTER</div>
+                <div style="display: flex; gap: 6px; margin-top: 5px; font-family: 'IBM Plex Mono', monospace; font-size: 10px;">
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #C6CDD4;">5 IRON</span>
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #C6CDD4;">3 COAL</span>
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #C6CDD4;">5 STONE</span>
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #5FCB93;">−10 ⚡</span>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; background: #171D26; border: 1px solid rgba(255,255,255,.07); border-radius: 4px; opacity: .45;">
+              <dc-import name="MachineTile" type="assembler" state="idle" size="{{ 40 }}" hint-size="40px,40px"></dc-import>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: 'Chakra Petch', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: .06em; color: #E8EDF2;">ASSEMBLER</div>
+                <div style="display: flex; gap: 6px; margin-top: 5px; font-family: 'IBM Plex Mono', monospace; font-size: 10px;">
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #EC6058;">8 IRON</span>
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #EC6058;">8 COPPER</span>
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #C6CDD4;">5 STONE</span>
+                  <span style="padding: 2px 5px; background: #101418; border-radius: 2px; color: #C6CDD4;">−15 ⚡</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="position: absolute; right: 24px; top: 24px; width: 372px; background: #141922; border: 1px solid rgba(255,255,255,.1); border-radius: 5px; box-shadow: 0 18px 44px rgba(0,0,0,.55); z-index: 30; overflow: hidden;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #1D242E; border-bottom: 1px solid rgba(255,255,255,.08);">
+            <span style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2;">POWER GRID</span>
+            <span style="display: flex; align-items: center; gap: 7px; font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .12em; color: #EC6058;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #EC6058;"></span>NOT ENOUGH</span>
+          </div>
+          <div style="padding: 14px;">
+            <div style="display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 600; color: #EC6058;">−14</span>
+              <span style="font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: #94A2B0;">50 produced · 64 demanded</span>
+            </div>
+            <div style="margin-top: 11px; height: 10px; background: #0E131A; border: 1px solid rgba(255,255,255,.08); border-radius: 2px; display: flex; overflow: hidden;">
+              <div style="width: 78%; background: #5FCB93;"></div>
+              <div style="width: 22%; background: repeating-linear-gradient(45deg,#EC6058 0 4px,#B8433C 4px 8px);"></div>
+            </div>
+            <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div style="padding: 8px 10px; background: #101720; border-radius: 3px;">
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #E8EDF2;">1 / 2</div>
+                <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; color: #94A2B0; margin-top: 2px;">generators fuelled · 50 ⚡ each</div>
+              </div>
+              <div style="padding: 8px 10px; background: #101720; border-radius: 3px;">
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #EC6058;">1</div>
+                <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; color: #94A2B0; margin-top: 2px;">machine shed to No Power</div>
+              </div>
+            </div>
+            <div style="margin-top: 11px; font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; line-height: 1.5; color: #7E8C9A;">Demand: miners 2×5 · conveyors 9×1 · smelter 10 · steel 20 · assembler 15. The unfuelled generator contributes nothing, so the grid is short and one miner drops offline — the panel and the world tell the same story.</div>
+          </div>
+        </div>
+
+        <div style="position: absolute; right: 24px; top: 316px; width: 372px; background: #141922; border: 1px solid rgba(255,255,255,.1); border-radius: 5px; box-shadow: 0 18px 44px rgba(0,0,0,.55); z-index: 30; overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #1D242E; border-bottom: 1px solid rgba(255,255,255,.08);">
+            <dc-import name="MachineTile" type="steel" state="plain" size="{{ 30 }}" hint-size="30px,30px"></dc-import>
+            <div style="flex: 1;">
+              <div style="font-family: 'Chakra Petch', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .1em; color: #E8EDF2;">STEEL FURNACE</div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88; margin-top: 2px;">tile 18 · 4 — facing Down ▼</div>
+            </div>
+            <div style="width: 22px; height: 22px; display: grid; place-items: center; border-radius: 3px; background: #101418; color: #94A2B0; font-family: 'IBM Plex Mono', monospace; font-size: 12px;">×</div>
+          </div>
+          <div style="padding: 14px;">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 9px 11px; background: rgba(246,187,69,.1); border-left: 3px solid #F6BB45; border-radius: 2px;">
+              <div style="display: flex; gap: 3px;"><div style="width: 4px; height: 14px; background: #F6BB45;"></div><div style="width: 4px; height: 14px; background: #F6BB45;"></div></div>
+              <div>
+                <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .1em; color: #F6BB45;">OUTPUT BLOCKED (FULL)</div>
+                <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: #C6D2DE; margin-top: 2px;">20 / 20 held — no room for the next steel plate.</div>
+              </div>
+            </div>
+            <div style="margin-top: 13px; display: grid; gap: 9px;">
+              <div>
+                <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #94A2B0;"><span>CYCLE</span><span style="color: #F6BB45;">100% · held</span></div>
+                <div style="margin-top: 5px; height: 8px; background: #0E131A; border-radius: 2px; overflow: hidden;"><div style="width: 100%; height: 100%; background: #F6BB45;"></div></div>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #94A2B0;"><span>POWER</span><span style="color: #5FCB93;">20 ⚡ drawn · OK</span></div>
+            </div>
+            <div style="margin-top: 12px; font-family: 'Chakra Petch', sans-serif; font-size: 10px; letter-spacing: .16em; color: #6E7B88;">CONTENTS</div>
+            <div style="margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 11px; height: 11px; background: #C6CDD4; border: 1px solid #101418;"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">IRON 6</span></div>
+              <div style="display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 11px; height: 11px; background: #2E3237; border: 1px solid #101418; border-radius: 50%;"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">COAL 4</span></div>
+              <div style="display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: #1A1610; border: 1px solid #F6BB45; border-radius: 3px;"><span style="width: 11px; height: 11px; background: #4a4a6a; border: 1px solid #101418;"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #F6BB45;">STEEL PLATE 20/20</span></div>
+            </div>
+            <div style="margin-top: 12px; display: flex; gap: 7px;">
+              <div style="flex: 1; height: 30px; display: grid; place-items: center; background: #1D242E; border: 1px solid rgba(255,255,255,.09); border-radius: 3px; font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: #C6D2DE;">ROTATE R</div>
+              <div style="flex: 1; height: 30px; display: grid; place-items: center; background: #1D242E; border: 1px solid rgba(255,255,255,.09); border-radius: 3px; font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: #EC6058;">REMOVE Q</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 24px; bottom: 24px; width: 296px; background: #141922; border: 1px solid rgba(255,255,255,.1); border-radius: 5px; box-shadow: 0 18px 44px rgba(0,0,0,.55); z-index: 30; overflow: hidden;">
+          <div style="padding: 10px 14px; background: #1D242E; border-bottom: 1px solid rgba(255,255,255,.08); display: flex; justify-content: space-between; align-items: baseline;">
+            <span style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2;">CARRYING</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88;">4 types · 20 items</span>
+          </div>
+          <div style="padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #101720; border-radius: 3px;"><span style="width: 14px; height: 14px; background: #8A5A2A; border: 2px solid #101418;"></span><span style="flex: 1; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: #C6D2DE;">Wood</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #E8EDF2;">8</span></div>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #101720; border-radius: 3px;"><span style="width: 14px; height: 14px; background: #8A8A8A; border: 2px solid #101418;"></span><span style="flex: 1; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: #C6D2DE;">Stone</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #E8EDF2;">6</span></div>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #101720; border-radius: 3px;"><span style="width: 14px; height: 14px; background: #2E3237; border: 2px solid #101418; border-radius: 50%;"></span><span style="flex: 1; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: #C6D2DE;">Coal</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #E8EDF2;">4</span></div>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #101720; border-radius: 3px;"><span style="width: 14px; height: 14px; background: #A0522D; border: 2px solid #101418; transform: rotate(45deg);"></span><span style="flex: 1; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: #C6D2DE;">Iron</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #E8EDF2;">2</span></div>
+          </div>
+        </div>
+
+        <div style="position: absolute; right: 24px; bottom: 24px; width: 178px; z-index: 30;">
+          <div style="padding: 7px 10px; background: #1D242E; border: 1px solid rgba(255,255,255,.1); border-bottom: 0; border-radius: 5px 5px 0 0; display: flex; justify-content: space-between;">
+            <span style="font-family: 'Chakra Petch', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .16em; color: #C6D2DE;">OUTPOST</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88;">120 × 120</span>
+          </div>
+          <div style="position: relative; height: 136px; background: #3E6339; border: 1px solid rgba(255,255,255,.1); border-radius: 0 0 5px 5px; overflow: hidden;">
+            <div style="position: absolute; left: 0; bottom: 0; width: 74px; height: 62px; background: #2C5C7A;"></div>
+            <div style="position: absolute; left: 0; bottom: 56px; width: 88px; height: 16px; background: #C8A96E;"></div>
+            <div style="position: absolute; right: 0; top: 0; width: 82px; height: 52px; background: #2F5637;"></div>
+            <div style="position: absolute; right: 8px; bottom: 34px; width: 66px; height: 58px; background: #6B6F74;"></div>
+            <div style="position: absolute; left: 78px; top: 84px; width: 62px; height: 3px; background: #E8AE4A;"></div>
+            <div style="position: absolute; left: 78px; top: 84px; width: 8px; height: 8px; margin: -3px 0 0 -3px; background: #E8AE4A; border: 1px solid #101418;"></div>
+            <div style="position: absolute; left: 108px; top: 108px; width: 7px; height: 7px; background: #F0774A; border-radius: 50%; border: 1px solid #101418;"></div>
+            <div style="position: absolute; left: 136px; top: 84px; width: 7px; height: 7px; background: #8A88E4; border: 1px solid #101418;"></div>
+            <div style="position: absolute; left: 92px; top: 96px; width: 10px; height: 10px; border: 2px solid #5FAEE0; border-radius: 50%; box-shadow: 0 0 6px #5FAEE0;"></div>
+            <div style="position: absolute; left: 66px; top: 62px; width: 76px; height: 60px; border: 1px solid rgba(232,237,242,.5); border-radius: 1px;"></div>
+          </div>
+        </div>
+
+        <div style="position: absolute; left: 50%; transform: translateX(-50%); bottom: 24px; display: flex; gap: 6px; padding: 7px 9px; background: rgba(20,25,34,.92); border: 1px solid rgba(255,255,255,.09); border-radius: 4px; z-index: 30; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #94A2B0;">
+          <span style="color: #E8EDF2;">WASD</span> move<span style="color: #3E4A57;">·</span><span style="color: #E8EDF2;">E</span> harvest<span style="color: #3E4A57;">·</span><span style="color: #E8EDF2;">drag</span> lay belt<span style="color: #3E4A57;">·</span><span style="color: #E8EDF2;">R</span> rotate<span style="color: #3E4A57;">·</span><span style="color: #E8EDF2;">Q</span> remove<span style="color: #3E4A57;">·</span><span style="color: #E8EDF2;">SPACE</span> pause
+        </div>
+
+      </div>
+    </div>
+
+    <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; font-size: 13px; line-height: 1.6; color: #A9B7C4;">
+      <div><strong style="color: #E8EDF2;">Read the line without reading text.</strong> Amber miner feeding a red smelter feeding a green assembler; the assembler's dashed blue collar and inbound chevron say it is starved, not broken.</div>
+      <div><strong style="color: #E8EDF2;">Failures announce themselves.</strong> The steel furnace wears an amber collar with a full held bar — <span style="font-family: 'IBM Plex Mono', monospace;">"Output Blocked (full)"</span> at 20/20; its belt run is visibly still, ending in a pulsing red gate at a storage container sitting at its 100-item cap.</div>
+      <div><strong style="color: #E8EDF2;">Unpowered is unmistakable.</strong> The second miner is desaturated with a 45° hatch and a struck-through bolt. It is offline because the grid is short 14 ⚡ — one of the two generators is out of coal, so the HUD, the power panel and the world all agree.</div>
+      <div><strong style="color: #E8EDF2;">One accent in the chrome.</strong> Amber marks the only primary action and the current selection; every other colour on screen belongs to the world or to a status.</div>
+    </div>
+  </div>
+
+  <div style="padding: 60px 64px 0;">
+    <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px;">
+      <div style="font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .16em; color: #E8AE4A; text-transform: uppercase;">06 — Asset &amp; state atlas</div>
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #7E8C9A;">every asset drawn at its real gameplay size, then again at zoomed-out size</div>
+    </div>
+
+    <div style="display: grid; gap: 20px;">
+
+      <div style="padding: 22px 26px; background: #141922; border: 1px solid rgba(255,255,255,.08); border-radius: 4px;">
+        <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2; margin-bottom: 4px;">TERRAIN</div>
+        <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #8DA0B4; margin-bottom: 18px;">Each type gets a base tone, a cluster texture, and an ink edge where it meets another type. Walkability is legible: only grass and sand are open ground.</div>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+          <div style="width: 168px;">
+            <div style="height: 120px; border-radius: 3px; background-color: #4E7A46; background-image: radial-gradient(circle at 6px 6px, rgba(63,101,57,.5) 0 2px, rgba(0,0,0,0) 2px), radial-gradient(circle at 18px 14px, rgba(94,142,82,.5) 0 2px, rgba(0,0,0,0) 2px), radial-gradient(circle at 10px 20px, rgba(63,101,57,.32) 0 1.5px, rgba(0,0,0,0) 2px), radial-gradient(180px 140px at 26% 30%, rgba(94,142,82,.42), rgba(94,142,82,0) 70%), repeating-linear-gradient(90deg, rgba(11,14,18,.09) 0 1px, rgba(0,0,0,0) 1px 40px), repeating-linear-gradient(180deg, rgba(11,14,18,.09) 0 1px, rgba(0,0,0,0) 1px 40px); background-size: 24px 24px, 24px 24px, 24px 24px, 100% 100%, 100% 100%, 100% 100%;"></div>
+            <div style="margin-top: 9px; font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .1em; color: #E8EDF2;">GRASS</div>
+            <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; color: #7E8C9A; margin-top: 2px;">Walkable. Base ground.</div>
+          </div>
+          <div style="width: 168px;">
+            <div style="position: relative; height: 120px; border-radius: 3px; background: #2F5637; overflow: hidden;">
+              <div style="position: absolute; left: 10px; top: 12px; width: 54px; height: 54px; background: #3D6B3F; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.2);"></div>
+              <div style="position: absolute; left: 78px; top: 34px; width: 62px; height: 62px; background: #467A47; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.2);"></div>
+              <div style="position: absolute; left: 24px; top: 74px; width: 40px; height: 40px; background: #3D6B3F; border: 3px solid #101418; border-radius: 50%; box-shadow: inset -8px -8px 0 rgba(16,20,24,.2);"></div>
+            </div>
+            <div style="margin-top: 9px; font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .1em; color: #E8EDF2;">FOREST</div>
+            <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; color: #7E8C9A; margin-top: 2px;">Blocked. Chop → wood.</div>
+          </div>
+          <div style="width: 168px;">
+            <div style="height: 120px; border-radius: 3px; background-color: #C8A96E; background-image: radial-gradient(circle at 30% 40%, rgba(216,188,130,.7) 0 20px, rgba(0,0,0,0) 21px), radial-gradient(circle at 76% 74%, rgba(184,155,98,.6) 0 24px, rgba(0,0,0,0) 25px);"></div>
+            <div style="margin-top: 9px; font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .1em; color: #E8EDF2;">SAND</div>
+            <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; color: #7E8C9A; margin-top: 2px;">Walkable. Rings water.</div>
+          </div>
+          <div style="width: 168px;">
+            <div style="position: relative; height: 120px; border-radius: 3px; background: #2C5C7A; overflow: hidden; box-shadow: inset 0 0 0 3px #101418;">
+              <div style="position: absolute; left: 14px; top: 26px; width: 96px; height: 7px; background: rgba(212,232,244,.3); border-radius: 4px;"></div>
+              <div style="position: absolute; left: 42px; top: 58px; width: 78px; height: 7px; background: rgba(212,232,244,.22); border-radius: 4px;"></div>
+              <div style="position: absolute; left: 8px; top: 88px; width: 88px; height: 7px; background: rgba(212,232,244,.26); border-radius: 4px;"></div>
+            </div>
+            <div style="margin-top: 9px; font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .1em; color: #E8EDF2;">WATER</div>
+            <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; color: #7E8C9A; margin-top: 2px;">Blocked. Drifting crests.</div>
+          </div>
+          <div style="width: 168px;">
+            <div style="position: relative; height: 120px; border-radius: 3px; background: #6B6F74; overflow: hidden; box-shadow: inset 0 0 0 3px #101418;">
+              <div style="position: absolute; left: 12px; top: 14px; width: 74px; height: 58px; background: #7C8188; clip-path: polygon(12% 0,100% 18%,86% 100%,0 74%);"></div>
+              <div style="position: absolute; left: 82px; top: 56px; width: 68px; height: 54px; background: #5B6065; clip-path: polygon(0 22%,84% 0,100% 84%,18% 100%);"></div>
+            </div>
+            <div style="margin-top: 9px; font-family: 'Chakra Petch', sans-serif; font-size: 11px; letter-spacing: .1em; color: #E8EDF2;">ROCK</div>
+            <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; color: #7E8C9A; margin-top: 2px;">Blocked. Mine → stone. Hosts ore.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1.55fr 1fr; gap: 20px;">
+        <div style="padding: 22px 26px; background: #141922; border: 1px solid rgba(255,255,255,.08); border-radius: 4px;">
+          <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2; margin-bottom: 4px;">RESOURCE DEPOSITS</div>
+          <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #8DA0B4; margin-bottom: 18px;">Deposits are <strong style="color: #C6D2DE;">clusters of 2–3 nuggets</strong>, not single blobs — cluster count scales with remaining amount, so a depleting node visibly thins out. Shape distinguishes the family: cube = raw solid, diamond = ore, disc = coal.</div>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+            <div style="text-align: center;">
+              <div style="position: relative; width: 96px; height: 96px; background: #2F5637; border-radius: 3px; display: grid; place-items: end center; padding-bottom: 22px; box-sizing: border-box;">
+                <div style="display: flex; gap: 4px; align-items: flex-end;"><div style="width: 14px; height: 22px; background: #8A5A2A; border: 2px solid #101418;"></div><div style="width: 18px; height: 30px; background: #9C6832; border: 2px solid #101418;"></div><div style="width: 12px; height: 18px; background: #8A5A2A; border: 2px solid #101418;"></div></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">WOOD</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 96px; height: 96px; background: #6B6F74; border-radius: 3px; display: grid; place-items: center;">
+                <div style="display: flex; gap: 4px; align-items: flex-end;"><div style="width: 20px; height: 20px; background: #9AA0A6; border: 2px solid #101418;"></div><div style="width: 26px; height: 26px; background: #8A8A8A; border: 2px solid #101418;"></div></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">STONE</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 96px; height: 96px; background: #6B6F74; border-radius: 3px; display: grid; place-items: center;">
+                <div style="display: flex; gap: 6px; align-items: center;"><div style="width: 18px; height: 18px; background: #A0522D; border: 2px solid #101418; transform: rotate(45deg);"></div><div style="width: 26px; height: 26px; background: #B4643B; border: 2px solid #101418; transform: rotate(45deg);"></div></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">IRON ORE</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 96px; height: 96px; background: #6B6F74; border-radius: 3px; display: grid; place-items: center;">
+                <div style="display: flex; gap: 6px; align-items: center;"><div style="width: 26px; height: 26px; background: #B87333; border: 2px solid #101418; transform: rotate(45deg);"></div><div style="width: 16px; height: 16px; background: #C98A46; border: 2px solid #101418; transform: rotate(45deg);"></div></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">COPPER ORE</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 96px; height: 96px; background: #6B6F74; border-radius: 3px; display: grid; place-items: center;">
+                <div style="display: flex; gap: 4px; align-items: flex-end;"><div style="width: 20px; height: 20px; background: #23262A; border: 2px solid #101418; border-radius: 50%;"></div><div style="width: 28px; height: 28px; background: #2E3237; border: 2px solid #101418; border-radius: 50%;"></div><div style="width: 16px; height: 16px; background: #23262A; border: 2px solid #101418; border-radius: 50%;"></div></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">COAL</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 96px; height: 96px; background: #6B6F74; border-radius: 3px; display: grid; place-items: center;">
+                <div style="position: absolute; inset: 24px; border-radius: 50%; box-shadow: 0 0 22px 6px rgba(255,215,0,.28);"></div>
+                <div style="display: flex; gap: 6px; align-items: center;"><div style="width: 16px; height: 16px; background: #FFD700; border: 2px solid #101418; transform: rotate(45deg);"></div><div style="width: 24px; height: 24px; background: #FFE04D; border: 2px solid #101418; transform: rotate(45deg);"></div></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">GOLD ORE</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding: 22px 26px; background: #141922; border: 1px solid rgba(255,255,255,.08); border-radius: 4px;">
+          <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2; margin-bottom: 4px;">PLAYER</div>
+          <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #8DA0B4; margin-bottom: 18px;">Cool blue — the only cool-hued object in the world, so the player never blends into machinery. A facing wedge shows the harvest target; the standing tile carries a light outline.</div>
+          <div style="display: flex; gap: 18px;">
+            <div style="text-align: center;">
+              <div style="position: relative; width: 72px; height: 72px; background: #4E7A46; border-radius: 3px;">
+                <div style="position: absolute; inset: 4px; border: 2px solid rgba(232,237,242,.4); border-radius: 3px;"></div>
+                <div style="position: absolute; left: 16px; top: 22px; width: 40px; height: 40px; background: rgba(8,12,16,.4); border-radius: 50%; filter: blur(5px);"></div>
+                <div style="position: absolute; left: 17px; top: 14px; width: 38px; height: 38px; background: #5FAEE0; border: 3px solid #101418; border-radius: 50%;">
+                  <div style="position: absolute; left: 6px; top: 5px; width: 13px; height: 11px; background: rgba(255,255,255,.42); border-radius: 50%;"></div>
+                  <div style="position: absolute; left: 9px; top: -12px; width: 14px; height: 11px; background: #E8AE4A; border: 2px solid #101418; clip-path: polygon(0 100%,100% 100%,50% 0);"></div>
+                </div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">UP</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 72px; height: 72px; background: #4E7A46; border-radius: 3px;">
+                <div style="position: absolute; inset: 4px; border: 2px solid rgba(232,237,242,.4); border-radius: 3px;"></div>
+                <div style="position: absolute; left: 16px; top: 22px; width: 40px; height: 40px; background: rgba(8,12,16,.4); border-radius: 50%; filter: blur(5px);"></div>
+                <div style="position: absolute; left: 17px; top: 14px; width: 38px; height: 38px; background: #5FAEE0; border: 3px solid #101418; border-radius: 50%;">
+                  <div style="position: absolute; left: 6px; top: 5px; width: 13px; height: 11px; background: rgba(255,255,255,.42); border-radius: 50%;"></div>
+                  <div style="position: absolute; right: -12px; top: 9px; width: 11px; height: 14px; background: #E8AE4A; border: 2px solid #101418; clip-path: polygon(0 0,0 100%,100% 50%);"></div>
+                </div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">RIGHT</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 72px; height: 72px; background: #4E7A46; border-radius: 3px;">
+                <div style="position: absolute; inset: 4px; border: 2px solid rgba(232,237,242,.4); border-radius: 3px;"></div>
+                <div style="position: absolute; left: 16px; top: 22px; width: 40px; height: 40px; background: rgba(8,12,16,.4); border-radius: 50%; filter: blur(5px);"></div>
+                <div style="position: absolute; left: 17px; top: 14px; width: 38px; height: 38px; background: #5FAEE0; border: 3px solid #101418; border-radius: 50%;">
+                  <div style="position: absolute; left: 6px; top: 5px; width: 13px; height: 11px; background: rgba(255,255,255,.42); border-radius: 50%;"></div>
+                  <div style="position: absolute; left: 9px; bottom: -12px; width: 14px; height: 11px; background: #E8AE4A; border: 2px solid #101418; clip-path: polygon(0 0,100% 0,50% 100%);"></div>
+                </div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">DOWN</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 22px 26px; background: #141922; border: 1px solid rgba(255,255,255,.08); border-radius: 4px;">
+        <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2; margin-bottom: 4px;">BUILDING SILHOUETTES</div>
+        <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #8DA0B4; margin-bottom: 18px;">Eight buildings, eight distinct outlines. The old three shapes become a silhouette per machine: notched hopper, disc, single stack, double stack, cut-corner octagon, and plain crates at two sizes. Each carries an inked interior glyph so type survives greyscale and desaturation.</div>
+        <div style="display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start;">
+          <div style="text-align: center;"><dc-import name="MachineTile" type="miner" state="plain" size="{{ 96 }}" hint-size="96px,96px"></dc-import><div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">MINER</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88;">notched hopper</div></div>
+          <div style="text-align: center;"><dc-import name="MachineTile" type="generator" state="plain" size="{{ 96 }}" hint-size="96px,96px"></dc-import><div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">GENERATOR</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88;">disc + bolt</div></div>
+          <div style="text-align: center;"><dc-import name="MachineTile" type="smelter" state="plain" size="{{ 96 }}" hint-size="96px,96px"></dc-import><div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">SMELTER</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88;">one stack</div></div>
+          <div style="text-align: center;"><dc-import name="MachineTile" type="steel" state="plain" size="{{ 96 }}" hint-size="96px,96px"></dc-import><div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">STEEL FURNACE</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88;">two stacks</div></div>
+          <div style="text-align: center;"><dc-import name="MachineTile" type="assembler" state="plain" size="{{ 96 }}" hint-size="96px,96px"></dc-import><div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">ASSEMBLER</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88;">octagon + rotor</div></div>
+          <div style="text-align: center;"><dc-import name="MachineTile" type="conveyor" state="plain" size="{{ 96 }}" hint-size="96px,96px"></dc-import><div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">CONVEYOR</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88;">treaded band</div></div>
+          <div style="text-align: center;"><dc-import name="MachineTile" type="storage" state="plain" size="{{ 96 }}" count="{{ 42 }}" hint-size="96px,96px"></dc-import><div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">STORAGE</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88;">full crate</div></div>
+          <div style="text-align: center;"><dc-import name="MachineTile" type="chest" state="plain" size="{{ 96 }}" count="{{ 8 }}" hint-size="96px,96px"></dc-import><div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C6D2DE;">CHEST</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88;">small crate</div></div>
+        </div>
+      </div>
+
+      <div style="padding: 22px 26px; background: #141922; border: 1px solid rgba(255,255,255,.08); border-radius: 4px;">
+        <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2; margin-bottom: 4px;">MACHINE STATE MATRIX <span style="color: #6E7B88; letter-spacing: .06em;">— at true 48px gameplay size</span></div>
+        <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #8DA0B4; margin-bottom: 18px;">Every state is <strong style="color: #C6D2DE;">three redundant signals</strong>: a collar (solid / dashed / dotted), a badge shape (chevron, double-bar, struck bolt, empty gauge), and a fill treatment (glow, hatch, desaturation). Colour is the fourth signal, never the only one — so the board survives colour-blindness and greyscale.</div>
+        <div style="display: flex; gap: 10px; padding-left: 152px; margin-bottom: 10px;">
+          <sc-for list="{{ states }}" as="s" hint-placeholder-count="6">
+            <div style="width: 68px; text-align: center; font-family: 'Chakra Petch', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: .1em; color: #94A2B0;">{{ s.n }}</div>
+          </sc-for>
+        </div>
+        <div style="display: grid; gap: 8px;">
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+            <div style="display: flex; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid rgba(255,255,255,.06);">
+              <div style="width: 142px;">
+                <div style="font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: #E8EDF2;">{{ r.name }}</div>
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88; margin-top: 2px;">{{ r.note }}</div>
+              </div>
+              <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6">
+                <div style="width: 68px; display: grid; place-items: center; background: #2E4A2C; border-radius: 3px; padding: 6px 0;">
+                  <sc-if value="{{ c.ok }}" hint-placeholder-val="{{ true }}">
+                    <dc-import name="MachineTile" type="{{ c.type }}" state="{{ c.k }}" size="{{ 48 }}" progress="{{ 0.55 }}" hint-size="48px,48px"></dc-import>
+                  </sc-if>
+                  <sc-if value="{{ c.na }}" hint-placeholder-val="{{ false }}">
+                    <div style="width: 48px; height: 48px; display: grid; place-items: center; background: rgba(11,14,18,.35); border: 1px dashed rgba(232,237,242,.16); border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #5E6873;">n/a</div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top: 12px; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; line-height: 1.6; color: #7E8C9A;"><span style="color: #C6D2DE;">n/a</span> = that branch does not exist in <span style="font-family: 'IBM Plex Mono', monospace;">GameEngine.computeBuildingStatus</span> (L983), so the engine cannot emit it. The generator switch has exactly two outcomes — <span style="font-family: 'IBM Plex Mono', monospace; color: #EC6058;">"No Fuel"</span> or <span style="font-family: 'IBM Plex Mono', monospace; color: #5FCB93;">"Producing 50 power"</span> — so it has no no-power, waiting, blocked or idle state at all. The miner has no item input, so it never waits; it alone reports <span style="font-family: 'IBM Plex Mono', monospace; color: #767C85;">"No Resource Below"</span> when its tile is exhausted. A smelter short of coal is <span style="font-family: 'IBM Plex Mono', monospace; color: #5FAEE0;">"Waiting for Input (1x Coal)"</span> — never "no fuel", which is generator-only.</div>
+        <div style="display: flex; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid rgba(255,255,255,.06);">
+          <div style="width: 142px;">
+            <div style="font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: #E8EDF2;">CONTAINERS</div>
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #6E7B88; margin-top: 2px;">passive · 0 ⚡</div>
+          </div>
+          <div style="width: 68px; display: grid; place-items: center; background: #2E4A2C; border-radius: 3px; padding: 6px 0;"><dc-import name="MachineTile" type="storage" state="plain" size="{{ 48 }}" count="{{ 42 }}" hint-size="48px,48px"></dc-import></div>
+          <div style="width: 68px; display: grid; place-items: center; background: #2E4A2C; border-radius: 3px; padding: 6px 0;"><dc-import name="MachineTile" type="chest" state="plain" size="{{ 48 }}" count="{{ 8 }}" hint-size="48px,48px"></dc-import></div>
+          <div style="width: 68px; display: grid; place-items: center; background: #2E4A2C; border-radius: 3px; padding: 6px 0;"><dc-import name="MachineTile" type="storage" state="blocked" size="{{ 48 }}" count="{{ 100 }}" progress="{{ 1 }}" hint-size="48px,48px"></dc-import></div>
+          <div style="flex: 1; padding-left: 12px; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: #7E8C9A;">Containers draw no power, so they have no unpowered or no-fuel state — only <span style="color: #C6D2DE;">holding</span>, and <span style="color: #F6BB45;">full</span> (amber collar + count at cap), which is what backs a line up.</div>
+        </div>
+        <div style="margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.06);">
+          <div style="font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .14em; color: #94A2B0; margin-bottom: 12px;">SAME ROW AT ZOOMED-OUT SIZE (26PX) — STATES STILL SEPARATE</div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <div style="width: 142px; font-family: 'Chakra Petch', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .1em; color: #E8EDF2;">SMELTER</div>
+            <sc-for list="{{ zoomCells }}" as="c" hint-placeholder-count="6">
+              <div style="width: 68px; display: grid; place-items: center; background: #2E4A2C; border-radius: 3px; padding: 8px 0;">
+                <sc-if value="{{ c.ok }}" hint-placeholder-val="{{ true }}">
+                  <dc-import name="MachineTile" type="smelter" state="{{ c.k }}" size="{{ 26 }}" progress="{{ 0.55 }}" hint-size="26px,26px"></dc-import>
+                </sc-if>
+                <sc-if value="{{ c.na }}" hint-placeholder-val="{{ false }}">
+                  <div style="width: 26px; height: 26px; display: grid; place-items: center; background: rgba(11,14,18,.35); border: 1px dashed rgba(232,237,242,.16); border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #5E6873;">—</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1.35fr 1fr; gap: 20px;">
+        <div style="padding: 22px 26px; background: #141922; border: 1px solid rgba(255,255,255,.08); border-radius: 4px;">
+          <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2; margin-bottom: 4px;">CONVEYORS, TURNS &amp; ITEMS</div>
+          <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #8DA0B4; margin-bottom: 18px;">A belt is a treaded band with a static direction wedge at its centre. The treads scroll only while items advance — a stopped belt is visibly frozen, which is the primary "something is wrong" cue before any badge is read. The four states below are the conveyor's four <span style="font-family: 'IBM Plex Mono', monospace; color: #C6D2DE;">statusReason</span> branches verbatim: <span style="font-family: 'IBM Plex Mono', monospace; color: #5FCB93;">"Transporting"</span>, <span style="font-family: 'IBM Plex Mono', monospace; color: #767C85;">"Idle — waiting for item"</span>, <span style="font-family: 'IBM Plex Mono', monospace; color: #F6BB45;">"Blocked"</span>, <span style="font-family: 'IBM Plex Mono', monospace; color: #98A0A9;">"No Power"</span>. Belts draw 1 ⚡ each, so they do go dark in a shortage. Routing kinds (<span style="font-family: 'IBM Plex Mono', monospace;">straight / turn / machine / blocked / headon / none</span>) come from <span style="font-family: 'IBM Plex Mono', monospace;">incomingConnectionKind</span> (L960).</div>
+          <div style="display: grid; gap: 18px;">
+            <div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88; margin-bottom: 8px;">FOUR DIRECTIONS</div>
+              <div style="display: flex; gap: 10px;">
+                <div style="padding: 6px; background: #2E4A2C; border-radius: 3px;"><dc-import name="BeltTile" dir="up" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+                <div style="padding: 6px; background: #2E4A2C; border-radius: 3px;"><dc-import name="BeltTile" dir="right" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+                <div style="padding: 6px; background: #2E4A2C; border-radius: 3px;"><dc-import name="BeltTile" dir="down" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+                <div style="padding: 6px; background: #2E4A2C; border-radius: 3px;"><dc-import name="BeltTile" dir="left" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+              </div>
+            </div>
+            <div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88; margin-bottom: 8px;">STRAIGHT RUN WITH ITEMS · L-TURN · HEAD-ON BLOCK</div>
+              <div style="display: flex; gap: 18px; align-items: flex-start;">
+                <div style="display: flex; padding: 6px; background: #2E4A2C; border-radius: 3px;">
+                  <dc-import name="BeltTile" dir="right" state="moving" item="#A0522D" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                  <dc-import name="BeltTile" dir="right" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                  <dc-import name="BeltTile" dir="right" state="moving" item="#8A8A8A" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                  <dc-import name="BeltTile" dir="right" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                </div>
+                <div style="padding: 6px; background: #2E4A2C; border-radius: 3px; display: grid; grid-template-columns: 48px 48px; grid-template-rows: 48px 48px;">
+                  <dc-import name="BeltTile" dir="down" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                  <div></div>
+                  <dc-import name="BeltTile" dir="right" from="up" state="moving" item="#B87333" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                  <dc-import name="BeltTile" dir="right" state="moving" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                </div>
+                <div style="display: flex; padding: 6px; background: #2E4A2C; border-radius: 3px;">
+                  <dc-import name="BeltTile" dir="right" state="blocked" item="#A0522D" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                  <dc-import name="BeltTile" dir="left" state="blocked" item="#A0522D" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88; margin-bottom: 8px;">BELT STATES</div>
+              <div style="display: flex; gap: 22px;">
+                <div style="text-align: center;"><div style="padding: 6px; background: #2E4A2C; border-radius: 3px;"><dc-import name="BeltTile" dir="right" state="moving" item="#C6CDD4" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #C6D2DE;">MOVING</div></div>
+                <div style="text-align: center;"><div style="padding: 6px; background: #2E4A2C; border-radius: 3px;"><dc-import name="BeltTile" dir="right" state="stopped" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #C6D2DE;">EMPTY / IDLE</div></div>
+                <div style="text-align: center;"><div style="padding: 6px; background: #2E4A2C; border-radius: 3px;"><dc-import name="BeltTile" dir="right" state="blocked" item="#8A88E4" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #C6D2DE;">BLOCKED · GATE</div></div>
+                <div style="text-align: center;"><div style="padding: 6px; background: #2E4A2C; border-radius: 3px;"><dc-import name="BeltTile" dir="right" state="nopower" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #C6D2DE;">NO POWER</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding: 22px 26px; background: #141922; border: 1px solid rgba(255,255,255,.08); border-radius: 4px;">
+          <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2; margin-bottom: 4px;">PLACEMENT, SELECTION &amp; POWER</div>
+          <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #8DA0B4; margin-bottom: 18px;">Overlays never recolour the building — they frame it. Valid is a green corner bracket, invalid is a red frame plus a strike, selection is a white bracket with a dashed ring.</div>
+          <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+            <div style="text-align: center;">
+              <div style="position: relative; width: 72px; height: 72px; background: #4E7A46; border-radius: 3px; display: grid; place-items: center;">
+                <div style="opacity: .55;"><dc-import name="MachineTile" type="miner" state="plain" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+                <div style="position: absolute; inset: 8px; border: 2px solid #5FCB93; border-radius: 3px; box-shadow: 0 0 12px rgba(95,203,147,.5);"></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #C6D2DE;">VALID</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 72px; height: 72px; background: #4E7A46; border-radius: 3px; display: grid; place-items: center;">
+                <div style="opacity: .4; filter: grayscale(.6);"><dc-import name="MachineTile" type="miner" state="plain" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+                <div style="position: absolute; inset: 8px; border: 2px solid #EC6058; border-radius: 3px; background: rgba(236,96,88,.16);"></div>
+                <div style="position: absolute; left: 8px; top: 50%; width: 56px; height: 2px; background: #EC6058; transform: rotate(-45deg);"></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #C6D2DE;">INVALID</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 72px; height: 72px; background: #4E7A46; border-radius: 3px; display: grid; place-items: center;">
+                <dc-import name="MachineTile" type="smelter" state="working" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                <div style="position: absolute; inset: 6px; border: 2px dashed rgba(232,237,242,.75); border-radius: 4px;"></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #C6D2DE;">SELECTED</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="position: relative; width: 72px; height: 72px; background: #4E7A46; border-radius: 3px; display: grid; place-items: center;">
+                <dc-import name="MachineTile" type="generator" state="working" size="{{ 48 }}" hint-size="48px,48px"></dc-import>
+                <div style="position: absolute; inset: 2px; border: 2px dashed #5FCB93; border-radius: 50%; opacity: .8;"></div>
+              </div>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #C6D2DE;">POWER SOURCE</div>
+            </div>
+          </div>
+          <div style="margin-top: 20px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6E7B88; margin-bottom: 10px;">POWER LINK</div>
+          <div style="position: relative; height: 84px; background: #4E7A46; border-radius: 3px; overflow: hidden;">
+            <div style="position: absolute; left: 16px; top: 18px;"><dc-import name="MachineTile" type="generator" state="working" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+            <div style="position: absolute; left: 64px; top: 42px; width: 120px; height: 2px; background: repeating-linear-gradient(90deg,#5FCB93 0 6px,rgba(0,0,0,0) 6px 12px); opacity: .6;"></div>
+            <div style="position: absolute; left: 64px; top: 39px; width: 6px; height: 6px; border-radius: 50%; background: #5FCB93; box-shadow: 0 0 8px #5FCB93; animation: spark 1.6s linear infinite;"></div>
+            <div style="position: absolute; left: 184px; top: 18px;"><dc-import name="MachineTile" type="smelter" state="working" size="{{ 48 }}" hint-size="48px,48px"></dc-import></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 22px 26px; background: #141922; border: 1px solid rgba(255,255,255,.08); border-radius: 4px;">
+        <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8EDF2; margin-bottom: 4px;">ITEM CHIPS &amp; ICON GRAMMAR</div>
+        <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: #8DA0B4; margin-bottom: 18px;">Items reuse the deposit shapes at chip scale, so the thing on the belt, the thing in the machine, and the thing in your inventory are visibly the same object. Raw = cube, ore = diamond, coal = disc, processed = plate with a notch.</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 13px; height: 13px; background: #8A5A2A; border: 2px solid #101418;"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">WOOD</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 13px; height: 13px; background: #8A8A8A; border: 2px solid #101418;"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">STONE</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 12px; height: 12px; background: #A0522D; border: 2px solid #101418; transform: rotate(45deg);"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">IRON ORE</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 12px; height: 12px; background: #B87333; border: 2px solid #101418; transform: rotate(45deg);"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">COPPER ORE</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 13px; height: 13px; background: #2E3237; border: 2px solid #101418; border-radius: 50%;"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">COAL</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 12px; height: 12px; background: #FFD700; border: 2px solid #101418; transform: rotate(45deg);"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">GOLD ORE</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 15px; height: 11px; background: #c0c0c0; border: 2px solid #101418; clip-path: polygon(0 0,100% 0,100% 70%,70% 100%,0 100%);"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">IRON INGOT</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 15px; height: 11px; background: #e67300; border: 2px solid #101418; clip-path: polygon(0 0,100% 0,100% 70%,70% 100%,0 100%);"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">COPPER WIRE</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 15px; height: 11px; background: #4a4a6a; border: 2px solid #101418; clip-path: polygon(0 0,100% 0,100% 70%,70% 100%,0 100%);"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">STEEL PLATE</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 13px; height: 13px; background: #00cc44; border: 2px solid #101418; border-radius: 2px;"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">CIRCUIT BOARD</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #101720; border: 1px solid rgba(255,255,255,.07); border-radius: 3px;"><span style="width: 13px; height: 13px; background: #b0b0b0; border: 2px solid #101418; border-radius: 50%;"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8EDF2;">GEAR</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #1A1410; border: 1px solid #E8AE4A; border-radius: 3px;"><span style="width: 15px; height: 13px; background: #ff6600; border: 2px solid #101418; clip-path: polygon(0 20%,60% 20%,60% 0,100% 40%,100% 100%,0 100%);"></span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #E8AE4A;">ENGINE · WIN ITEM</span></div>
+        </div>
+        <div style="margin-top: 14px; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; line-height: 1.6; color: #7E8C9A;">All twelve fills are the current <span style="font-family: 'IBM Plex Mono', monospace;">ITEM_COLORS</span> values unchanged — items are the one place the source palette already works, because every item is distinct and none of them collides with terrain. The redesign only adds the ink outline and the shape grammar. Production chain per <span style="font-family: 'IBM Plex Mono', monospace;">BUILDING_DEFS</span>: smelter → <span style="font-family: 'IBM Plex Mono', monospace; color: #C6D2DE;">iron_ingot</span>, steel furnace → <span style="font-family: 'IBM Plex Mono', monospace; color: #C6D2DE;">steel_plate</span>, assembler → <span style="font-family: 'IBM Plex Mono', monospace; color: #C6D2DE;">copper_wire</span> → <span style="font-family: 'IBM Plex Mono', monospace; color: #C6D2DE;">gear</span> → <span style="font-family: 'IBM Plex Mono', monospace; color: #C6D2DE;">engine</span>.</div>
+      </div>
+
+      <div style="padding: 24px 26px; background: linear-gradient(180deg,#171E29,#141922); border: 1px solid rgba(255,255,255,.08); border-radius: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+        <div>
+          <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8AE4A; margin-bottom: 12px;">WHAT THIS DOES NOT CHANGE</div>
+          <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; line-height: 1.7; color: #A9B7C4;">Every cost, power figure, capacity and recipe on this board is read from <span style="font-family: 'IBM Plex Mono', monospace; color: #C6D2DE;">BUILDING_DEFS</span> (<span style="font-family: 'IBM Plex Mono', monospace;">src/types/index.ts</span> L263–387) and every state from <span style="font-family: 'IBM Plex Mono', monospace; color: #C6D2DE;">computeBuildingStatus</span> (<span style="font-family: 'IBM Plex Mono', monospace;">GameEngine.ts</span> L983) — unchanged. Item fills are <span style="font-family: 'IBM Plex Mono', monospace; color: #C6D2DE;">ITEM_COLORS</span> verbatim. The restyle touches only <span style="font-family: 'IBM Plex Mono', monospace;">BUILDING_DEFS.color</span>/<span style="font-family: 'IBM Plex Mono', monospace;">.shape</span>, <span style="font-family: 'IBM Plex Mono', monospace;">Renderer.ts</span> draw code and the panel CSS — never <span style="font-family: 'IBM Plex Mono', monospace;">GameEngine.ts</span>.</div>
+        </div>
+        <div>
+          <div style="font-family: 'Chakra Petch', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .16em; color: #E8AE4A; margin-bottom: 12px;">NEXT, ON YOUR APPROVAL</div>
+          <ul style="margin: 0; padding-left: 18px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; line-height: 1.7; color: #A9B7C4; display: grid; gap: 4px;">
+            <li>Remaining UI: objectives, tutorial cards, help, save/load, first-run and win states.</li>
+            <li>Zoom-tier spec — what each asset drops at 24px, 32px, 48px and 96px.</li>
+            <li>Coding-agent handoff keyed to <span style="font-family: 'IBM Plex Mono', monospace;">source-map.md</span>: new <span style="font-family: 'IBM Plex Mono', monospace;">BUILDING_DEFS</span> colour/shape values, per-asset draw specs for <span style="font-family: 'IBM Plex Mono', monospace;">generateTerrainTiles</span> (L73), <span style="font-family: 'IBM Plex Mono', monospace;">drawBuilding</span> (L597), <span style="font-family: 'IBM Plex Mono', monospace;">drawConveyor</span> (L819), <span style="font-family: 'IBM Plex Mono', monospace;">drawPowerLinks</span> (L732) and <span style="font-family: 'IBM Plex Mono', monospace;">drawMinimap</span> (L1161), plus a CSS variable sheet for <span style="font-family: 'IBM Plex Mono', monospace;">App.css</span>.</li>
+            <li>A ninth <span style="font-family: 'IBM Plex Mono', monospace;">.shape</span> value: eight distinct silhouettes need <span style="font-family: 'IBM Plex Mono', monospace;">.shape</span> widened from four names to eight, which is a one-line type change plus new branches in <span style="font-family: 'IBM Plex Mono', monospace;">drawBuilding</span>.</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+// Columns are the real status vocabulary emitted by
+// GameEngine.computeBuildingStatus (src/engine/GameEngine.ts L983).
+const COLS = [
+  { k: 'working', n: 'WORKING' },
+  { k: 'waiting', n: 'WAITING FOR INPUT' },
+  { k: 'blocked', n: 'OUTPUT BLOCKED' },
+  { k: 'nopower', n: 'NO POWER' },
+  { k: 'nofuel', n: 'NO FUEL' },
+  { k: 'idle', n: 'NO RESOURCE' }
+];
+
+// Exactly the branches each building type has in computeBuildingStatus.
+// The generator switch has only two outcomes: 'No Fuel' or 'Producing N power'
+// — it never reports no-power, waiting, blocked or idle. The miner has no item
+// input, so it never waits; instead it alone reports 'No Resource Below'.
+const VALID = {
+  miner:     ['working', 'blocked', 'nopower', 'idle'],
+  generator: ['working', 'nofuel'],
+  smelter:   ['working', 'waiting', 'blocked', 'nopower'],
+  steel:     ['working', 'waiting', 'blocked', 'nopower'],
+  assembler: ['working', 'waiting', 'blocked', 'nopower']
+};
+
+const NAMES = {
+  miner: 'MINER', generator: 'COAL GENERATOR', smelter: 'SMELTER',
+  steel: 'STEEL FURNACE', assembler: 'ASSEMBLER'
+};
+
+// verbatim statusReason strings, per building
+const NOTE = {
+  miner: '5 ⚡ · cap 10 · "Mining"',
+  generator: 'makes 50 ⚡ · cap 20 · "Producing 50 power"',
+  smelter: '10 ⚡ · cap 20 · "Smelting"',
+  steel: '20 ⚡ · cap 20 · "Smelting"',
+  assembler: '15 ⚡ · cap 30 · "Crafting"'
+};
+
+function cellsFor(type) {
+  return COLS.map((c) => {
+    const ok = VALID[type].indexOf(c.k) !== -1;
+    return { type: type, k: ok ? c.k : 'plain', ok: ok, na: !ok };
+  });
+}
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      states: COLS,
+      rows: Object.keys(VALID).map((t) => ({ type: t, name: NAMES[t], note: NOTE[t], cells: cellsFor(t) })),
+      zoomCells: cellsFor('smelter')
+    };
+  }
+}
+</script>
+</body>
+</html>

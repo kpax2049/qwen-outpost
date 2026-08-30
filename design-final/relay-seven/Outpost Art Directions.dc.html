@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #0a0c10; }
+  a { color: #9fd8ff; text-decoration: none; }
+  a:hover { color: #ffffff; text-decoration: underline; }
+  img { image-rendering: pixelated; -ms-interpolation-mode: nearest-neighbor; display: block; }
+  @keyframes beltx { to { background-position-x: -64px } }
+  @keyframes beltxr { to { background-position-x: 64px } }
+  @keyframes belty { to { background-position-y: -64px } }
+  @keyframes prog { 0% { width: 6% } 100% { width: 100% } }
+  @keyframes glowpulse { 0%, 100% { opacity: .45 } 50% { opacity: 1 } }
+  @keyframes bob16 { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
+  @keyframes smoke { 0% { transform: translate(0,0) scale(1); opacity: .55 } 100% { transform: translate(-10px,-26px) scale(1.7); opacity: 0 } }
+  @keyframes itemx { to { transform: translateX(-192px) } }
+</style>
+</helmet>
+
+<div style="width: 1420px; padding: 0 0 90px; background: #0a0c10; color: #e8edf2; font-family: 'IBM Plex Sans', system-ui, sans-serif;">
+
+  <div style="padding: 52px 60px 34px; border-bottom: 3px solid #1c222b;">
+    <div style="font-family: 'Silkscreen', monospace; font-size: 11px; letter-spacing: .1em; color: #6d7c8a;">OUTPOST · VISUAL REDESIGN · ROUND 2 — DIRECTIONAL RESET</div>
+    <h1 style="margin: 16px 0 0; font-family: 'Silkscreen', monospace; font-size: 40px; line-height: 1.15; font-weight: 700;">THREE 16-BIT<br />SCI-FI OUTPOSTS</h1>
+    <p style="margin: 18px 0 0; max-width: 900px; font-size: 16px; line-height: 1.65; color: #b3c0cc; text-wrap: pretty;">Foundry is dropped. These three are built from actual pixel art — every tile, node, machine and character below is a hand-placed 16×16 sprite shown at 4×, not a CSS shape. What carries over from the last round is only what you asked to keep: crisp rendering, heavy UI framing, the progress-bar treatment, and the conveyor's motion language.</p>
+    <div style="margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; font-family: 'IBM Plex Mono', monospace; font-size: 12px;">
+      <span style="padding: 7px 12px; background: #131922; border: 2px solid #232c38; border-radius: 2px; color: #9fb0c0;">16×16 native · 4× display · nearest-neighbour</span>
+      <span style="padding: 7px 12px; background: #131922; border: 2px solid #232c38; border-radius: 2px; color: #9fb0c0;">1px ink outline · 2–3 tone ramps</span>
+      <span style="padding: 7px 12px; background: #131922; border: 2px solid #232c38; border-radius: 2px; color: #9fb0c0;">silhouette-first machine design</span>
+      <span style="padding: 7px 12px; background: #131922; border: 2px solid #232c38; border-radius: 2px; color: #9fb0c0;">no gameplay, cost or power changes</span>
+    </div>
+  </div>
+
+  <section style="padding: 0;">
+
+    <!-- ============================= 2a ============================= -->
+    <div id="2a" style="padding: 46px 60px 56px; border-bottom: 3px solid #1c222b;">
+      <div style="display: flex; align-items: flex-start; gap: 20px;">
+        <div style="font-family: 'Silkscreen', monospace; font-size: 13px; padding: 8px 12px; background: #ffb347; color: #191204; border-radius: 2px;">2a</div>
+        <div style="flex: 1;">
+          <h2 style="margin: 0; font-family: 'Silkscreen', monospace; font-size: 30px; color: #ffcf85;">VERDANT RELAY</h2>
+          <p style="margin: 10px 0 0; max-width: 880px; font-size: 15px; line-height: 1.65; color: #b3c0cc;">A terraformed valley that is already winning the argument with your machinery. Warm mid-greens, ochre soil, amber sodium tech light. The outpost reads as <em>salvaged and lived-in</em> — a relay station someone bolted together under a tree line, not a factory floor.</p>
+        </div>
+        <div style="display: flex; gap: 0; border: 3px solid #0a0c10; box-shadow: 0 0 0 1px #2a333f;">
+          <div style="width: 34px; height: 46px; background: #4a7a3a;"></div>
+          <div style="width: 34px; height: 46px; background: #1b3318;"></div>
+          <div style="width: 34px; height: 46px; background: #b08c4a;"></div>
+          <div style="width: 34px; height: 46px; background: #2a5a7a;"></div>
+          <div style="width: 34px; height: 46px; background: #6a7065;"></div>
+          <div style="width: 34px; height: 46px; background: #6e7873;"></div>
+          <div style="width: 34px; height: 46px; background: #ffb347;"></div>
+          <div style="width: 34px; height: 46px; background: #ff6a2a;"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px;">
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">GRASS</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Blade tufts on a two-tone dither — texture without noise.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/A-forest.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">FOREST</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Individual broadleaf crowns with lit tops and visible trunks.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/A-sand.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">SAND</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Ripple bands with a highlight above each crest.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/A-water.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">WATER</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Depth bands, not a flat fill; bright dashes read as moving crests.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/A-rock.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">ROCK</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Fissured bedrock with lit outcrop faces — walkable-looking but hard.</div></div>
+      </div>
+
+      <div style="margin-top: 32px; display: grid; grid-template-columns: 300px 1fr; gap: 26px;">
+        <div style="padding: 18px; background: #101620; border: 3px solid #1c222b;">
+          <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #ffb347;">PLAYER — FIELD ENGINEER</div>
+          <div style="margin-top: 14px; display: flex; gap: 14px; align-items: flex-end;">
+            <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated; padding: 0;"><img src="sprites/A-player-down.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #7e8c9a;">DOWN</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-player-side.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #7e8c9a;">SIDE</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-player-up.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #7e8c9a;">UP</div></div>
+          </div>
+          <div style="margin-top: 14px; font-size: 13px; line-height: 1.55; color: #9fb0c0;">A person, on foot, with a backpack rig: hard hat with an amber visor, chest lamp, side packs and a stub antenna. The lamp is the one saturated pixel on the character, so your eye finds you instantly on busy terrain.</div>
+        </div>
+        <div style="padding: 18px; background: #101620; border: 3px solid #1c222b;">
+          <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #ffb347;">RESOURCE NODES</div>
+          <div style="margin-top: 14px; display: flex; gap: 12px; flex-wrap: wrap;">
+            <div style="text-align: center;"><div style="background-image: url('sprites/A-forest.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-res-wood.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">WOOD</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/A-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-res-stone.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">STONE</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/A-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-res-iron.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">IRON</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/A-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-res-copper.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">COPPER</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/A-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-res-coal.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">COAL</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/A-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-res-gold.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">GOLD</div></div>
+          </div>
+          <div style="margin-top: 14px; font-size: 13px; line-height: 1.55; color: #9fb0c0;">Every node is a cluster of faceted lumps with a lit top face, sitting on its host terrain — not a floating primitive. Wood is a cut log pile with end-grain rings; ore keeps its <span style="font-family: 'IBM Plex Mono', monospace;">ITEM_COLORS</span> hue but now covers most of the rock so it reads at a glance; gold gets three sparkle pixels, the only glint in the set.</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 26px; padding: 18px; background: #101620; border: 3px solid #1c222b;">
+        <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #ffb347;">MACHINE SILHOUETTES — EACH A DIFFERENT OUTER SHAPE</div>
+        <div style="margin-top: 16px; display: flex; gap: 18px; flex-wrap: wrap;">
+          <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-b-miner.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">MINER</div><div style="font-size: 11px; color: #7e8c9a;">derrick + drill</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-b-generator.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">GENERATOR</div><div style="font-size: 11px; color: #7e8c9a;">domed boiler + stack</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-b-smelter.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">SMELTER</div><div style="font-size: 11px; color: #7e8c9a;">glowing arch mouth</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-b-steel.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">STEEL FURNACE</div><div style="font-size: 11px; color: #7e8c9a;">tiered, twin stacks</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-b-assembler.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">ASSEMBLER</div><div style="font-size: 11px; color: #7e8c9a;">overhead gantry arm</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-b-storage.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">STORAGE</div><div style="font-size: 11px; color: #7e8c9a;">stacked crates</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/A-b-chest.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">CHEST</div><div style="font-size: 11px; color: #7e8c9a;">one small crate</div></div>
+          <div style="text-align: center;"><div style="width: 64px; height: 64px; background-image: url('sprites/A-belt-h.png'); background-size: 64px 64px; image-rendering: pixelated;"></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">CONVEYOR</div><div style="font-size: 11px; color: #7e8c9a;">kept + evolved</div></div>
+        </div>
+      </div>
+
+      <div data-screen-label="2a gameplay" style="margin-top: 30px; border: 3px solid #1c222b; background: #0a0c10;">
+        <div style="display: flex; align-items: center; gap: 14px; height: 54px; padding: 0 14px; background: #141b24; border-bottom: 3px solid #1c222b;">
+          <span style="font-family: 'Silkscreen', monospace; font-size: 14px; color: #ffb347;">OUTPOST</span>
+          <div style="display: flex; gap: 4px; padding: 3px; background: #0d131a; border: 2px solid #232c38;">
+            <span style="width: 30px; height: 22px; display: grid; place-items: center; background: #ffb347; color: #191204; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;">II</span>
+            <span style="width: 30px; height: 22px; display: grid; place-items: center; background: #1c2530; color: #cbd6e0; font-family: 'IBM Plex Mono', monospace; font-size: 11px;">×1</span>
+            <span style="width: 30px; height: 22px; display: grid; place-items: center; color: #6d7c8a; font-family: 'IBM Plex Mono', monospace; font-size: 11px;">×5</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 11px; background: #0d131a; border: 2px solid #232c38;">
+            <span style="width: 8px; height: 8px; background: #7ddc8a;"></span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #e8edf2;">100</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6d7c8a;">/ 70</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #7ddc8a;">+30</span>
+            <span style="font-family: 'Silkscreen', monospace; font-size: 9px; color: #6d7c8a;">POWER</span>
+          </div>
+          <div style="flex: 1;"></div>
+          <span style="height: 28px; padding: 0 12px; display: grid; place-items: center; background: #ffb347; color: #191204; font-family: 'Silkscreen', monospace; font-size: 10px;">BUILD</span>
+          <span style="height: 28px; padding: 0 12px; display: grid; place-items: center; background: #1c2530; border: 2px solid #232c38; color: #cbd6e0; font-family: 'Silkscreen', monospace; font-size: 10px;">BAG</span>
+        </div>
+
+        <div style="position: relative; width: 1280px; height: 640px; overflow: hidden; background-image: url('sprites/A-grass.png'); background-size: 64px 64px; image-rendering: pixelated;">
+          <div style="position: absolute; left: 0; top: 0; width: 256px; height: 192px; background-image: url('sprites/A-forest.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 1024px; top: 0; width: 256px; height: 128px; background-image: url('sprites/A-forest.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 768px; top: 256px; width: 512px; height: 384px; background-image: url('sprites/A-rock.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 0; top: 384px; width: 384px; height: 256px; background-image: url('sprites/A-sand.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 0; top: 448px; width: 256px; height: 192px; background-image: url('sprites/A-water.png'); background-size: 64px 64px;"></div>
+
+          <img src="sprites/A-res-wood.png" width="64" height="64" style="position: absolute; left: 64px; top: 64px;" alt="" />
+          <img src="sprites/A-res-iron.png" width="64" height="64" style="position: absolute; left: 960px; top: 256px;" alt="" />
+          <img src="sprites/A-res-coal.png" width="64" height="64" style="position: absolute; left: 832px; top: 448px;" alt="" />
+          <img src="sprites/A-res-stone.png" width="64" height="64" style="position: absolute; left: 1152px; top: 512px;" alt="" />
+          <img src="sprites/A-res-copper.png" width="64" height="64" style="position: absolute; left: 1088px; top: 320px;" alt="" />
+          <img src="sprites/A-res-gold.png" width="64" height="64" style="position: absolute; left: 1216px; top: 384px;" alt="" />
+
+          <div style="position: absolute; left: 384px; top: 320px; width: 512px; height: 64px; background-image: url('sprites/A-belt-h.png'); background-size: 64px 64px; animation: beltx .8s linear infinite;"></div>
+          <div style="position: absolute; left: 320px; top: 192px; width: 64px; height: 128px; background-image: url('sprites/A-belt-v.png'); background-size: 64px 64px; animation: belty .8s linear infinite;"></div>
+
+          <div style="position: absolute; left: 384px; top: 336px; width: 512px; height: 32px; overflow: hidden;">
+            <div style="position: absolute; left: 448px; top: 4px; display: flex; gap: 128px; animation: itemx 3.2s linear infinite;">
+              <div style="width: 24px; height: 24px; background: #a0522d; box-shadow: 0 0 0 3px #141a12;"></div>
+              <div style="width: 24px; height: 24px; background: #a0522d; box-shadow: 0 0 0 3px #141a12;"></div>
+              <div style="width: 24px; height: 24px; background: #c0c0c0; box-shadow: 0 0 0 3px #141a12;"></div>
+            </div>
+          </div>
+
+          <img src="sprites/A-b-miner.png" width="64" height="64" style="position: absolute; left: 960px; top: 320px;" alt="" />
+          <div style="position: absolute; left: 966px; top: 372px; width: 52px; height: 10px; background: #141a12; border: 2px solid #141a12; box-sizing: border-box;"><div style="height: 100%; background: #7ddc8a; animation: prog 2.4s linear infinite;"></div></div>
+
+          <img src="sprites/A-b-smelter.png" width="64" height="64" style="position: absolute; left: 896px; top: 320px;" alt="" />
+          <img src="sprites/A-b-smelter.png" width="64" height="64" style="position: absolute; left: 320px; top: 320px;" alt="" />
+          <div style="position: absolute; left: 326px; top: 372px; width: 52px; height: 10px; background: #141a12; border: 2px solid #141a12; box-sizing: border-box;"><div style="height: 100%; background: #ffb347; animation: prog 3.6s linear infinite;"></div></div>
+
+          <img src="sprites/A-b-assembler.png" width="64" height="64" style="position: absolute; left: 320px; top: 128px;" alt="" />
+          <div style="position: absolute; left: 326px; top: 180px; width: 52px; height: 10px; background: #141a12; border: 2px solid #141a12; box-sizing: border-box;"><div style="height: 100%; background: #7ddc8a; animation: prog 4.2s linear infinite;"></div></div>
+
+          <img src="sprites/A-b-storage.png" width="64" height="64" style="position: absolute; left: 256px; top: 64px;" alt="" />
+          <img src="sprites/A-b-chest.png" width="64" height="64" style="position: absolute; left: 448px; top: 192px;" alt="" />
+
+          <img src="sprites/A-b-generator.png" width="64" height="64" style="position: absolute; left: 768px; top: 448px;" alt="" />
+          <div style="position: absolute; left: 786px; top: 442px; width: 12px; height: 12px; background: #cbd6e0; border-radius: 50%; animation: smoke 2.2s linear infinite;"></div>
+          <img src="sprites/A-b-generator.png" width="64" height="64" style="position: absolute; left: 896px; top: 512px;" alt="" />
+          <div style="position: absolute; left: 914px; top: 506px; width: 12px; height: 12px; background: #cbd6e0; border-radius: 50%; animation: smoke 2.2s linear infinite 1.1s;"></div>
+          <img src="sprites/A-b-steel.png" width="64" height="64" style="position: absolute; left: 1088px; top: 448px;" alt="" />
+
+          <img src="sprites/A-player-down.png" width="64" height="64" style="position: absolute; left: 576px; top: 192px; animation: bob16 2.6s ease-in-out infinite;" alt="" />
+
+          <div style="position: absolute; right: 16px; bottom: 16px; width: 176px; border: 3px solid #1c222b; background: #141b24;">
+            <div style="padding: 5px 8px; font-family: 'Silkscreen', monospace; font-size: 9px; color: #cbd6e0; border-bottom: 2px solid #232c38;">MAP</div>
+            <div style="position: relative; height: 140px; background: #3d6330;">
+              <div style="position: absolute; left: 0; top: 0; width: 40px; height: 34px; background: #1b3318;"></div>
+              <div style="position: absolute; right: 0; top: 46px; width: 62px; height: 62px; background: #4a4f45;"></div>
+              <div style="position: absolute; left: 0; bottom: 0; width: 46px; height: 34px; background: #2a5a7a;"></div>
+              <div style="position: absolute; left: 44px; top: 56px; width: 62px; height: 3px; background: #ffb347;"></div>
+              <div style="position: absolute; left: 70px; top: 40px; width: 6px; height: 6px; background: #ff6a2a;"></div>
+              <div style="position: absolute; left: 52px; top: 34px; width: 8px; height: 8px; background: #ffffff;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; font-size: 13px; line-height: 1.6; color: #9fb0c0;">
+        <div><strong style="color: #ffcf85; font-family: 'Silkscreen', monospace; font-size: 10px;">WHY IT READS</strong><br />Warm green ground sits opposite every machine's cool grey metal, so buildings pop off terrain by temperature, not by outline weight. Amber is reserved for tech light and UI accent — nothing in nature is amber, so anything glowing amber is something you built.</div>
+        <div><strong style="color: #ffcf85; font-family: 'Silkscreen', monospace; font-size: 10px;">CHARACTER</strong><br />This is the most classic-adventure of the three: legible daylight, dense foliage, a person on foot. It suits the exploration half of the loop — walking out to find deposits feels like a hike, not a map query.</div>
+        <div><strong style="color: #ffcf85; font-family: 'Silkscreen', monospace; font-size: 10px;">RISK</strong><br />Green ground plus green foliage is the narrowest value range of the three, so belts and machines carry most of the contrast. If you want maximum machine legibility, 2b or 2c beats it.</div>
+      </div>
+    </div>
+
+    <!-- ============================= 2b ============================= -->
+    <div id="2b" style="padding: 46px 60px 56px; border-bottom: 3px solid #1c222b; background: #090d11;">
+      <div style="display: flex; align-items: flex-start; gap: 20px;">
+        <div style="font-family: 'Silkscreen', monospace; font-size: 13px; padding: 8px 12px; background: #4fe3ff; color: #04161c; border-radius: 2px;">2b</div>
+        <div style="flex: 1;">
+          <h2 style="margin: 0; font-family: 'Silkscreen', monospace; font-size: 30px; color: #9beeff;">CRYO STATION</h2>
+          <p style="margin: 10px 0 0; max-width: 880px; font-size: 15px; line-height: 1.65; color: #b3c0cc;">A research shelf on a frozen world: pale tundra moss, snow drifts, cracked ice, black basalt. This is the light-cyberpunk option — cyan holograms for anything working, hot magenta for anything wrong. Cold, quiet, slightly hostile.</p>
+        </div>
+        <div style="display: flex; border: 3px solid #090d11; box-shadow: 0 0 0 1px #2a333f;">
+          <div style="width: 34px; height: 46px; background: #5a6b63;"></div>
+          <div style="width: 34px; height: 46px; background: #1d2a33;"></div>
+          <div style="width: 34px; height: 46px; background: #c2ccd2;"></div>
+          <div style="width: 34px; height: 46px; background: #3d6b82;"></div>
+          <div style="width: 34px; height: 46px; background: #464e57;"></div>
+          <div style="width: 34px; height: 46px; background: #71818d;"></div>
+          <div style="width: 34px; height: 46px; background: #4fe3ff;"></div>
+          <div style="width: 34px; height: 46px; background: #ff5fa8;"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px;">
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">TUNDRA</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Grass becomes frostbitten moss with snow flecks.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/B-forest.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">FROZEN PINES</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Tall narrow spires with snow-loaded branches.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/B-sand.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">SNOW DRIFT</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Sand's ripple grammar, re-lit as wind-packed snow.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/B-water.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">PACK ICE</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Fracture lines with bright rime — obviously not walkable.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/B-rock.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">BASALT</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Near-black stone with frost caught on the lit faces.</div></div>
+      </div>
+
+      <div style="margin-top: 32px; display: grid; grid-template-columns: 300px 1fr; gap: 26px;">
+        <div style="padding: 18px; background: #0e141b; border: 3px solid #1c222b;">
+          <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #4fe3ff;">PLAYER — SURVEY DRONE</div>
+          <div style="margin-top: 14px; display: flex; gap: 14px; align-items: flex-end;">
+            <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-player-down.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #7e8c9a;">DOWN</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-player-side.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #7e8c9a;">SIDE</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-player-up.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #7e8c9a;">UP</div></div>
+          </div>
+          <div style="margin-top: 14px; font-size: 13px; line-height: 1.55; color: #9fb0c0;">A hovering survey drone: disc chassis, twin thruster nacelles, one cyan sensor lens facing your heading, and a cast glow on the ground beneath it. The ground glow is the readability trick — it separates the player from terrain even over pale snow, where a dark sprite would vanish.</div>
+        </div>
+        <div style="padding: 18px; background: #0e141b; border: 3px solid #1c222b;">
+          <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #4fe3ff;">RESOURCE NODES</div>
+          <div style="margin-top: 14px; display: flex; gap: 12px; flex-wrap: wrap;">
+            <div style="text-align: center;"><div style="background-image: url('sprites/B-forest.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-res-wood.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">WOOD</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/B-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-res-stone.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">STONE</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/B-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-res-iron.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">IRON</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/B-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-res-copper.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">COPPER</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/B-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-res-coal.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">COAL</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/B-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-res-gold.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">GOLD</div></div>
+          </div>
+          <div style="margin-top: 14px; font-size: 13px; line-height: 1.55; color: #9fb0c0;">Against near-black basalt the warm ore hues hit their highest contrast of the three directions — iron and copper are unmistakable here even at half zoom. Coal is the hard case on dark rock, so it keeps two bright grey glints to hold its edge.</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 26px; padding: 18px; background: #0e141b; border: 3px solid #1c222b;">
+        <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #4fe3ff;">MACHINE SILHOUETTES</div>
+        <div style="margin-top: 16px; display: flex; gap: 18px; flex-wrap: wrap;">
+          <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-b-miner.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">MINER</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-b-generator.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">GENERATOR</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-b-smelter.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">SMELTER</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-b-steel.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">STEEL</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-b-assembler.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">ASSEMBLER</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-b-storage.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">STORAGE</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/B-b-chest.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">CHEST</div></div>
+          <div style="text-align: center;"><div style="width: 64px; height: 64px; background-image: url('sprites/B-belt-h.png'); background-size: 64px 64px; image-rendering: pixelated;"></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">CONVEYOR</div></div>
+        </div>
+        <div style="margin-top: 14px; font-size: 13px; line-height: 1.55; color: #9fb0c0;">Same silhouette grammar as 2a — the shapes are the readability system and shouldn't change between directions. What changes is the skin: colder steel, cyan status light, and magenta where the source palette used alarm red, so failures shout without going full neon.</div>
+      </div>
+
+      <div data-screen-label="2b gameplay" style="margin-top: 30px; border: 3px solid #1c222b; background: #090d11;">
+        <div style="display: flex; align-items: center; gap: 14px; height: 54px; padding: 0 14px; background: #101a22; border-bottom: 3px solid #1c222b;">
+          <span style="font-family: 'Silkscreen', monospace; font-size: 14px; color: #4fe3ff;">OUTPOST</span>
+          <div style="display: flex; gap: 4px; padding: 3px; background: #0a1116; border: 2px solid #223040;">
+            <span style="width: 30px; height: 22px; display: grid; place-items: center; background: #4fe3ff; color: #04161c; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;">II</span>
+            <span style="width: 30px; height: 22px; display: grid; place-items: center; background: #17222c; color: #cbd6e0; font-family: 'IBM Plex Mono', monospace; font-size: 11px;">×1</span>
+            <span style="width: 30px; height: 22px; display: grid; place-items: center; color: #6d7c8a; font-family: 'IBM Plex Mono', monospace; font-size: 11px;">×5</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 11px; background: #0a1116; border: 2px solid #223040;">
+            <span style="width: 8px; height: 8px; background: #ff5fa8; animation: glowpulse 1.2s ease-in-out infinite;"></span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #e8edf2;">50</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6d7c8a;">/ 70</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #ff5fa8;">−20</span>
+          </div>
+          <div style="flex: 1;"></div>
+          <span style="height: 28px; padding: 0 12px; display: grid; place-items: center; background: #4fe3ff; color: #04161c; font-family: 'Silkscreen', monospace; font-size: 10px;">BUILD</span>
+          <span style="height: 28px; padding: 0 12px; display: grid; place-items: center; background: #17222c; border: 2px solid #223040; color: #cbd6e0; font-family: 'Silkscreen', monospace; font-size: 10px;">BAG</span>
+        </div>
+
+        <div style="position: relative; width: 1280px; height: 640px; overflow: hidden; background-image: url('sprites/B-grass.png'); background-size: 64px 64px; image-rendering: pixelated;">
+          <div style="position: absolute; left: 0; top: 0; width: 192px; height: 256px; background-image: url('sprites/B-forest.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 1088px; top: 0; width: 192px; height: 192px; background-image: url('sprites/B-forest.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 704px; top: 256px; width: 576px; height: 384px; background-image: url('sprites/B-rock.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 0; top: 320px; width: 448px; height: 320px; background-image: url('sprites/B-sand.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 0; top: 448px; width: 320px; height: 192px; background-image: url('sprites/B-water.png'); background-size: 64px 64px;"></div>
+
+          <img src="sprites/B-res-wood.png" width="64" height="64" style="position: absolute; left: 64px; top: 128px;" alt="" />
+          <img src="sprites/B-res-iron.png" width="64" height="64" style="position: absolute; left: 960px; top: 256px;" alt="" />
+          <img src="sprites/B-res-coal.png" width="64" height="64" style="position: absolute; left: 768px; top: 448px;" alt="" />
+          <img src="sprites/B-res-copper.png" width="64" height="64" style="position: absolute; left: 1088px; top: 320px;" alt="" />
+          <img src="sprites/B-res-stone.png" width="64" height="64" style="position: absolute; left: 1152px; top: 512px;" alt="" />
+          <img src="sprites/B-res-gold.png" width="64" height="64" style="position: absolute; left: 1216px; top: 256px;" alt="" />
+
+          <div style="position: absolute; left: 384px; top: 320px; width: 512px; height: 64px; background-image: url('sprites/B-belt-h.png'); background-size: 64px 64px; animation: beltx .8s linear infinite;"></div>
+          <div style="position: absolute; left: 320px; top: 192px; width: 64px; height: 128px; background-image: url('sprites/B-belt-v.png'); background-size: 64px 64px; animation: belty .8s linear infinite;"></div>
+
+          <div style="position: absolute; left: 384px; top: 336px; width: 512px; height: 32px; overflow: hidden;">
+            <div style="position: absolute; left: 448px; top: 4px; display: flex; gap: 128px; animation: itemx 3.2s linear infinite;">
+              <div style="width: 24px; height: 24px; background: #a0522d; box-shadow: 0 0 0 3px #0c1216;"></div>
+              <div style="width: 24px; height: 24px; background: #a0522d; box-shadow: 0 0 0 3px #0c1216;"></div>
+              <div style="width: 24px; height: 24px; background: #c0c0c0; box-shadow: 0 0 0 3px #0c1216;"></div>
+            </div>
+          </div>
+
+          <img src="sprites/B-b-miner.png" width="64" height="64" style="position: absolute; left: 960px; top: 320px;" alt="" />
+          <div style="position: absolute; left: 966px; top: 372px; width: 52px; height: 10px; background: #0c1216; border: 2px solid #0c1216; box-sizing: border-box;"><div style="height: 100%; background: #4fe3ff; animation: prog 2.4s linear infinite;"></div></div>
+
+          <img src="sprites/B-b-smelter.png" width="64" height="64" style="position: absolute; left: 896px; top: 320px;" alt="" />
+          <img src="sprites/B-b-smelter.png" width="64" height="64" style="position: absolute; left: 320px; top: 320px;" alt="" />
+          <div style="position: absolute; left: 326px; top: 372px; width: 52px; height: 10px; background: #0c1216; border: 2px solid #0c1216; box-sizing: border-box;"><div style="height: 100%; background: #ff5fa8; width: 100%;"></div></div>
+          <div style="position: absolute; left: 336px; top: 300px; width: 32px; height: 16px; background: #ff5fa8; animation: glowpulse 1.2s ease-in-out infinite;"></div>
+
+          <img src="sprites/B-b-assembler.png" width="64" height="64" style="position: absolute; left: 320px; top: 128px;" alt="" />
+          <div style="position: absolute; left: 326px; top: 180px; width: 52px; height: 10px; background: #0c1216; border: 2px solid #0c1216; box-sizing: border-box;"><div style="height: 100%; background: #4fe3ff; animation: prog 4.2s linear infinite;"></div></div>
+
+          <img src="sprites/B-b-storage.png" width="64" height="64" style="position: absolute; left: 256px; top: 64px;" alt="" />
+          <img src="sprites/B-b-chest.png" width="64" height="64" style="position: absolute; left: 448px; top: 192px;" alt="" />
+          <img src="sprites/B-b-generator.png" width="64" height="64" style="position: absolute; left: 704px; top: 448px;" alt="" />
+          <img src="sprites/B-b-steel.png" width="64" height="64" style="position: absolute; left: 1024px; top: 512px;" alt="" />
+
+          <img src="sprites/B-player-down.png" width="64" height="64" style="position: absolute; left: 576px; top: 192px; animation: bob16 2.2s ease-in-out infinite;" alt="" />
+
+          <div style="position: absolute; right: 16px; bottom: 16px; width: 176px; border: 3px solid #1c222b; background: #101a22;">
+            <div style="padding: 5px 8px; font-family: 'Silkscreen', monospace; font-size: 9px; color: #cbd6e0; border-bottom: 2px solid #223040;">MAP</div>
+            <div style="position: relative; height: 140px; background: #566760;">
+              <div style="position: absolute; left: 0; top: 0; width: 30px; height: 40px; background: #1d2a33;"></div>
+              <div style="position: absolute; right: 0; top: 46px; width: 74px; height: 62px; background: #3a4149;"></div>
+              <div style="position: absolute; left: 0; bottom: 0; width: 46px; height: 30px; background: #3d6b82;"></div>
+              <div style="position: absolute; left: 44px; top: 56px; width: 62px; height: 3px; background: #4fe3ff;"></div>
+              <div style="position: absolute; left: 44px; top: 52px; width: 6px; height: 6px; background: #ff5fa8;"></div>
+              <div style="position: absolute; left: 52px; top: 34px; width: 8px; height: 8px; background: #ffffff;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; font-size: 13px; line-height: 1.6; color: #9fb0c0;">
+        <div><strong style="color: #9beeff; font-family: 'Silkscreen', monospace; font-size: 10px;">WHY IT READS</strong><br />The widest value range of the three: near-white snow, near-black basalt. Machines are mid-grey, so they separate from <em>both</em> extremes, and the two accents do exactly one job each — cyan means running, magenta means broken. The mockup runs one generator against 70 ⚡ of demand, so it shows two failures at once: the grid is 20 ⚡ short (magenta HUD chip) and the near smelter is jammed (magenta bar and flag) — everything still working stays calm cyan.</div>
+        <div><strong style="color: #9beeff; font-family: 'Silkscreen', monospace; font-size: 10px;">CHARACTER</strong><br />The strongest mood and the clearest sci-fi read. A drone instead of a person makes the outpost feel remote-operated and slightly lonely — which fits a game about automating yourself out of the loop.</div>
+        <div><strong style="color: #9beeff; font-family: 'Silkscreen', monospace; font-size: 10px;">RISK</strong><br />Cold palettes get monotonous over long sessions, and snow's brightness fights the HUD. Wood as a resource makes least sense on an ice shelf — the frozen pines are a fiction we'd need to keep leaning on.</div>
+      </div>
+    </div>
+
+    <!-- ============================= 2c ============================= -->
+    <div id="2c" style="padding: 46px 60px 60px;">
+      <div style="display: flex; align-items: flex-start; gap: 20px;">
+        <div style="font-family: 'Silkscreen', monospace; font-size: 13px; padding: 8px 12px; background: #35d6d0; color: #04191a; border-radius: 2px;">2c</div>
+        <div style="flex: 1;">
+          <h2 style="margin: 0; font-family: 'Silkscreen', monospace; font-size: 30px; color: #7fe8e3;">RUST BASIN</h2>
+          <p style="margin: 10px 0 0; max-width: 880px; font-size: 15px; line-height: 1.65; color: #b3c0cc;">A dry salvage canyon: khaki scrub, pale dust, red sandstone, one alkali pool. Everything you build looks scavenged and sun-bleached, and the only cool colour on screen is the cyan of working technology. Warm world, cold machines — maximum separation.</p>
+        </div>
+        <div style="display: flex; border: 3px solid #0a0c10; box-shadow: 0 0 0 1px #2a333f;">
+          <div style="width: 34px; height: 46px; background: #6b6a3a;"></div>
+          <div style="width: 34px; height: 46px; background: #2e3c1e;"></div>
+          <div style="width: 34px; height: 46px; background: #c7a878;"></div>
+          <div style="width: 34px; height: 46px; background: #3f6b63;"></div>
+          <div style="width: 34px; height: 46px; background: #965134;"></div>
+          <div style="width: 34px; height: 46px; background: #7a7268;"></div>
+          <div style="width: 34px; height: 46px; background: #35d6d0;"></div>
+          <div style="width: 34px; height: 46px; background: #ff8a1e;"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px;">
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">DRY SCRUB</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Khaki ground with sparse olive tufts.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/C-forest.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">THORN THICKET</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Low spreading scrub — dense enough to block, sparse enough to read.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/C-sand.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">DUST</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">The most walkable-looking surface in the set.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/C-water.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">ALKALI POOL</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">Shallow, mineral, faintly toxic — scarce water reads as precious.</div></div>
+        <div><div style="width: 100%; height: 128px; background-image: url('sprites/C-rock.png'); background-size: 64px 64px; image-rendering: pixelated; border: 3px solid #1c222b;"></div><div style="margin-top: 8px; font-family: 'Silkscreen', monospace; font-size: 10px; color: #cbd6e0;">SANDSTONE</div><div style="font-size: 12px; color: #7e8c9a; line-height: 1.45;">The signature tile: banded red rock with dust caught on the ledges.</div></div>
+      </div>
+
+      <div style="margin-top: 32px; display: grid; grid-template-columns: 300px 1fr; gap: 26px;">
+        <div style="padding: 18px; background: #101620; border: 3px solid #1c222b;">
+          <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #35d6d0;">PLAYER — SALVAGE ROVER</div>
+          <div style="margin-top: 14px; display: flex; gap: 14px; align-items: flex-end;">
+            <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-player-down.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #7e8c9a;">DOWN</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-player-side.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #7e8c9a;">SIDE</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-player-up.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #7e8c9a;">UP</div></div>
+          </div>
+          <div style="margin-top: 14px; font-size: 13px; line-height: 1.55; color: #9fb0c0;">A four-wheeled rover with a roll cage, cyan windscreen, cargo bed and a whip antenna. Wider than it is tall, so it never reads as a building; the wheels give it an unmistakable non-machine silhouette even when parked beside a miner.</div>
+        </div>
+        <div style="padding: 18px; background: #101620; border: 3px solid #1c222b;">
+          <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #35d6d0;">RESOURCE NODES</div>
+          <div style="margin-top: 14px; display: flex; gap: 12px; flex-wrap: wrap;">
+            <div style="text-align: center;"><div style="background-image: url('sprites/C-forest.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-res-wood.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">WOOD</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/C-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-res-stone.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">STONE</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/C-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-res-iron.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">IRON</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/C-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-res-copper.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">COPPER</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/C-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-res-coal.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">COAL</div></div>
+            <div style="text-align: center;"><div style="background-image: url('sprites/C-rock.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-res-gold.png" width="64" height="64" alt="" /></div><div style="margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #9fb0c0;">GOLD</div></div>
+          </div>
+          <div style="margin-top: 14px; font-size: 13px; line-height: 1.55; color: #9fb0c0;">This is the direction's one real tension: red sandstone shares a family with iron and copper ore. It's solved by value rather than hue — the nuggets carry a bright lit top face and a hard ink outline that the terrain never uses, so they sit clearly <em>on</em> the rock. Coal and gold are the easiest reads of any direction here.</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 26px; padding: 18px; background: #101620; border: 3px solid #1c222b;">
+        <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #35d6d0;">MACHINE SILHOUETTES</div>
+        <div style="margin-top: 16px; display: flex; gap: 18px; flex-wrap: wrap;">
+          <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-b-miner.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">MINER</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-b-generator.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">GENERATOR</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-b-smelter.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">SMELTER</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-b-steel.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">STEEL</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-b-assembler.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">ASSEMBLER</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-b-storage.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">STORAGE</div></div>
+          <div style="text-align: center;"><div style="background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;"><img src="sprites/C-b-chest.png" width="64" height="64" alt="" /></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">CHEST</div></div>
+          <div style="text-align: center;"><div style="width: 64px; height: 64px; background-image: url('sprites/C-belt-h.png'); background-size: 64px 64px; image-rendering: pixelated;"></div><div style="margin-top: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #cbd6e0;">CONVEYOR</div></div>
+        </div>
+      </div>
+
+      <div data-screen-label="2c gameplay" style="margin-top: 30px; border: 3px solid #1c222b; background: #0a0c10;">
+        <div style="display: flex; align-items: center; gap: 14px; height: 54px; padding: 0 14px; background: #171a18; border-bottom: 3px solid #1c222b;">
+          <span style="font-family: 'Silkscreen', monospace; font-size: 14px; color: #35d6d0;">OUTPOST</span>
+          <div style="display: flex; gap: 4px; padding: 3px; background: #0f1211; border: 2px solid #2a302c;">
+            <span style="width: 30px; height: 22px; display: grid; place-items: center; background: #35d6d0; color: #04191a; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;">II</span>
+            <span style="width: 30px; height: 22px; display: grid; place-items: center; background: #202521; color: #cbd6e0; font-family: 'IBM Plex Mono', monospace; font-size: 11px;">×1</span>
+            <span style="width: 30px; height: 22px; display: grid; place-items: center; color: #6d7c8a; font-family: 'IBM Plex Mono', monospace; font-size: 11px;">×5</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 11px; background: #0f1211; border: 2px solid #2a302c;">
+            <span style="width: 8px; height: 8px; background: #35d6d0;"></span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #e8edf2;">100</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6d7c8a;">/ 70</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #35d6d0;">+30</span>
+          </div>
+          <div style="flex: 1;"></div>
+          <span style="height: 28px; padding: 0 12px; display: grid; place-items: center; background: #35d6d0; color: #04191a; font-family: 'Silkscreen', monospace; font-size: 10px;">BUILD</span>
+          <span style="height: 28px; padding: 0 12px; display: grid; place-items: center; background: #202521; border: 2px solid #2a302c; color: #cbd6e0; font-family: 'Silkscreen', monospace; font-size: 10px;">BAG</span>
+        </div>
+
+        <div style="position: relative; width: 1280px; height: 640px; overflow: hidden; background-image: url('sprites/C-grass.png'); background-size: 64px 64px; image-rendering: pixelated;">
+          <div style="position: absolute; left: 0; top: 0; width: 192px; height: 192px; background-image: url('sprites/C-forest.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 1152px; top: 128px; width: 128px; height: 128px; background-image: url('sprites/C-forest.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 640px; top: 192px; width: 640px; height: 448px; background-image: url('sprites/C-rock.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 0; top: 256px; width: 640px; height: 384px; background-image: url('sprites/C-sand.png'); background-size: 64px 64px;"></div>
+          <div style="position: absolute; left: 64px; top: 448px; width: 256px; height: 128px; background-image: url('sprites/C-water.png'); background-size: 64px 64px;"></div>
+
+          <img src="sprites/C-res-wood.png" width="64" height="64" style="position: absolute; left: 64px; top: 64px;" alt="" />
+          <img src="sprites/C-res-iron.png" width="64" height="64" style="position: absolute; left: 960px; top: 256px;" alt="" />
+          <img src="sprites/C-res-coal.png" width="64" height="64" style="position: absolute; left: 704px; top: 448px;" alt="" />
+          <img src="sprites/C-res-copper.png" width="64" height="64" style="position: absolute; left: 1088px; top: 192px;" alt="" />
+          <img src="sprites/C-res-stone.png" width="64" height="64" style="position: absolute; left: 1152px; top: 512px;" alt="" />
+          <img src="sprites/C-res-gold.png" width="64" height="64" style="position: absolute; left: 1216px; top: 384px;" alt="" />
+
+          <div style="position: absolute; left: 384px; top: 320px; width: 512px; height: 64px; background-image: url('sprites/C-belt-h.png'); background-size: 64px 64px; animation: beltx .8s linear infinite;"></div>
+          <div style="position: absolute; left: 320px; top: 192px; width: 64px; height: 128px; background-image: url('sprites/C-belt-v.png'); background-size: 64px 64px; animation: belty .8s linear infinite;"></div>
+
+          <div style="position: absolute; left: 384px; top: 336px; width: 512px; height: 32px; overflow: hidden;">
+            <div style="position: absolute; left: 448px; top: 4px; display: flex; gap: 128px; animation: itemx 3.2s linear infinite;">
+              <div style="width: 24px; height: 24px; background: #a0522d; box-shadow: 0 0 0 3px #160e08;"></div>
+              <div style="width: 24px; height: 24px; background: #a0522d; box-shadow: 0 0 0 3px #160e08;"></div>
+              <div style="width: 24px; height: 24px; background: #c0c0c0; box-shadow: 0 0 0 3px #160e08;"></div>
+            </div>
+          </div>
+
+          <img src="sprites/C-b-miner.png" width="64" height="64" style="position: absolute; left: 960px; top: 320px;" alt="" />
+          <div style="position: absolute; left: 966px; top: 372px; width: 52px; height: 10px; background: #160e08; border: 2px solid #160e08; box-sizing: border-box;"><div style="height: 100%; background: #35d6d0; animation: prog 2.4s linear infinite;"></div></div>
+
+          <img src="sprites/C-b-smelter.png" width="64" height="64" style="position: absolute; left: 896px; top: 320px;" alt="" />
+          <img src="sprites/C-b-smelter.png" width="64" height="64" style="position: absolute; left: 320px; top: 320px;" alt="" />
+          <div style="position: absolute; left: 326px; top: 372px; width: 52px; height: 10px; background: #160e08; border: 2px solid #160e08; box-sizing: border-box;"><div style="height: 100%; background: #ff8a1e; animation: prog 3.6s linear infinite;"></div></div>
+
+          <img src="sprites/C-b-assembler.png" width="64" height="64" style="position: absolute; left: 320px; top: 128px;" alt="" />
+          <div style="position: absolute; left: 326px; top: 180px; width: 52px; height: 10px; background: #160e08; border: 2px solid #160e08; box-sizing: border-box;"><div style="height: 100%; background: #35d6d0; animation: prog 4.2s linear infinite;"></div></div>
+
+          <img src="sprites/C-b-storage.png" width="64" height="64" style="position: absolute; left: 256px; top: 64px;" alt="" />
+          <img src="sprites/C-b-chest.png" width="64" height="64" style="position: absolute; left: 448px; top: 192px;" alt="" />
+          <img src="sprites/C-b-generator.png" width="64" height="64" style="position: absolute; left: 640px; top: 448px;" alt="" />
+          <div style="position: absolute; left: 658px; top: 442px; width: 12px; height: 12px; background: #cbd6e0; border-radius: 50%; animation: smoke 2.2s linear infinite;"></div>
+          <img src="sprites/C-b-generator.png" width="64" height="64" style="position: absolute; left: 768px; top: 576px;" alt="" />
+          <div style="position: absolute; left: 786px; top: 570px; width: 12px; height: 12px; background: #cbd6e0; border-radius: 50%; animation: smoke 2.2s linear infinite 1.1s;"></div>
+          <img src="sprites/C-b-steel.png" width="64" height="64" style="position: absolute; left: 1024px; top: 512px;" alt="" />
+
+          <img src="sprites/C-player-side.png" width="64" height="64" style="position: absolute; left: 512px; top: 192px;" alt="" />
+
+          <div style="position: absolute; right: 16px; bottom: 16px; width: 176px; border: 3px solid #1c222b; background: #171a18;">
+            <div style="padding: 5px 8px; font-family: 'Silkscreen', monospace; font-size: 9px; color: #cbd6e0; border-bottom: 2px solid #2a302c;">MAP</div>
+            <div style="position: relative; height: 140px; background: #6b6a3a;">
+              <div style="position: absolute; left: 0; top: 0; width: 30px; height: 30px; background: #2e3c1e;"></div>
+              <div style="position: absolute; right: 0; top: 30px; width: 88px; height: 78px; background: #965134;"></div>
+              <div style="position: absolute; left: 0; top: 56px; width: 88px; height: 84px; background: #c7a878;"></div>
+              <div style="position: absolute; left: 10px; top: 98px; width: 36px; height: 18px; background: #3f6b63;"></div>
+              <div style="position: absolute; left: 44px; top: 56px; width: 62px; height: 3px; background: #35d6d0;"></div>
+              <div style="position: absolute; left: 52px; top: 34px; width: 8px; height: 8px; background: #ffffff;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; font-size: 13px; line-height: 1.6; color: #9fb0c0;">
+        <div><strong style="color: #7fe8e3; font-family: 'Silkscreen', monospace; font-size: 10px;">WHY IT READS</strong><br />The whole world is warm and the whole machine set is cool grey with cyan light, so <em>built vs. found</em> is a single temperature decision your eye makes before it resolves any shape. It's the cleanest solution to the original problem of green buildings on green ground.</div>
+        <div><strong style="color: #7fe8e3; font-family: 'Silkscreen', monospace; font-size: 10px;">CHARACTER</strong><br />Salvage-punk with a lot of soul: red canyon, dust, a rover with an antenna. Feels like the outpost was dropped somewhere already picked over — and it gives the terrain the most visual variety of the three.</div>
+        <div><strong style="color: #7fe8e3; font-family: 'Silkscreen', monospace; font-size: 10px;">RISK</strong><br />Red sandstone competes with iron and copper ore, so ore nodes lean on outline and highlight rather than hue. Long sessions in an all-warm palette can feel dusty; the cyan accent is what keeps it from going sepia.</div>
+      </div>
+
+      <div style="margin-top: 34px; padding: 24px 26px; background: #101620; border: 3px solid #1c222b;">
+        <div style="font-family: 'Silkscreen', monospace; font-size: 11px; color: #cbd6e0;">WHAT'S SHARED, AND WHAT I'D PICK</div>
+        <div style="margin-top: 14px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; font-size: 13px; line-height: 1.65; color: #9fb0c0;">
+          <div>All three share one deliberate constant: the <strong style="color: #e8edf2;">machine silhouette grammar</strong> — derrick, dome, arch, tier, gantry, crate stack. That's the part doing the readability work, and it shouldn't be a stylistic variable. What actually differs between directions is biome, palette temperature, accent logic, and who the player is. The conveyor is carried over from the last round untouched in behaviour: treaded band, static direction wedge, motion only while items advance.<br /><br />Everything here still respects the source: <span style="font-family: 'IBM Plex Mono', monospace;">ITEM_COLORS</span> hues on items and nodes, 48px logical tiles (shown at 64px), and no change to costs, power, recipes or states.</div>
+          <div><strong style="color: #e8edf2;">My recommendation: <a href="#2c">2c</a></strong>, with <a href="#2b">2b</a>'s accent discipline. Rust Basin solves the original readability problem most directly — a warm world against cool machines — and has the most world identity per pixel. Borrowing 2b's strict two-accent rule (one colour for running, one for broken) would give it the state clarity that Cryo Station gets for free.<br /><br />Tell me which to take forward and I'll build the full state matrix, the remaining UI, and the coding-agent handoff on it.</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</div>
+</x-dc>
+</body>
+</html>
