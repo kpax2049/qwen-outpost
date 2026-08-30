@@ -1,0 +1,17 @@
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Debug files
+debug*.json
+
+# Screenshots from QA/debug sessions
+*-screenshot.png
+final-game-screenshot.png
+game-screenshot*.png
+showcase-*.png
+
+# OpenCode session exports
+*-session.json
+
+# Playwright test results
+test-results/

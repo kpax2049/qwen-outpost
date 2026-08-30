@@ -29,6 +29,4 @@ console*.log
 screenshot*.png
 snapshot*.png
 qa_*.png
-
-# Opencode config (local)
-opencode.json
+test-results/
