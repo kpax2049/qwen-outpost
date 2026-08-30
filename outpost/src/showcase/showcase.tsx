@@ -695,6 +695,51 @@ function Showcase() {
         />
         <GroupTitle>Representative machine states (working / idle / no-power / no-fuel / waiting / blocked / progress)</GroupTitle>
         <SwatchRow items={MACHINE_STATES.map((s) => ({ caption: s.caption, build: s.build, zoom: 2.1 }))} />
+        <GroupTitle>Side-by-side: powered vs no-power (state difference)</GroupTitle>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
+          <TileBoard
+            rows={1}
+            cols={2}
+            origin={{ x: 59, y: 59 }}
+            zoom={2.0}
+            caption="Powered Miner (working — amber glow + progress bar)"
+            setup={(e) => {
+              setResource(e, 59, 59, 'coal', 100);
+              put(e, 59, 59, makeBuilding('miner', { active: true, powerConsumed: 5, direction: Dir.Down, maxProgress: 30, progress: 15, inventory: [{ type: 'coal', amount: 3 }] }));
+            }}
+          />
+          <TileBoard
+            rows={1}
+            cols={2}
+            origin={{ x: 62, y: 59 }}
+            zoom={2.0}
+            caption="Unpowered Miner (blue-gray wash — no output)"
+            setup={(e) => {
+              setResource(e, 62, 59, 'coal', 100);
+              put(e, 62, 59, makeBuilding('miner', { active: false, powerConsumed: 5, direction: Dir.Down, maxProgress: 30, progress: 0, inventory: [] }));
+            }}
+          />
+          <TileBoard
+            rows={1}
+            cols={2}
+            origin={{ x: 59, y: 62 }}
+            zoom={2.0}
+            caption="Powered Smelter (smelting — amber glow + progress)"
+            setup={(e) => {
+              put(e, 59, 62, makeBuilding('smelter', { active: true, powerConsumed: 10, direction: Dir.Down, maxProgress: 60, progress: 30, inventory: [{ type: 'iron', amount: 2 }, { type: 'coal', amount: 3 }] }));
+            }}
+          />
+          <TileBoard
+            rows={1}
+            cols={2}
+            origin={{ x: 62, y: 62 }}
+            zoom={2.0}
+            caption="Unpowered Smelter (blue-gray — stopped)"
+            setup={(e) => {
+              put(e, 62, 62, makeBuilding('smelter', { active: false, powerConsumed: 10, direction: Dir.Down, maxProgress: 60, progress: 0, inventory: [{ type: 'iron', amount: 2 }, { type: 'coal', amount: 3 }] }));
+            }}
+          />
+        </div>
       </Section>
 
       {/* 05 — Conveyors & Routing */}
@@ -837,6 +882,42 @@ function Showcase() {
               buildValid: false,
               buildDirection: Dir.Down,
             }}
+          />
+        </div>
+
+        <GroupTitle>Belt item sprites (multiple item types visible on conveyors)</GroupTitle>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20 }}>
+          <TileBoard
+            rows={1}
+            cols={1}
+            origin={{ x: 56, y: 60 }}
+            zoom={2.5}
+            caption="Coal on belt (R-item-coal sprite, 16×16 → 32px)"
+            setup={(e) => put(e, 56, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'coal', amount: 1 }] }))}
+          />
+          <TileBoard
+            rows={1}
+            cols={1}
+            origin={{ x: 60, y: 60 }}
+            zoom={2.5}
+            caption="Iron Ingot on belt (R-item-ingot sprite, 16×16 → 32px)"
+            setup={(e) => put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'iron_ingot', amount: 1 }] }))}
+          />
+          <TileBoard
+            rows={1}
+            cols={1}
+            origin={{ x: 64, y: 60 }}
+            zoom={2.5}
+            caption="Copper Wire on belt (R-item-wire sprite, 16×16 → 32px)"
+            setup={(e) => put(e, 64, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'copper_wire', amount: 1 }] }))}
+          />
+          <TileBoard
+            rows={1}
+            cols={1}
+            origin={{ x: 68, y: 60 }}
+            zoom={2.5}
+            caption="Circuit Board on belt (R-item-circuit sprite, 16×16 → 32px)"
+            setup={(e) => put(e, 68, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'circuit', amount: 1 }] }))}
           />
         </div>
       </Section>

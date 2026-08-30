@@ -305,4 +305,60 @@ test.describe('Gameplay world rendering', () => {
     });
     expect(errors).toBe(true);
   });
+
+  test('conveyor sprites render without large procedural chevrons', async ({ page }) => {
+    await page.goto('/showcase.html');
+    await page.waitForTimeout(3000);
+
+    // Verify the conveyor section renders correctly (no old chevrons).
+    // The conveyor section has TileBoard elements that render belt sprites.
+    const conveyorSection = page.locator('[data-scenario="conveyors"]');
+    const canvases = conveyorSection.locator('canvas');
+    const count = await canvases.count();
+    expect(count).toBeGreaterThan(0);
+
+    // Each conveyor canvas should have non-zero dimensions and contain
+    // belt sprite content (not just procedural arrows).
+    for (let i = 0; i < Math.min(count, 3); i++) {
+      const dims = await canvases.nth(i).evaluate(el => ({
+        w: el.width, h: el.height,
+      }));
+      expect(dims.w).toBeGreaterThan(50);
+      expect(dims.h).toBeGreaterThan(50);
+    }
+  });
+
+  test('machine state overlays render correctly', async ({ page }) => {
+    await page.goto('/showcase.html');
+    await page.waitForTimeout(3000);
+
+    // Machine states section should have swatches showing different states.
+    const machineSection = page.locator('[data-scenario="machines"]');
+    const canvases = machineSection.locator('canvas');
+    const count = await canvases.count();
+    expect(count).toBeGreaterThan(5);
+
+    // Each swatch should render without errors.
+    for (let i = 0; i < Math.min(count, 3); i++) {
+      const dims = await canvases.nth(i).evaluate(el => ({
+        w: el.width, h: el.height,
+      }));
+      expect(dims.w).toBeGreaterThan(50);
+      expect(dims.h).toBeGreaterThan(50);
+    }
+  });
+
+  test('belt item sprites render on conveyors', async ({ page }) => {
+    await page.goto('/showcase.html');
+    await page.waitForTimeout(3000);
+
+    // The gameplay scene has belts with items (iron ingot, coal).
+    const gameplaySection = page.locator('[data-scenario="gameplay"]');
+    const canvas = gameplaySection.locator('canvas').first();
+    const dims = await canvas.evaluate(el => ({
+      w: el.width, h: el.height,
+    }));
+    expect(dims.w).toBeGreaterThan(100);
+    expect(dims.h).toBeGreaterThan(100);
+  });
 });

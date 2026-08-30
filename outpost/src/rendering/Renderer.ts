@@ -981,8 +981,10 @@ export class Renderer {
     // Draw connected belt edges (seamless chains)
     this.drawBeltConnections(gx, gy, map);
 
-    // Animated chevrons showing belt movement direction
-    this.drawBeltChevrons(gx, gy, building, dir, phase);
+    // Subtle belt tread animation (restrained, industrial)
+    if (moving) {
+      this.drawBeltTread(gx, gy, dir, phase);
+    }
 
     // Blocked state (red gate + overlay)
     if (building.blocked) {
@@ -1008,9 +1010,9 @@ export class Renderer {
       ctx.strokeRect(bx + 2, by + 2, TILE_SIZE - 4, TILE_SIZE - 4);
     }
 
-    // Idle state (no item on belt)
+    // Idle state: barely perceptible dimming to indicate "waiting for item"
     if (building.active && !building.blocked && building.inventory.every(i => i.amount <= 0)) {
-      ctx.fillStyle = 'rgba(40, 40, 50, 0.2)';
+      ctx.fillStyle = 'rgba(30, 30, 40, 0.06)';
       ctx.fillRect(bx + 3, by + 3, TILE_SIZE - 6, TILE_SIZE - 6);
     }
 
@@ -1127,43 +1129,29 @@ export class Renderer {
     return c;
   }
 
-  /** Draw animated chevrons on the belt to indicate flow direction. */
-  private drawBeltChevrons(gx: number, gy: number, building: Building, dir: DirectionValue, phase: number): void {
+  /**
+   * Subtle belt tread animation: a thin semi-transparent dot that moves along the
+   * belt direction, indicating flow without obscuring the sprite artwork.
+   */
+  private drawBeltTread(gx: number, gy: number, dir: DirectionValue, phase: number): void {
     const { ctx } = this;
-    const chevronCount = 4;
 
-    for (let i = 0; i < chevronCount; i++) {
-      let t = (i + phase) / chevronCount;
+    for (let i = 0; i < 3; i++) {
+      let t = (i + phase) / 3;
       if (t > 1) t -= 1;
 
-      const pos = this.beltPointForChevron(gx, gy, dir, t);
-      const isBlocked = !!building.blocked;
+      const pos = this.getBeltPoint(gx, gy, dir, t);
 
-      ctx.save();
-      ctx.translate(pos.x, pos.y);
-      let ang = 0;
-      switch (dir) {
-        case Dir.Right: ang = 0; break;
-        case Dir.Up: ang = -Math.PI / 2; break;
-        case Dir.Down: ang = Math.PI; break;
-        case Dir.Left: ang = Math.PI / 2; break;
-      }
-      ctx.rotate(ang);
-
-      const chevronColor = isBlocked ? 'rgba(255, 80, 80, 0.9)' : 'rgba(235, 235, 235, 0.6)';
-      ctx.fillStyle = chevronColor;
+      // Thin tread dot (industrial style)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
       ctx.beginPath();
-      ctx.moveTo(4, 0);
-      ctx.lineTo(-3, -3);
-      ctx.lineTo(-3, 3);
-      ctx.closePath();
+      ctx.arc(pos.x, pos.y, 1.5, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
     }
   }
 
-  /** Get a position along the belt for a chevron at parameter t. */
-  private beltPointForChevron(gx: number, gy: number, dir: DirectionValue, t: number): { x: number; y: number } {
+  /** Get a position along the belt at parameter t (used by tread animation and item rendering). */
+  private getBeltPoint(gx: number, gy: number, dir: DirectionValue, t: number): { x: number; y: number } {
     const bx = gx * TILE_SIZE;
     const by = gy * TILE_SIZE;
     const inset = 6;
@@ -1214,7 +1202,7 @@ export class Renderer {
 
     // Position along belt based on progress
     const t = building.blocked ? 0.95 : Math.min(0.92, building.maxProgress > 0 ? building.progress / building.maxProgress : 0.5);
-    const pos = this.beltPointForChevron(0, 0, dir, t);
+    const pos = this.getBeltPoint(0, 0, dir, t);
 
     // Get item sprite
     const itemSpriteKey = this.getItemSpriteKey(invItem.type as ItemType);
