@@ -192,14 +192,22 @@ const App: React.FC = () => {
       'R-res-wood', 'R-res-stone', 'R-res-iron', 'R-res-copper', 'R-res-coal', 'R-res-gold',
       'R-b-storage', 'R-b-chest', 'R-b-generator', 'R-b-miner',
       'R-b-conveyor', 'R-b-smelter', 'R-b-steel', 'R-b-assembler',
+      'R-belt-right', 'R-belt-up', 'R-belt-down', 'R-belt-left', 'R-belt-elbow',
+    ];
+
+    const itemSpriteKeys = [
+      'R-item-coal', 'R-item-stone', 'R-item-iron', 'R-item-copper', 'R-item-gold', 'R-item-wood',
+      'R-item-ingot', 'R-item-plate', 'R-item-wire', 'R-item-gear', 'R-item-circuit', 'R-item-engine',
     ];
 
     // Create the renderer immediately (it uses fallback colors until assets load).
     rendererRef.current = new Renderer(canvas, loader);
 
-    // Once assets are ready, update the renderer's terrain cache with sprites.
+    // Once assets are ready, update the renderer's terrain cache with sprites and load items.
     loader.load(spriteKeys).then(() => {
       rendererRef.current!.updateTerrainCache();
+      // Item sprites are 16x16 native — load them at 32px so they're clearly visible on conveyors.
+      return loader.load(itemSpriteKeys, 32);
     }).catch(err => {
       console.warn('Asset loading failed (using fallback visuals):', err);
     });

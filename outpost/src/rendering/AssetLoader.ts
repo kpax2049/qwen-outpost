@@ -1,10 +1,9 @@
 /**
  * Relay Seven asset loader.
  *
- * Loads 32x32 sprite PNGs from the public assets directory and pre-renders them
- * at 1.5x scale (48px) onto offscreen canvases so the main render loop only does
- * fast blits.  Nearest-neighbor scaling guarantees pixel-crisp output – no blur.
- * The 48px scale matches the game's TILE_SIZE so sprites fit tile geometry exactly.
+ * Loads sprite PNGs from the public assets directory and pre-renders them at a
+ * target scale onto offscreen canvases so the main render loop only does fast
+ * blits.  Nearest-neighbor scaling guarantees pixel-crisp output — no blur.
  */
 
 import { TILE_SIZE } from '../types';
@@ -13,10 +12,13 @@ const BASE_URL = '/assets/relay-seven';
 
 /** A single pre-rendered tile ready for blitting. */
 export interface TileSprite {
-  /** The pre-rendered canvas scaled to TILE_SIZE (48px). */
+  /** The pre-rendered canvas scaled to the target size. */
   canvas: HTMLCanvasElement;
   /** The raw Image element (available for other uses). */
   image: HTMLImageElement;
+  /** Original pixel dimensions of the source sprite. */
+  origW: number;
+  origH: number;
 }
 
 export class AssetLoader {
@@ -40,25 +42,30 @@ export class AssetLoader {
   }
 
   /**
-   * Load all Relay Seven sprites.
+   * Load all sprites.
    * @param keys – sprite filename prefix list (without .png extension).
+   * @param size – target pixel size for each sprite's canvas. Defaults to TILE_SIZE (48).
    */
-  async load(keys: string[]): Promise<void> {
+  async load(keys: string[], size?: number): Promise<void> {
     if (this.loaded) return;
+    const targetSize = size ?? TILE_SIZE;
 
     const loadOne = (key: string): Promise<TileSprite> =>
       new Promise<TileSprite>((res, rej) => {
         const img = new Image();
         img.onload = () => {
-          // Pre-render at TILE_SIZE (48px) with nearest-neighbor for crisp pixel art.
-          // 32px source sprites are scaled 1.5x to match the game's tile size.
           const c = document.createElement('canvas');
-          c.width = TILE_SIZE;
-          c.height = TILE_SIZE;
+          c.width = targetSize;
+          c.height = targetSize;
           const ctx = c.getContext('2d')!;
           ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(img, 0, 0, TILE_SIZE, TILE_SIZE);
-          res({ canvas: c, image: img });
+          ctx.drawImage(img, 0, 0, targetSize, targetSize);
+          res({
+            canvas: c,
+            image: img,
+            origW: img.naturalWidth,
+            origH: img.naturalHeight,
+          });
         };
         img.onerror = () => rej(new Error(`Failed to load sprite: ${key}`));
         img.src = `${BASE_URL}/${key}.png`;
@@ -67,7 +74,6 @@ export class AssetLoader {
     try {
       const results = await Promise.all(keys.map(loadOne));
       for (const s of results) {
-        // Use the filename stem (without extension) as the key.
         const stem = s.image.src.split('/').pop()!.replace('.png', '');
         this.sprites.set(stem, s);
       }

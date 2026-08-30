@@ -10,9 +10,9 @@ import {
   type ItemType,
   RESOURCE_COLORS,
   ITEM_COLORS,
-  oppositeDirection,
   directionVector,
   Dir,
+  type BuildingTypeValue,
 } from '../types';
 import { AssetLoader } from './AssetLoader';
 
@@ -82,7 +82,7 @@ class LcgRandom {
 export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  /** Pre-rendered terrain tiles (64x64 each). */
+  /** Pre-rendered terrain tiles (TILE_SIZE each). */
   private terrainCache: Map<TerrainValue, HTMLCanvasElement> = new Map();
   private particles: Particle[] = [];
   private frameCount = 0;
@@ -106,6 +106,9 @@ export class Renderer {
    */
   private particleRand = new LcgRandom(135797531);
 
+  /** Caches for sprite canvases keyed by type+direction+state. */
+  private beltSpriteCache = new Map<string, HTMLCanvasElement>();
+
   constructor(canvas: HTMLCanvasElement, assetLoader: AssetLoader) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -113,11 +116,55 @@ export class Renderer {
     this.loadTerrainSprites();
   }
 
+  // ======================== Sprite Key Mappings ========================
+
+  private getBuildingSpriteKey(type: BuildingTypeValue): string {
+    const map: Record<BuildingTypeValue, string> = {
+      storage: 'R-b-storage',
+      chest: 'R-b-chest',
+      generator: 'R-b-generator',
+      miner: 'R-b-miner',
+      conveyor: 'R-b-conveyor',
+      smelter: 'R-b-smelter',
+      steel_smelter: 'R-b-steel',
+      assembler: 'R-b-assembler',
+    };
+    return map[type] ?? '';
+  }
+
+  private getBeltSpriteKey(direction: DirectionValue): string {
+    const map: Record<DirectionValue, string> = {
+      [Dir.Up]: 'R-belt-up',
+      [Dir.Right]: 'R-belt-right',
+      [Dir.Down]: 'R-belt-down',
+      [Dir.Left]: 'R-belt-left',
+    };
+    return map[direction] ?? 'R-belt-right';
+  }
+
+  private getItemSpriteKey(itemType: ItemType): string | undefined {
+    const map: Partial<Record<ItemType, string>> = {
+      coal: 'R-item-coal',
+      stone: 'R-item-stone',
+      iron: 'R-item-iron',
+      copper: 'R-item-copper',
+      gold: 'R-item-gold',
+      wood: 'R-item-wood',
+      iron_ingot: 'R-item-ingot',
+      steel_plate: 'R-item-plate',
+      copper_wire: 'R-item-wire',
+      gear: 'R-item-gear',
+      circuit: 'R-item-circuit',
+      engine: 'R-item-engine',
+    };
+    return map[itemType];
+  }
+
+  // ======================== Terrain Cache ========================
+
   /**
    * Build the terrain tile cache from Relay Seven sprites.
-   * Each 32x32 sprite is pre-rendered at 64px (2x) with nearest-neighbor scaling.
-   * Deterministic variation is applied on top so identical terrain types still
-   * look slightly different across tiles (preserving the original visual polish).
+   * Each 32x32 sprite is scaled to TILE_SIZE with nearest-neighbor for crisp pixels.
    */
   private loadTerrainSprites(): void {
     const spriteNames: Record<TerrainValue, string> = {
@@ -132,7 +179,6 @@ export class Renderer {
     for (const [terrain, name] of Object.entries(spriteNames) as [TerrainValue, string][]) {
       const sprite = this.assetLoader.get(name);
       if (sprite) {
-        // Create a variation canvas with subtle noise overlay for tile diversity.
         const vc = document.createElement('canvas');
         vc.width = TILE_SIZE;
         vc.height = TILE_SIZE;
@@ -140,8 +186,6 @@ export class Renderer {
         vctx.imageSmoothingEnabled = false;
         vctx.drawImage(sprite.canvas, 0, 0);
 
-        // Deterministic noise: only add subtle variation on non-water, non-rock tiles
-        // to preserve the clean look of those.
         if (terrain !== 'water' && terrain !== 'rock') {
           for (let i = 0; i < 6; i++) {
             const nx = this.terrainRand.next() * TILE_SIZE;
@@ -160,7 +204,6 @@ export class Renderer {
 
         this.terrainCache.set(terrain, vc);
       } else {
-        // Fallback: if sprite isn't available, create a solid-color tile.
         const fc = document.createElement('canvas');
         fc.width = TILE_SIZE;
         fc.height = TILE_SIZE;
@@ -180,20 +223,18 @@ export class Renderer {
     }
   }
 
-  /**
-   * Rebuild the terrain tile cache from the asset loader (call after assets finish loading).
-   * Replaces any fallback solid-color tiles with sprite-based tiles.
-   */
+  /** Rebuild the terrain tile cache after assets finish loading. */
   public updateTerrainCache(): void {
     this.terrainCache.clear();
     this.loadTerrainSprites();
   }
 
+  // ======================== Particle System ========================
+
   private spawnParticle(x: number, y: number, color: string, count: number = 5): void {
     for (let i = 0; i < count; i++) {
       this.particles.push({
-        x,
-        y,
+        x, y,
         vx: (this.particleRand.next() - 0.5) * 2,
         vy: -this.particleRand.next() * 2 - 0.5,
         life: 30 + this.particleRand.next() * 20,
@@ -245,6 +286,8 @@ export class Renderer {
     ctx.restore();
   }
 
+  // ======================== Main Render ========================
+
   render(map: Tile[][], player: PlayerState, camera: Camera, options: RenderOptions): void {
     this.frameCount++;
     this.waterTime += 0.05;
@@ -252,6 +295,7 @@ export class Renderer {
     const { ctx } = this;
     const { selectedTile, buildPreview, buildColor, buildValid, buildPath, buildPathValid, buildDirection, inspectedTile, interactiveTile, interactiveLabel, facing } = options;
 
+    // Background
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -259,12 +303,13 @@ export class Renderer {
     ctx.translate(camera.x, camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
+    // Visible tile range
     const startTileX = Math.floor(-camera.x / (TILE_SIZE * camera.zoom));
     const startTileY = Math.floor(-camera.y / (TILE_SIZE * camera.zoom));
     const endTileX = startTileX + Math.ceil(this.canvas.width / (TILE_SIZE * camera.zoom)) + 1;
     const endTileY = startTileY + Math.ceil(this.canvas.height / (TILE_SIZE * camera.zoom)) + 1;
 
-    // Render terrain tiles from sprite cache
+    // Terrain tiles
     for (let y = Math.max(0, startTileY); y < Math.min(MAP_SIZE, endTileY); y++) {
       for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
         const tile = map[y][x];
@@ -278,7 +323,7 @@ export class Renderer {
       }
     }
 
-    // Render resource deposits (sprite-based)
+    // Resource deposits
     for (let y = Math.max(0, startTileY); y < Math.min(MAP_SIZE, endTileY); y++) {
       for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
         const tile = map[y][x];
@@ -288,7 +333,7 @@ export class Renderer {
       }
     }
 
-    // Track building changes for particle effects
+    // Track building state changes for particles
     const currentTickBuildings = new Map<string, boolean>();
     for (let y = Math.max(0, startTileY); y < Math.min(MAP_SIZE, endTileY); y++) {
       for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
@@ -307,7 +352,7 @@ export class Renderer {
         const [bx, by] = key.split(',').map(Number);
         const cx = bx * TILE_SIZE + TILE_SIZE / 2;
         const cy = by * TILE_SIZE + TILE_SIZE / 2;
-        this.spawnParticle(cx, cy, '#44ff44', 3);
+        this.spawnParticle(cx, cy, '#ffaa44', 5);
       }
     }
     this.lastTickBuildings.clear();
@@ -315,7 +360,7 @@ export class Renderer {
       this.lastTickBuildings.set(key, active);
     }
 
-    // Render buildings (procedural — buildings are milestone 2)
+    // Buildings
     for (let y = Math.max(0, startTileY); y < Math.min(MAP_SIZE, endTileY); y++) {
       for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
         const tile = map[y][x];
@@ -325,19 +370,18 @@ export class Renderer {
       }
     }
 
-    // Render the powered grid: visible energy links from fueled generators to
-    // the machines they power. Makes the shared-grid concept tangible.
+    // Power grid links
     this.drawPowerLinks(map, startTileX, startTileY, endTileX, endTileY);
 
-    // Render player (sprite-based, hidden on the dev-only isolated asset boards via showPlayer:false)
+    // Player
     if (options.showPlayer !== false) {
       this.drawPlayer(player.x, player.y, facing ?? player.facing);
     }
 
-    // Render particles
+    // Particles
     this.drawParticles();
 
-    // Grid lines (subtle)
+    // Grid lines
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
     ctx.lineWidth = 0.5;
     for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
@@ -355,71 +399,86 @@ export class Renderer {
 
     ctx.restore();
 
-    // UI overlays (unchanged)
+    // UI overlays
+    this.drawUIOverlays(camera, selectedTile, buildPreview, buildColor, buildValid, buildPath, buildPathValid, buildDirection, inspectedTile, interactiveTile, interactiveLabel);
+
+    // Minimap
+    if (options.showMinimap !== false) {
+      this.drawMinimap(map, player ? { x: player.x, y: player.y } : undefined);
+    }
+
+    this.updateParticles();
+  }
+
+  private drawUIOverlays(
+    camera: Camera,
+    selectedTile: { x: number; y: number } | null | undefined,
+    buildPreview: { x: number; y: number } | null | undefined,
+    buildColor: string | undefined,
+    buildValid: boolean | undefined,
+    buildPath: { x: number; y: number }[] | undefined,
+    buildPathValid: boolean | undefined,
+    buildDirection: DirectionValue | undefined,
+    inspectedTile: { x: number; y: number } | null | undefined,
+    interactiveTile: { x: number; y: number } | null | undefined,
+    interactiveLabel: string | undefined,
+  ): void {
+    const { ctx } = this;
+
+    // Selected tile highlight
     if (selectedTile) {
       ctx.save();
       ctx.translate(camera.x, camera.y);
       ctx.scale(camera.zoom, camera.zoom);
-
       ctx.strokeStyle = 'rgba(255, 255, 100, 0.8)';
       ctx.lineWidth = 2;
       ctx.strokeRect(
         selectedTile.x * TILE_SIZE - 1,
         selectedTile.y * TILE_SIZE - 1,
         TILE_SIZE + 2,
-        TILE_SIZE + 2
+        TILE_SIZE + 2,
       );
-
       ctx.restore();
     }
 
-    // Highlight the currently inspected tile
+    // Inspected tile highlight
     if (inspectedTile) {
       ctx.save();
       ctx.translate(camera.x, camera.y);
       ctx.scale(camera.zoom, camera.zoom);
-
       ctx.fillStyle = 'rgba(120, 190, 255, 0.10)';
-      ctx.fillRect(
-        inspectedTile.x * TILE_SIZE,
-        inspectedTile.y * TILE_SIZE,
-        TILE_SIZE,
-        TILE_SIZE
-      );
+      ctx.fillRect(inspectedTile.x * TILE_SIZE, inspectedTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
       ctx.strokeStyle = 'rgba(140, 200, 255, 0.95)';
       ctx.lineWidth = 2.5;
       ctx.strokeRect(
         inspectedTile.x * TILE_SIZE - 2,
         inspectedTile.y * TILE_SIZE - 2,
         TILE_SIZE + 4,
-        TILE_SIZE + 4
+        TILE_SIZE + 4,
       );
-
       ctx.restore();
     }
 
-    // Highlight the tile E will interact with
+    // Interactive tile (E to interact)
     if (interactiveTile) {
       ctx.save();
       ctx.translate(camera.x, camera.y);
       ctx.scale(camera.zoom, camera.zoom);
-
       ctx.strokeStyle = 'rgba(255, 170, 0, 0.9)';
       ctx.lineWidth = 3;
       ctx.strokeRect(
         interactiveTile.x * TILE_SIZE - 2,
         interactiveTile.y * TILE_SIZE - 2,
         TILE_SIZE + 4,
-        TILE_SIZE + 4
+        TILE_SIZE + 4,
       );
       ctx.fillStyle = 'rgba(255, 170, 0, 0.12)';
       ctx.fillRect(
         interactiveTile.x * TILE_SIZE,
         interactiveTile.y * TILE_SIZE,
         TILE_SIZE,
-        TILE_SIZE
+        TILE_SIZE,
       );
-
       if (interactiveLabel) {
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         const text = `E: ${interactiveLabel}`;
@@ -429,7 +488,7 @@ export class Renderer {
           interactiveTile.x * TILE_SIZE + TILE_SIZE / 2 - tw / 2,
           interactiveTile.y * TILE_SIZE - 18,
           tw,
-          16
+          16,
         );
         ctx.fillStyle = '#ffcc00';
         ctx.textAlign = 'center';
@@ -438,57 +497,49 @@ export class Renderer {
         ctx.textBaseline = 'alphabetic';
         ctx.textAlign = 'left';
       }
-
       ctx.restore();
     }
 
+    // Build preview
     if (buildPreview) {
       ctx.save();
       ctx.translate(camera.x, camera.y);
       ctx.scale(camera.zoom, camera.zoom);
-
       const { x, y } = buildPreview;
-      const boostX = x * TILE_SIZE;
-      const boostY = y * TILE_SIZE;
-
+      const bx = x * TILE_SIZE;
+      const by = y * TILE_SIZE;
       if (buildColor) {
         ctx.globalAlpha = 0.45;
         ctx.fillStyle = buildColor;
-        ctx.fillRect(boostX, boostY, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(bx, by, TILE_SIZE, TILE_SIZE);
         ctx.globalAlpha = 1.0;
       }
-
       if (buildValid === false) {
         ctx.fillStyle = 'rgba(255, 40, 40, 0.28)';
-        ctx.fillRect(boostX, boostY, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(bx, by, TILE_SIZE, TILE_SIZE);
         ctx.strokeStyle = '#ff4444';
         ctx.lineWidth = 2;
-        ctx.strokeRect(boostX + 2, boostY + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        ctx.strokeRect(bx + 2, by + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       } else if (buildColor) {
         ctx.strokeStyle = 'rgba(180, 255, 180, 0.7)';
         ctx.lineWidth = 2;
-        ctx.strokeRect(boostX + 2, boostY + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        ctx.strokeRect(bx + 2, by + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }
-
-      // Show the direction the new conveyor will face.
       if (buildDirection !== undefined) {
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.beginPath();
-        ctx.arc(boostX + TILE_SIZE / 2, boostY + TILE_SIZE / 2, 9, 0, Math.PI * 2);
+        ctx.arc(bx + TILE_SIZE / 2, by + TILE_SIZE / 2, 9, 0, Math.PI * 2);
         ctx.fill();
-        this.drawArrow(boostX + TILE_SIZE / 2, boostY + TILE_SIZE / 2, buildDirection, 10);
+        this.drawArrow(bx + TILE_SIZE / 2, by + TILE_SIZE / 2, buildDirection, 10);
       }
-
       ctx.restore();
     }
 
-    // Multi-tile conveyor route being dragged: highlight each planned tile and
-    // draw a connecting guide line so the player sees the whole route at once.
+    // Conveyor build path
     if (buildPath && buildPath.length > 0) {
       ctx.save();
       ctx.translate(camera.x, camera.y);
       ctx.scale(camera.zoom, camera.zoom);
-
       const valid = buildPathValid !== false;
       ctx.strokeStyle = valid ? 'rgba(180, 255, 180, 0.6)' : 'rgba(255, 80, 80, 0.45)';
       ctx.lineWidth = 2;
@@ -496,13 +547,12 @@ export class Renderer {
       ctx.beginPath();
       for (let i = 0; i < buildPath.length; i++) {
         const t = buildPath[i];
-        const cx = t.x * TILE_SIZE + TILE_SIZE / 2;
-        const cy = t.y * TILE_SIZE + TILE_SIZE / 2;
-        if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+        const cx2 = t.x * TILE_SIZE + TILE_SIZE / 2;
+        const cy2 = t.y * TILE_SIZE + TILE_SIZE / 2;
+        if (i === 0) ctx.moveTo(cx2, cy2); else ctx.lineTo(cx2, cy2);
       }
       ctx.stroke();
       ctx.setLineDash([]);
-
       for (const t of buildPath) {
         const tx = t.x * TILE_SIZE;
         const ty = t.y * TILE_SIZE;
@@ -517,7 +567,6 @@ export class Renderer {
           ctx.strokeRect(tx + 2, ty + 2, TILE_SIZE - 4, TILE_SIZE - 4);
         }
       }
-
       ctx.restore();
     }
 
@@ -525,53 +574,34 @@ export class Renderer {
     ctx.save();
     ctx.translate(camera.x, camera.y);
     ctx.scale(camera.zoom, camera.zoom);
-
     ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
     ctx.lineWidth = 2;
     ctx.strokeRect(0, 0, MAP_SIZE * TILE_SIZE, MAP_SIZE * TILE_SIZE);
-
     ctx.restore();
-
-    // Minimap (kept for normal gameplay; the dev showcase may hide it)
-    if (options.showMinimap !== false) {
-      this.drawMinimap(map, player ? { x: player.x, y: player.y } : undefined);
-    }
-
-    this.updateParticles();
   }
 
-  /**
-   * Draw a resource deposit using the corresponding Relay Seven sprite.
-   * Resources are drawn at 32px center on the tile with deterministic depletion scaling.
-   */
+  // ======================== Resource Rendering ========================
+
   private drawResource(gx: number, gy: number, resource: { type: ResourceTypeValue; amount: number }): void {
     const { ctx } = this;
-
-    // Map resource type to sprite key
     const spriteKey = this.getResourceSpriteKey(resource.type);
     const sprite = this.assetLoader.get(spriteKey);
 
     if (sprite) {
-      // Draw at 32px center on tile (the deposit sprite is 32x32)
-      // Scale down slightly based on depletion
       const depletion = Math.max(0.4, resource.amount / 100);
       const size = Math.floor(32 * (0.6 + 0.4 * depletion));
       const offset = (TILE_SIZE - size) / 2;
-
-      ctx.drawImage(sprite.canvas,
+      ctx.drawImage(
+        sprite.canvas,
         gx * TILE_SIZE + offset,
         gy * TILE_SIZE + offset,
-        size, size
+        size, size,
       );
     } else {
-      // Fallback: colored shape (same as before)
       this.drawResourceFallback(gx, gy, resource);
     }
   }
 
-  /**
-   * Get the sprite key for a resource type.
-   */
   private getResourceSpriteKey(type: ResourceTypeValue): string {
     const map: Record<ResourceTypeValue, string> = {
       wood: 'R-res-wood',
@@ -584,9 +614,6 @@ export class Renderer {
     return map[type] ?? 'R-res-stone';
   }
 
-  /**
-   * Fallback resource draw using colored shapes (when sprites aren't available).
-   */
   private drawResourceFallback(gx: number, gy: number, resource: { type: ResourceTypeValue; amount: number }): void {
     const { ctx } = this;
     const cx = gx * TILE_SIZE + TILE_SIZE / 2;
@@ -597,8 +624,6 @@ export class Renderer {
 
     ctx.globalAlpha = depletion;
     ctx.fillStyle = color;
-
-    // Glow effect
     ctx.shadowColor = color;
     ctx.shadowBlur = 6;
 
@@ -642,7 +667,6 @@ export class Renderer {
         break;
       }
       case 'wood': {
-        // Log with tree top
         ctx.fillStyle = '#6a4a1a';
         ctx.fillRect(cx - size / 4, cy, size / 2, size * 0.9);
         ctx.fillStyle = color;
@@ -667,22 +691,154 @@ export class Renderer {
     }
   }
 
+  // ======================== Building Rendering ========================
+
   private drawBuilding(gx: number, gy: number, building: Building, map: Tile[][]): void {
+    // Conveyor gets full sprite-based rendering
+    if (building.type === 'conveyor') {
+      this.drawConveyor(gx, gy, building, map);
+      return;
+    }
+
+    // Get cached building sprite
+    const spriteKey = this.getBuildingSpriteKey(building.type);
+    const baseSprite = this.assetLoader.get(spriteKey);
+
+    if (baseSprite) {
+      this.drawBuildingSprite(gx, gy, baseSprite, building);
+    } else {
+      // Fallback: procedural rendering
+      this.drawBuildingFallback(gx, gy, building, map);
+    }
+  }
+
+  /** Draw a building sprite with state-based overlays. */
+  private drawBuildingSprite(gx: number, gy: number, baseSprite: { canvas: HTMLCanvasElement }, building: Building): void {
+    const { ctx } = this;
+    const bx = gx * TILE_SIZE;
+    const by = gy * TILE_SIZE;
+    const cx = gx * TILE_SIZE + TILE_SIZE / 2;
+    const cy = gy * TILE_SIZE + TILE_SIZE / 2;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(bx + 3, by + 3, TILE_SIZE - 4, TILE_SIZE - 4);
+
+    // Base sprite
+    ctx.drawImage(baseSprite.canvas, bx, by);
+
+    // State overlay
+    const hasPower = building.active;
+    const isBlocked = !!building.blocked;
+    const isWorking = hasPower && building.maxProgress > 1 && building.progress > 0 && building.progress < building.maxProgress;
+    const isIdle = hasPower && (building.maxProgress <= 1 || building.progress === 0 || building.progress >= building.maxProgress);
+
+    if (isBlocked) {
+      // Blocked: dark overlay with red pulse + gate
+      ctx.fillStyle = 'rgba(60, 20, 20, 0.35)';
+      ctx.fillRect(bx, by, TILE_SIZE, TILE_SIZE);
+
+      // Red gate at exit edge
+      const dir = building.direction;
+      const perp = { x: directionVector(dir).y, y: directionVector(dir).x };
+      const exitEdge = this.edgeMid(building.direction);
+      const ex = bx + exitEdge.x;
+      const ey = by + exitEdge.y;
+      ctx.strokeStyle = '#ff4444';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(ex - perp.x * 9, ey - perp.y * 9);
+      ctx.lineTo(ex + perp.x * 9, ey + perp.y * 9);
+      ctx.stroke();
+
+      // Pulsing border
+      const pulse = Math.sin(this.frameCount * 0.15) * 0.35 + 0.55;
+      ctx.strokeStyle = `rgba(255, 68, 68, ${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx + 1, by + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+    } else if (!hasPower) {
+      // No power: blue-gray wash over sprite
+      ctx.fillStyle = 'rgba(40, 50, 70, 0.35)';
+      ctx.fillRect(bx, by, TILE_SIZE, TILE_SIZE);
+    } else if (isWorking) {
+      // Working: warm amber glow/pulse around edges
+      const pulse = Math.sin(this.frameCount * 0.08) * 0.12 + 0.18;
+      ctx.shadowColor = '#ffaa44';
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = `rgba(255, 170, 68, ${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx + 1, by + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+      ctx.shadowBlur = 0;
+
+      // Subtle amber top accent
+      ctx.fillStyle = 'rgba(255, 170, 68, 0.08)';
+      ctx.fillRect(bx, by, TILE_SIZE, 4);
+    } else if (isIdle) {
+      // Idle with power: slight dimming
+      ctx.fillStyle = 'rgba(20, 20, 30, 0.12)';
+      ctx.fillRect(bx, by, TILE_SIZE, TILE_SIZE);
+    }
+
+    // Progress bar (industrial treatment)
+    this.drawIndustrialProgress(gx, gy, building, isWorking);
+
+    // Inventory count bubble
+    const totalItems = building.inventory.reduce((sum, i) => sum + i.amount, 0);
+    if (totalItems > 0) {
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.beginPath();
+      ctx.arc(cx, cy + 10, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(Math.min(totalItems, 99)), cx, cy + 10);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    // Power indicator dot
+    if (building.powerConsumed > 0) {
+      const px = bx + TILE_SIZE - 6;
+      const py = by + 6;
+      ctx.fillStyle = hasPower ? '#44ff44' : '#ff4444';
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (hasPower) {
+        const pulse = Math.sin(this.frameCount * 0.1) * 0.3 + 0.5;
+        ctx.strokeStyle = `rgba(68, 255, 68, ${pulse})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // Direction indicator for miners
+    if (building.type === 'miner' && !isBlocked) {
+      this.drawArrow(cx, cy - 3, building.direction, 6);
+    }
+  }
+
+  /** Fallback procedural building rendering (when sprites aren't available). */
+  private drawBuildingFallback(gx: number, gy: number, building: Building, _map: Tile[][]): void {
     const { ctx } = this;
     const cx = gx * TILE_SIZE + TILE_SIZE / 2;
     const cy = gy * TILE_SIZE + TILE_SIZE / 2;
     const def = this.getBuildingDef(building.type);
     const color = def.color;
 
-    // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.fillRect(gx * TILE_SIZE + 3, gy * TILE_SIZE + 3, TILE_SIZE - 4, TILE_SIZE - 4);
 
-    // Base
     ctx.fillStyle = '#2a2a3a';
     ctx.fillRect(gx * TILE_SIZE + 2, gy * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
 
-    // Active glow
     if (building.active) {
       ctx.shadowColor = color;
       ctx.shadowBlur = 8;
@@ -699,7 +855,6 @@ export class Renderer {
       case 'rect': {
         const inset = 8;
         ctx.fillRect(gx * TILE_SIZE + inset, gy * TILE_SIZE + inset, TILE_SIZE - inset * 2, TILE_SIZE - inset * 2);
-        // Top highlight
         ctx.fillStyle = 'rgba(255,255,255,0.1)';
         ctx.fillRect(gx * TILE_SIZE + inset, gy * TILE_SIZE + inset, TILE_SIZE - inset * 2, 2);
         break;
@@ -712,8 +867,6 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(cx, cy, TILE_SIZE / 2 - 8, 0, Math.PI * 2);
         ctx.fill();
-
-        // Smoke particles from generator when active
         if (building.active && this.frameCount % 20 === 0) {
           this.spawnParticle(cx, gy * TILE_SIZE, '#888', 1);
         }
@@ -729,34 +882,24 @@ export class Renderer {
         ctx.fill();
         break;
       }
-      case 'arrow': {
-        // Conveyor belt — full direction/connection/blocked/item rendering.
-        this.drawConveyor(gx, gy, building, map);
-        break;
-      }
     }
 
-    // Progress bar with gradient
+    // Progress bar (fallback)
     if (building.maxProgress > 1) {
       const barWidth = TILE_SIZE - 16;
       const barHeight = 4;
       const barX = gx * TILE_SIZE + 8;
       const barY = gy * TILE_SIZE + TILE_SIZE - 8;
-
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-
       const progress = building.progress / building.maxProgress;
       const barColor = building.active ? '#44cc44' : '#cc4444';
       ctx.fillStyle = barColor;
       ctx.fillRect(barX, barY, barWidth * progress, barHeight);
-
-      // Bar highlight
       ctx.fillStyle = 'rgba(255,255,255,0.2)';
       ctx.fillRect(barX, barY, barWidth * progress, 1);
     }
 
-    // Inventory count with background (sprites are drawn per-belt instead)
     const totalItems = building.inventory.reduce((sum, i) => sum + i.amount, 0);
     if (totalItems > 0 && building.type !== 'conveyor') {
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -768,15 +911,13 @@ export class Renderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(String(totalItems), cx, cy + 8);
+      ctx.textBaseline = 'alphabetic';
     }
-    ctx.textBaseline = 'alphabetic';
 
-    // Direction indicator for miners (conveyors show chevrons instead)
     if (building.type === 'miner') {
       this.drawArrow(cx, cy - 2, building.direction, 6);
     }
 
-    // Power indicator
     if (building.powerConsumed > 0) {
       const px = gx * TILE_SIZE + TILE_SIZE - 6;
       const py = gy * TILE_SIZE + 6;
@@ -784,7 +925,6 @@ export class Renderer {
       ctx.beginPath();
       ctx.arc(px, py, 2.5, 0, Math.PI * 2);
       ctx.fill();
-
       if (building.active) {
         const pulse = Math.sin(this.frameCount * 0.1) * 0.3 + 0.5;
         ctx.strokeStyle = `rgba(68, 255, 68, ${pulse})`;
@@ -796,12 +936,493 @@ export class Renderer {
     }
   }
 
-  /**
-   * Draw visible energy links between fueled (active) generators and the powered
-   * consumers in view, so the shared power grid is legible at a glance. An
-   * L-shaped cable with a moving glow pulse connects each generator to its
-   * nearest powered machines, and a dashed ring marks running generators.
-   */
+  // ======================== Conveyor / Belt Rendering ========================
+
+  private drawConveyor(gx: number, gy: number, building: Building, map: Tile[][]): void {
+    const { ctx } = this;
+    const dir = building.direction;
+    const key = `${gx},${gy}`;
+
+    if (!this.conveyorAnims.has(key)) {
+      this.conveyorAnims.set(key, { offset: 0 });
+    }
+    const anim = this.conveyorAnims.get(key)!;
+    const moving = building.active && !building.blocked;
+    if (moving) {
+      anim.offset = (anim.offset + 1) % 12;
+    }
+    const phase = anim.offset / 12;
+
+    const bx = gx * TILE_SIZE;
+    const by = gy * TILE_SIZE;
+
+    // Get belt sprite based on direction
+    const beltSpriteKey = this.getBeltSpriteKey(dir);
+    const cachedKey = `${beltSpriteKey}_${dir}`;
+
+    if (!this.beltSpriteCache.has(cachedKey)) {
+      this.beltSpriteCache.set(cachedKey, this.rotateBeltSprite(beltSpriteKey, dir));
+    }
+    const beltCanvas = this.beltSpriteCache.get(cachedKey);
+
+    // Dark base underneath
+    ctx.fillStyle = '#2a2a30';
+    ctx.fillRect(bx + 2, by + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+
+    if (beltCanvas) {
+      // Draw the belt sprite
+      ctx.drawImage(beltCanvas, bx, by);
+    } else {
+      // Fallback: procedural belt
+      ctx.fillStyle = '#3a3a42';
+      ctx.fillRect(bx + 5, by + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+    }
+
+    // Draw connected belt edges (seamless chains)
+    this.drawBeltConnections(gx, gy, map);
+
+    // Animated chevrons showing belt movement direction
+    this.drawBeltChevrons(gx, gy, building, dir, phase);
+
+    // Blocked state (red gate + overlay)
+    if (building.blocked) {
+      ctx.fillStyle = 'rgba(255, 30, 30, 0.15)';
+      ctx.fillRect(bx + 3, by + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+
+      // Gate line at exit edge
+      const perp = { x: directionVector(dir).y, y: directionVector(dir).x };
+      const exitMid = this.edgeMid(dir);
+      const ex = bx + exitMid.x;
+      const ey = by + exitMid.y;
+      ctx.strokeStyle = '#ff3333';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(ex - perp.x * 9, ey - perp.y * 9);
+      ctx.lineTo(ex + perp.x * 9, ey + perp.y * 9);
+      ctx.stroke();
+
+      // Pulsing red border
+      const pulse = Math.sin(this.frameCount * 0.15) * 0.35 + 0.55;
+      ctx.strokeStyle = `rgba(255, 50, 50, ${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx + 2, by + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    }
+
+    // Idle state (no item on belt)
+    if (building.active && !building.blocked && building.inventory.every(i => i.amount <= 0)) {
+      ctx.fillStyle = 'rgba(40, 40, 50, 0.2)';
+      ctx.fillRect(bx + 3, by + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+    }
+
+    // Belt item (sprite-based)
+    this.drawBeltItem(building, dir, map);
+  }
+
+  /** Draw seamless connections between adjacent belts. */
+  private drawBeltConnections(gx: number, gy: number, map: Tile[][]): void {
+    const { ctx } = this;
+    const inset = 4;
+    const bx = gx * TILE_SIZE;
+    const by = gy * TILE_SIZE;
+
+    // On each side, if there's no adjacent belt, draw a dark gap to show the open end
+    for (const side of [Dir.Up, Dir.Right, Dir.Down, Dir.Left] as DirectionValue[]) {
+      const nx = gx + directionVector(side).x;
+      const ny = gy + directionVector(side).y;
+      const isConnected =
+        nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE &&
+        map[ny][nx].building?.type === 'conveyor';
+
+      if (!isConnected) {
+        ctx.fillStyle = 'rgba(26, 26, 46, 0.6)';
+        if (side === Dir.Up) ctx.fillRect(bx + inset, by, TILE_SIZE - inset * 2, inset);
+        if (side === Dir.Down) ctx.fillRect(bx + inset, by + TILE_SIZE - inset, TILE_SIZE - inset * 2, inset);
+        if (side === Dir.Left) ctx.fillRect(bx, by + inset, inset, TILE_SIZE - inset * 2);
+        if (side === Dir.Right) ctx.fillRect(bx + TILE_SIZE - inset, by + inset, inset, TILE_SIZE - inset * 2);
+      }
+    }
+  }
+
+  /** Rotate a belt sprite for the given direction. */
+  private rotateBeltSprite(beltSpriteKey: string, dir: DirectionValue): HTMLCanvasElement {
+    const sprite = this.assetLoader.get(beltSpriteKey);
+    if (!sprite) {
+      // Fallback: create a simple belt sprite
+      return this.createBeltSpriteFallback(dir);
+    }
+
+    const c = document.createElement('canvas');
+    c.width = TILE_SIZE;
+    c.height = TILE_SIZE;
+    const ctx = c.getContext('2d')!;
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.translate(TILE_SIZE / 2, TILE_SIZE / 2);
+
+    // Rotation angles for each direction (from the base "right" sprite)
+    let angle = 0;
+    switch (dir) {
+      case Dir.Right: angle = 0; break;
+      case Dir.Up: angle = -Math.PI / 2; break;
+      case Dir.Down: angle = Math.PI; break;
+      case Dir.Left: angle = Math.PI / 2; break;
+    }
+
+    ctx.rotate(angle);
+    ctx.drawImage(sprite.canvas, -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
+
+    return c;
+  }
+
+  /** Create a fallback belt sprite procedurally. */
+  private createBeltSpriteFallback(dir: DirectionValue): HTMLCanvasElement {
+    const c = document.createElement('canvas');
+    c.width = TILE_SIZE;
+    c.height = TILE_SIZE;
+    const ctx = c.getContext('2d')!;
+
+    ctx.fillStyle = '#3a3a42';
+    ctx.fillRect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8);
+
+    // Belt tread lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    const isHorizontal = dir === Dir.Right || dir === Dir.Left;
+    for (let i = 0; i < 6; i++) {
+      if (isHorizontal) {
+        const y = 8 + i * 7;
+        ctx.beginPath();
+        ctx.moveTo(6, y);
+        ctx.lineTo(TILE_SIZE - 6, y);
+        ctx.stroke();
+      } else {
+        const x = 8 + i * 7;
+        ctx.beginPath();
+        ctx.moveTo(x, 6);
+        ctx.lineTo(x, TILE_SIZE - 6);
+        ctx.stroke();
+      }
+    }
+
+    // Direction chevron
+    ctx.fillStyle = 'rgba(235, 235, 235, 0.5)';
+    ctx.save();
+    ctx.translate(TILE_SIZE / 2, TILE_SIZE / 2);
+    let angle = 0;
+    switch (dir) {
+      case Dir.Right: angle = 0; break;
+      case Dir.Up: angle = -Math.PI / 2; break;
+      case Dir.Down: angle = Math.PI; break;
+      case Dir.Left: angle = Math.PI / 2; break;
+    }
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(8, 0);
+    ctx.lineTo(-4, -5);
+    ctx.lineTo(-4, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    return c;
+  }
+
+  /** Draw animated chevrons on the belt to indicate flow direction. */
+  private drawBeltChevrons(gx: number, gy: number, building: Building, dir: DirectionValue, phase: number): void {
+    const { ctx } = this;
+    const chevronCount = 4;
+
+    for (let i = 0; i < chevronCount; i++) {
+      let t = (i + phase) / chevronCount;
+      if (t > 1) t -= 1;
+
+      const pos = this.beltPointForChevron(gx, gy, dir, t);
+      const isBlocked = !!building.blocked;
+
+      ctx.save();
+      ctx.translate(pos.x, pos.y);
+      let ang = 0;
+      switch (dir) {
+        case Dir.Right: ang = 0; break;
+        case Dir.Up: ang = -Math.PI / 2; break;
+        case Dir.Down: ang = Math.PI; break;
+        case Dir.Left: ang = Math.PI / 2; break;
+      }
+      ctx.rotate(ang);
+
+      const chevronColor = isBlocked ? 'rgba(255, 80, 80, 0.9)' : 'rgba(235, 235, 235, 0.6)';
+      ctx.fillStyle = chevronColor;
+      ctx.beginPath();
+      ctx.moveTo(4, 0);
+      ctx.lineTo(-3, -3);
+      ctx.lineTo(-3, 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /** Get a position along the belt for a chevron at parameter t. */
+  private beltPointForChevron(gx: number, gy: number, dir: DirectionValue, t: number): { x: number; y: number } {
+    const bx = gx * TILE_SIZE;
+    const by = gy * TILE_SIZE;
+    const inset = 6;
+
+    switch (dir) {
+      case Dir.Right:
+        return {
+          x: bx + inset + t * (TILE_SIZE - inset * 2),
+          y: by + TILE_SIZE / 2,
+        };
+      case Dir.Down:
+        return {
+          x: bx + TILE_SIZE / 2,
+          y: by + inset + t * (TILE_SIZE - inset * 2),
+        };
+      case Dir.Up:
+        return {
+          x: bx + TILE_SIZE / 2,
+          y: by + TILE_SIZE - inset - t * (TILE_SIZE - inset * 2),
+        };
+      case Dir.Left:
+        return {
+          x: bx + TILE_SIZE - inset - t * (TILE_SIZE - inset * 2),
+          y: by + TILE_SIZE / 2,
+        };
+    }
+  }
+
+  /** Get the midpoint of an edge in local tile coordinates. */
+  private edgeMid(dir: DirectionValue): { x: number; y: number } {
+    const h = TILE_SIZE / 2;
+    switch (dir) {
+      case Dir.Up: return { x: h, y: 0 };
+      case Dir.Down: return { x: h, y: TILE_SIZE };
+      case Dir.Left: return { x: 0, y: h };
+      case Dir.Right: return { x: TILE_SIZE, y: h };
+    }
+  }
+
+  // ======================== Belt Item Rendering ========================
+
+  private drawBeltItem(building: Building, dir: DirectionValue, _map: Tile[][]): void {
+    const { ctx } = this;
+
+    // Find the first item type on this belt
+    const invItem = building.inventory[0];
+    if (!invItem || invItem.amount <= 0) return;
+
+    // Position along belt based on progress
+    const t = building.blocked ? 0.95 : Math.min(0.92, building.maxProgress > 0 ? building.progress / building.maxProgress : 0.5);
+    const pos = this.beltPointForChevron(0, 0, dir, t);
+
+    // Get item sprite
+    const itemSpriteKey = this.getItemSpriteKey(invItem.type as ItemType);
+    const itemSprite = itemSpriteKey ? this.assetLoader.get(itemSpriteKey) : null;
+
+    // Use world-space position relative to the building tile
+    const worldX = dir === Dir.Right
+      ? pos.x
+      : dir === Dir.Left
+        ? pos.x
+        : 0;
+    const worldY = dir === Dir.Down
+      ? pos.y
+      : dir === Dir.Up
+        ? pos.y
+        : 0;
+
+    const spriteX = worldX + (dir === Dir.Right || dir === Dir.Left ? 0 : TILE_SIZE / 2);
+    const spriteY = worldY + (dir === Dir.Up || dir === Dir.Down ? 0 : TILE_SIZE / 2);
+
+    if (itemSprite) {
+      // Draw item sprite with shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(spriteX + 1, spriteY + 2, 7, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.drawImage(itemSprite.canvas, spriteX - 16, spriteY - 16, 32, 32);
+    } else {
+      // Fallback: colored circle
+      const color = ITEM_COLORS[invItem.type as ItemType] ?? '#dddddd';
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.arc(spriteX + 1, spriteY + 2, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(spriteX, spriteY, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  // ======================== Industrial Progress Bar ========================
+
+  private drawIndustrialProgress(gx: number, gy: number, building: Building, isWorking: boolean): void {
+    const { ctx } = this;
+
+    if (building.maxProgress <= 1) return;
+
+    const barWidth = TILE_SIZE - 12;
+    const barHeight = 5;
+    const barX = gx * TILE_SIZE + 6;
+    const barY = gy * TILE_SIZE + TILE_SIZE - 9;
+
+    // Dark recessed housing
+    ctx.fillStyle = 'rgba(15, 15, 25, 0.85)';
+    ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+
+    // Inner recess (darker)
+    ctx.fillStyle = 'rgba(25, 25, 40, 0.9)';
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+
+    // Tick marks (industrial scale)
+    const tickCount = 8;
+    for (let i = 0; i <= tickCount; i++) {
+      const tx = barX + (i / tickCount) * barWidth;
+      const tickH = i % 2 === 0 ? 3 : 2;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.fillRect(tx, barY + barHeight - tickH, 0.5, tickH);
+    }
+
+    // Progress fill with amber/sodium color for working machines
+    const progress = building.progress / building.maxProgress;
+
+    if (progress > 0) {
+      if (isWorking) {
+        // Amber glow fill with subtle gradient
+        const grad = ctx.createLinearGradient(barX, barY, barX, barY + barHeight);
+        grad.addColorStop(0, 'rgba(255, 180, 80, 0.9)');
+        grad.addColorStop(0.5, 'rgba(255, 150, 50, 0.85)');
+        grad.addColorStop(1, 'rgba(220, 120, 30, 0.8)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(barX + 1, barY + 1, (barWidth - 2) * progress, barHeight - 2);
+
+        // Glow effect
+        ctx.shadowColor = '#ffaa33';
+        ctx.shadowBlur = 3;
+        ctx.strokeStyle = 'rgba(255, 180, 80, 0.5)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(barX + 1, barY + 1, (barWidth - 2) * progress, barHeight - 2);
+        ctx.shadowBlur = 0;
+      } else {
+        // Idle: muted blue-gray
+        ctx.fillStyle = 'rgba(80, 90, 120, 0.5)';
+        ctx.fillRect(barX + 1, barY + 1, (barWidth - 2) * progress, barHeight - 2);
+      }
+    }
+
+    // Top highlight line
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.fillRect(barX, barY, barWidth, 1);
+
+    // Housing border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+  }
+
+  // ======================== Player Rendering ========================
+
+  private drawPlayer(gx: number, gy: number, facing: DirectionValue): void {
+    const { ctx } = this;
+    const spriteKey = facing === Dir.Up
+      ? 'R-player-up'
+      : facing === Dir.Down
+        ? 'R-player-down'
+        : 'R-player-side';
+
+    const sprite = this.assetLoader.get(spriteKey);
+
+    if (sprite) {
+      ctx.drawImage(sprite.canvas, gx * TILE_SIZE, gy * TILE_SIZE);
+    } else {
+      this.drawPlayerFallback(gx, gy, facing);
+    }
+  }
+
+  private drawPlayerFallback(gx: number, gy: number, facing: DirectionValue): void {
+    const { ctx } = this;
+    const cx = gx * TILE_SIZE + TILE_SIZE / 2;
+    const cy = gy * TILE_SIZE + TILE_SIZE / 2;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + TILE_SIZE / 2 - 4, TILE_SIZE / 2 - 4, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const bodyGrad = ctx.createRadialGradient(cx - 2, cy - 2, 2, cx, cy, TILE_SIZE / 2 - 6);
+    bodyGrad.addColorStop(0, '#66aaff');
+    bodyGrad.addColorStop(1, '#4488ff');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, TILE_SIZE / 2 - 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#88ccff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.arc(cx - 3, cy - 3, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    switch (facing) {
+      case Dir.Up: ctx.rotate(-Math.PI / 2); break;
+      case Dir.Right: ctx.rotate(0); break;
+      case Dir.Down: ctx.rotate(Math.PI / 2); break;
+      case Dir.Left: ctx.rotate(Math.PI); break;
+    }
+    ctx.fillStyle = 'rgba(255, 220, 120, 0.95)';
+    ctx.beginPath();
+    ctx.moveTo(6, 0);
+    ctx.lineTo(-1, -5);
+    ctx.lineTo(-1, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    const pulse = Math.sin(this.frameCount * 0.05) * 0.3 + 0.7;
+    ctx.strokeStyle = `rgba(68, 136, 255, ${pulse})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, TILE_SIZE / 2 - 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // ======================== Arrow Drawing ========================
+
+  private drawArrow(cx: number, cy: number, direction: DirectionValue, size: number): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    switch (direction) {
+      case Dir.Up: ctx.rotate(-Math.PI / 2); break;
+      case Dir.Right: ctx.rotate(0); break;
+      case Dir.Down: ctx.rotate(Math.PI / 2); break;
+      case Dir.Left: ctx.rotate(Math.PI); break;
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.4, -size * 0.5);
+    ctx.lineTo(size * 0.5, 0);
+    ctx.lineTo(-size * 0.4, size * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ======================== Power Links ========================
+
   private drawPowerLinks(map: Tile[][], startTileX: number, startTileY: number, endTileX: number, endTileY: number): void {
     const { ctx } = this;
     const gens: { x: number; y: number }[] = [];
@@ -889,377 +1510,7 @@ export class Renderer {
     return { x: c.mx + (c.bx - c.mx) * f, y: c.my + (c.by - c.my) * f };
   }
 
-  private drawConveyor(gx: number, gy: number, building: Building, map: Tile[][]): void {
-    const { ctx } = this;
-    const dir = building.direction;
-    const key = `${gx},${gy}`;
-    if (!this.conveyorAnims.has(key)) {
-      this.conveyorAnims.set(key, { offset: 0 });
-    }
-    const anim = this.conveyorAnims.get(key)!;
-    const moving = building.active && !building.blocked;
-    if (moving) {
-      anim.offset = (anim.offset + 1) % 12;
-    }
-    const phase = (anim.offset % 12) / 12;
-
-    const inset = 6;
-    const bx = gx * TILE_SIZE;
-    const by = gy * TILE_SIZE;
-    ctx.fillStyle = '#2f2f36';
-    ctx.fillRect(bx + inset, by + inset, TILE_SIZE - inset * 2, TILE_SIZE - inset * 2);
-
-    // Cut dark gaps on every side that does NOT connect to a neighboring conveyor,
-    // so belts visually chain together and show clear open ends.
-    const sideHasBelt: Partial<Record<DirectionValue, boolean>> = {};
-    for (const side of [Dir.Up, Dir.Right, Dir.Down, Dir.Left] as DirectionValue[]) {
-      const nx = gx + directionVector(side).x;
-      const ny = gy + directionVector(side).y;
-      const isConnected =
-        nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE &&
-        map[ny][nx].building?.type === 'conveyor';
-      sideHasBelt[side] = isConnected;
-      if (!isConnected) {
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        if (side === Dir.Up) ctx.fillRect(bx + inset, by, TILE_SIZE - inset * 2, inset);
-        if (side === Dir.Down) ctx.fillRect(bx + inset, by + TILE_SIZE - inset, TILE_SIZE - inset * 2, inset);
-        if (side === Dir.Left) ctx.fillRect(bx, by + inset, inset, TILE_SIZE - inset * 2);
-        if (side === Dir.Right) ctx.fillRect(bx + TILE_SIZE - inset, by + inset, inset, TILE_SIZE - inset * 2);
-      }
-    }
-
-    const isBlocked = !!building.blocked;
-
-    // Belt path used by chevrons + items; entry reflects how items arrive.
-    const entry = this.beltEntryPoint(gx, gy, dir, map);
-    const exit = this.beltExitPoint(gx, gy, dir);
-    const path = this.beltPath(entry, exit);
-
-    const chevronColor = isBlocked ? 'rgba(255, 80, 80, 0.9)' : 'rgba(235, 235, 235, 0.75)';
-    const chevronCount = 5;
-    for (let i = 0; i < chevronCount; i++) {
-      let t = (i + phase) / chevronCount;
-      t = t + 0.06;
-      if (t > 1) t -= 1;
-      const p = this.beltPoint(path, t);
-      const tangent = this.beltTangent(path, t);
-      this.drawBeltChevron(p.x, p.y, tangent.x, tangent.y, chevronColor, isBlocked);
-    }
-
-    // Elbow connection band — visually "wires" a corner between two belts.
-    const inConn = this.incomingConnectionKind(gx, gy, dir, map);
-    if (inConn === 'turn') {
-      ctx.strokeStyle = 'rgba(190, 190, 205, 0.18)';
-      ctx.lineWidth = 6;
-      this.traceBeltPath(path);
-      ctx.stroke();
-    }
-
-    // Blocked gate + red wash when the belt is jammed.
-    if (isBlocked) {
-      ctx.fillStyle = 'rgba(255, 40, 40, 0.12)';
-      ctx.fillRect(bx + inset, by + inset, TILE_SIZE - inset * 2, TILE_SIZE - inset * 2);
-
-      const ex = exit.x;
-      const ey = exit.y;
-      ctx.strokeStyle = '#ff4444';
-      ctx.lineWidth = 4;
-      const perp = { x: directionVector(dir).y, y: directionVector(dir).x };
-      ctx.beginPath();
-      ctx.moveTo(ex - perp.x * 9, ey - perp.y * 9);
-      ctx.lineTo(ex + perp.x * 9, ey + perp.y * 9);
-      ctx.stroke();
-      const pulse = Math.sin(this.frameCount * 0.15) * 0.35 + 0.55;
-      ctx.strokeStyle = `rgba(255, 68, 68, ${pulse})`;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(bx + inset - 1, by + inset - 1, TILE_SIZE - inset * 2 + 2, TILE_SIZE - inset * 2 + 2);
-    }
-
-    this.drawBeltItem(building, path);
-  }
-
-  /** Local-space (tile-relative) midpoint of the edge a direction points at. */
-  private edgeMid(dir: DirectionValue): { x: number; y: number } {
-    const h = TILE_SIZE / 2;
-    switch (dir) {
-      case Dir.Up: return { x: h, y: 0 };
-      case Dir.Down: return { x: h, y: TILE_SIZE };
-      case Dir.Left: return { x: 0, y: h };
-      case Dir.Right: return { x: TILE_SIZE, y: h };
-    }
-  }
-
-  /** World-space point where an item enters this belt (or the tile center if none). */
-  private beltEntryPoint(gx: number, gy: number, dir: DirectionValue, map: Tile[][]): { x: number; y: number } {
-    const back = oppositeDirection(dir);
-    const at = (d: DirectionValue) => {
-      const nx = gx + directionVector(d).x;
-      const ny = gy + directionVector(d).y;
-      return nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE && map[ny][nx].building?.type === 'conveyor'
-        ? map[ny][nx].building!
-        : null;
-    };
-
-    // Same-axis feeder behind us.
-    const backBelt = at(back);
-    if (backBelt && (backBelt.direction === dir || backBelt.direction === back)) {
-      const m = this.edgeMid(back);
-      return { x: gx * TILE_SIZE + m.x, y: gy * TILE_SIZE + m.y };
-    }
-
-    // Perpendicular belt pointing into this tile (elbow entry).
-    for (const side of [Dir.Left, Dir.Right] as DirectionValue[]) {
-      const sideBelt = at(side);
-      if (!sideBelt) continue;
-      const sx = gx + directionVector(side).x;
-      const sy = gy + directionVector(side).y;
-      const fwd = directionVector(sideBelt.direction);
-      if (sx + fwd.x === gx && sy + fwd.y === gy) {
-        const m = this.edgeMid(side);
-        return { x: gx * TILE_SIZE + m.x, y: gy * TILE_SIZE + m.y };
-      }
-    }
-
-    return { x: gx * TILE_SIZE + TILE_SIZE / 2, y: gy * TILE_SIZE + TILE_SIZE / 2 };
-  }
-
-  /** World-space point where items leave the belt (midpoint of the forward edge). */
-  private beltExitPoint(gx: number, gy: number, dir: DirectionValue): { x: number; y: number } {
-    const m = this.edgeMid(dir);
-    return { x: gx * TILE_SIZE + m.x, y: gy * TILE_SIZE + m.y };
-  }
-
-  /** Whether the entry path curves (elbow) — an incoming side belt makes a corner. */
-  private incomingConnectionKind(gx: number, gy: number, dir: DirectionValue, map: Tile[][]): 'straight' | 'turn' | 'none' {
-    const back = oppositeDirection(dir);
-    const backPos = { x: gx + directionVector(back).x, y: gy + directionVector(back).y };
-    if (backPos.x >= 0 && backPos.x < MAP_SIZE && backPos.y >= 0 && backPos.y < MAP_SIZE) {
-      const b = map[backPos.y][backPos.x].building;
-      if (b?.type === 'conveyor' && (b.direction === dir || b.direction === back)) return 'straight';
-    }
-    for (const side of [Dir.Left, Dir.Right] as DirectionValue[]) {
-      const sp = { x: gx + directionVector(side).x, y: gy + directionVector(side).y };
-      if (sp.x < 0 || sp.x >= MAP_SIZE || sp.y < 0 || sp.y >= MAP_SIZE) continue;
-      const b = map[sp.y][sp.x].building;
-      if (b?.type === 'conveyor') {
-        const fwd = directionVector(b.direction);
-        if (sp.x + fwd.x === gx && sp.y + fwd.y === gy) return 'turn';
-      }
-    }
-    return 'none';
-  }
-
-  /**
-   * Cubic path from entry to exit. Straight entries stay on-axis; corner entries
-   * get a smooth bezier with tangent-extended control points.
-   */
-  private beltPath(p0: { x: number; y: number }, p1: { x: number; y: number }): {
-    p0: { x: number; y: number };
-    p1: { x: number; y: number };
-    c1: { x: number; y: number };
-    c2: { x: number; y: number };
-  } {
-    const k = TILE_SIZE / 4;
-    const straight = p0.x === p1.x || p0.y === p1.y;
-    if (straight) {
-      return { p0, p1, c1: p0, c2: p1 };
-    }
-    // Corner: control points extend the in/out tangents.
-    const a: { x: number; y: number } = { x: p0.x, y: p0.y };
-    const b: { x: number; y: number } = { x: p1.x, y: p1.y };
-    if (p0.y === 0) { a.x += (p1.x > p0.x ? k : -k); a.y += k; }
-    if (p0.y === TILE_SIZE) { a.x += (p1.x > p0.x ? k : -k); a.y -= k; }
-    if (p0.x === 0) { a.y += (p1.y > p0.y ? k : -k); a.x += k; }
-    if (p0.x === TILE_SIZE) { a.x -= k; a.y += (p1.y > p0.y ? k : -k); }
-    if (p1.y === 0) { b.x += (p1.x > p0.x ? k : -k); b.y -= k; }
-    if (p1.y === TILE_SIZE) { b.x += (p1.x > p0.x ? k : -k); b.y += k; }
-    if (p1.x === 0) { b.y += (p1.y > p0.y ? k : -k); b.x -= k; }
-    if (p1.x === TILE_SIZE) { b.x += k; b.y += (p1.y > p0.y ? k : -k); }
-    return { p0, p1, c1: a, c2: b };
-  }
-
-  private beltPoint(path: { p0: { x: number; y: number }; p1: { x: number; y: number }; c1: { x: number; y: number }; c2: { x: number; y: number } }, t: number): { x: number; y: number } {
-    const { p0, p1, c1, c2 } = path;
-    if (p0.x === p1.x || p0.y === p1.y) {
-      return { x: p0.x + (p1.x - p0.x) * t, y: p0.y + (p1.y - p0.y) * t };
-    }
-    const u = 1 - t;
-    const x = u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p1.x;
-    const y = u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p1.y;
-    return { x, y };
-  }
-
-  private beltTangent(path: { p0: { x: number; y: number }; p1: { x: number; y: number }; c1: { x: number; y: number }; c2: { x: number; y: number } }, t: number): { x: number; y: number } {
-    const a = this.beltPoint(path, Math.max(0, t - 0.02));
-    const b = this.beltPoint(path, Math.min(1, t + 0.02));
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    return { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
-  }
-
-  private traceBeltPath(path: { p0: { x: number; y: number }; p1: { x: number; y: number }; c1: { x: number; y: number }; c2: { x: number; y: number } }): void {
-    const { ctx } = this;
-    const { p0, c1, c2, p1 } = path;
-    ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, p1.x, p1.y);
-  }
-
-  private drawBeltChevron(x: number, y: number, tx: number, ty: number, color: string, blocked: boolean): void {
-    const { ctx } = this;
-    ctx.save();
-    ctx.translate(x, y);
-    const ang = Math.atan2(ty, tx);
-    ctx.rotate(ang);
-    ctx.fillStyle = color;
-    const w = blocked ? 7 : 6;
-    ctx.beginPath();
-    ctx.moveTo(w - 3, 0);
-    ctx.lineTo(-3, -3.5);
-    ctx.lineTo(-3, 3.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-
-  private drawBeltItem(building: Building, path: { p0: { x: number; y: number }; p1: { x: number; y: number }; c1: { x: number; y: number }; c2: { x: number; y: number } }): void {
-    const { ctx } = this;
-    const invItem = building.inventory[0];
-    if (!invItem || invItem.amount <= 0) return;
-    const t = building.blocked ? 1 : Math.min(0.97, building.maxProgress > 0 ? building.progress / building.maxProgress : 0);
-    const p = this.beltPoint(path, t);
-    const color = ITEM_COLORS[invItem.type as ItemType] ?? '#dddddd';
-
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.arc(p.x + 1, p.y + 2, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = color;
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  private drawArrow(cx: number, cy: number, direction: DirectionValue, size: number): void {
-    const { ctx } = this;
-    ctx.save();
-    ctx.translate(cx, cy);
-
-    switch (direction) {
-      case Dir.Up:
-        ctx.rotate(-Math.PI / 2);
-        break;
-      case Dir.Right:
-        ctx.rotate(0);
-        break;
-      case Dir.Down:
-        ctx.rotate(Math.PI / 2);
-        break;
-      case Dir.Left:
-        ctx.rotate(Math.PI);
-        break;
-    }
-
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.beginPath();
-    ctx.moveTo(-size * 0.4, -size * 0.5);
-    ctx.lineTo(size * 0.5, 0);
-    ctx.lineTo(-size * 0.4, size * 0.5);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.restore();
-  }
-
-  /**
-   * Draw the player character using Relay Seven directional sprites.
-   *
-   * Three sprites: up (hood back), down (visor forward), side (profile view).
-   * Each is 32x32 native, drawn at 64px (2x) with nearest-neighbor for crisp pixels.
-   */
-  private drawPlayer(gx: number, gy: number, facing: DirectionValue): void {
-    const { ctx } = this;
-
-    // Determine sprite key based on facing direction
-    const spriteKey = facing === Dir.Up
-      ? 'R-player-up'
-      : facing === Dir.Down
-        ? 'R-player-down'
-        : 'R-player-side';
-
-    const sprite = this.assetLoader.get(spriteKey);
-
-    if (sprite) {
-      // Draw player sprite centered on tile at 64px (2x the 32px source)
-      ctx.drawImage(sprite.canvas, gx * TILE_SIZE, gy * TILE_SIZE);
-    } else {
-      // Fallback: original procedural player sprite
-      this.drawPlayerFallback(gx, gy, facing);
-    }
-  }
-
-  /**
-   * Fallback player draw using the original procedural sprite.
-   */
-  private drawPlayerFallback(gx: number, gy: number, facing: DirectionValue): void {
-    const { ctx } = this;
-    const cx = gx * TILE_SIZE + TILE_SIZE / 2;
-    const cy = gy * TILE_SIZE + TILE_SIZE / 2;
-
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + TILE_SIZE / 2 - 4, TILE_SIZE / 2 - 4, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Body
-    const bodyGrad = ctx.createRadialGradient(cx - 2, cy - 2, 2, cx, cy, TILE_SIZE / 2 - 6);
-    bodyGrad.addColorStop(0, '#66aaff');
-    bodyGrad.addColorStop(1, '#4488ff');
-    ctx.fillStyle = bodyGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, TILE_SIZE / 2 - 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Outline
-    ctx.strokeStyle = '#88ccff';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.beginPath();
-    ctx.arc(cx - 3, cy - 3, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Facing indicator arrow
-    ctx.save();
-    ctx.translate(cx, cy);
-    switch (facing) {
-      case Dir.Up: ctx.rotate(-Math.PI / 2); break;
-      case Dir.Right: ctx.rotate(0); break;
-      case Dir.Down: ctx.rotate(Math.PI / 2); break;
-      case Dir.Left: ctx.rotate(Math.PI); break;
-    }
-    ctx.fillStyle = 'rgba(255, 220, 120, 0.95)';
-    ctx.beginPath();
-    ctx.moveTo(6, 0);
-    ctx.lineTo(-1, -5);
-    ctx.lineTo(-1, 5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    // Pulsing ring
-    const pulse = Math.sin(this.frameCount * 0.05) * 0.3 + 0.7;
-    ctx.strokeStyle = `rgba(68, 136, 255, ${pulse})`;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, TILE_SIZE / 2 - 2, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+  // ======================== Minimap ========================
 
   private drawMinimap(map: Tile[][], playerPos: { x: number; y: number } | undefined): void {
     const { ctx } = this;
@@ -1268,11 +1519,9 @@ export class Renderer {
     const mx = this.canvas.width - minimapSize - 10;
     const my = this.canvas.height - minimapSize - 40;
 
-    // Background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(mx - 2, my - 2, minimapSize + 4, minimapSize + 4);
 
-    // Terrain
     const terrainColors: Record<TerrainValue, string> = {
       grass: '#3a5a2e',
       forest: '#2d5a1e',
@@ -1288,13 +1537,11 @@ export class Renderer {
         ctx.fillStyle = terrainColors[tile.terrain] || '#3a5a2e';
         ctx.fillRect(mx + x * scale, my + y * scale, scale * 2 + 1, scale * 2 + 1);
 
-        // Resources
         if (tile.resource && tile.resource.amount > 0) {
           ctx.fillStyle = RESOURCE_COLORS[tile.resource.type] || '#888';
           ctx.fillRect(mx + x * scale, my + y * scale, scale * 2 + 1, scale * 2 + 1);
         }
 
-        // Buildings
         if (tile.building) {
           const def = this.getBuildingDef(tile.building.type);
           ctx.fillStyle = def.color;
@@ -1303,7 +1550,6 @@ export class Renderer {
       }
     }
 
-    // Player
     if (playerPos) {
       ctx.fillStyle = '#4488ff';
       ctx.beginPath();
@@ -1314,6 +1560,8 @@ export class Renderer {
       ctx.stroke();
     }
   }
+
+  // ======================== Helpers ========================
 
   private getBuildingDef(type: string): { color: string; shape: string; name: string } {
     const defs: Record<string, { color: string; shape: string; name: string }> = {

@@ -78,6 +78,9 @@ function WorldCanvas({
       'R-res-wood', 'R-res-stone', 'R-res-iron', 'R-res-copper', 'R-res-coal', 'R-res-gold',
       'R-b-storage', 'R-b-chest', 'R-b-generator', 'R-b-miner',
       'R-b-conveyor', 'R-b-smelter', 'R-b-steel', 'R-b-assembler',
+      'R-belt-right', 'R-belt-up', 'R-belt-down', 'R-belt-left', 'R-belt-elbow',
+      'R-item-coal', 'R-item-stone', 'R-item-iron', 'R-item-copper', 'R-item-gold', 'R-item-wood',
+      'R-item-ingot', 'R-item-plate', 'R-item-wire', 'R-item-gear', 'R-item-circuit', 'R-item-engine',
     ];
     loader.load(spriteKeys).then(() => {
       rendererRef.current = new Renderer(canvas, loader);
