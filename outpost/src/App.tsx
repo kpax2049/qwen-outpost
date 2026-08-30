@@ -15,7 +15,7 @@ import { InspectionPanel, type InspectionData } from './ui/InspectionPanel';
 import type { TutorialStep } from './ui/Tutorial';
 
 const SAVE_KEY = 'outpost-save';
-const TILE_SIZE = 64;
+const TILE_SIZE = 48;
 /** How far (Chebyshev distance) the player can place a building from their tile. */
 const BUILD_RANGE = 6;
 
@@ -77,7 +77,6 @@ const App: React.FC = () => {
   const rendererRef = useRef<Renderer | null>(null);
   const assetLoaderRef = useRef<AssetLoader | null>(null);
   const tickAccumulatorRef = useRef<number>(0);
-  const [assetsLoaded, setAssetsLoaded] = useState(false);
 
   const cameraRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -162,32 +161,11 @@ const App: React.FC = () => {
     setRenderTick(t => t + 1);
   }, []);
 
-  // Load relay-seven sprite assets before creating the renderer.
+  // Initialize renderer and start asset loading.
+  // The renderer is created immediately (with fallback colors) and asset loading
+  // happens in parallel. Once assets are ready, the renderer's terrain cache is
+  // updated with the sprite-based tiles.
   useEffect(() => {
-    const loader = new AssetLoader();
-    assetLoaderRef.current = loader;
-
-    // Collect all R-*.png keys from the public assets directory.
-    const spriteKeys = [
-      'R-player-up', 'R-player-down', 'R-player-side',
-      'R-grass', 'R-forest', 'R-sand', 'R-water', 'R-rock',
-      'R-res-wood', 'R-res-stone', 'R-res-iron', 'R-res-copper', 'R-res-coal', 'R-res-gold',
-      'R-b-storage', 'R-b-chest', 'R-b-generator', 'R-b-miner',
-      'R-b-conveyor', 'R-b-smelter', 'R-b-steel', 'R-b-assembler',
-    ];
-
-    loader.load(spriteKeys).then(() => {
-      setAssetsLoaded(true);
-    }).catch(err => {
-      console.warn('Asset loading failed (proceeding with fallbacks):', err);
-      setAssetsLoaded(true);
-    });
-  }, []);
-
-  // Initialize renderer once assets are loaded.
-  useEffect(() => {
-    if (!assetsLoaded) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -204,7 +182,27 @@ const App: React.FC = () => {
     resize();
     window.addEventListener('resize', resize);
 
-    rendererRef.current = new Renderer(canvas, assetLoaderRef.current!);
+    // Create asset loader and start loading in parallel.
+    const loader = new AssetLoader();
+    assetLoaderRef.current = loader;
+
+    const spriteKeys = [
+      'R-player-up', 'R-player-down', 'R-player-side',
+      'R-grass', 'R-forest', 'R-sand', 'R-water', 'R-rock',
+      'R-res-wood', 'R-res-stone', 'R-res-iron', 'R-res-copper', 'R-res-coal', 'R-res-gold',
+      'R-b-storage', 'R-b-chest', 'R-b-generator', 'R-b-miner',
+      'R-b-conveyor', 'R-b-smelter', 'R-b-steel', 'R-b-assembler',
+    ];
+
+    // Create the renderer immediately (it uses fallback colors until assets load).
+    rendererRef.current = new Renderer(canvas, loader);
+
+    // Once assets are ready, update the renderer's terrain cache with sprites.
+    loader.load(spriteKeys).then(() => {
+      rendererRef.current!.updateTerrainCache();
+    }).catch(err => {
+      console.warn('Asset loading failed (using fallback visuals):', err);
+    });
 
     (window as unknown as { __outpost?: unknown }).__outpost = {
       get engine() { return engineRef.current; },

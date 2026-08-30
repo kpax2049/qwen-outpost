@@ -1,6 +1,6 @@
 // ==================== CORE TYPES ====================
 
-export const TILE_SIZE = 64;
+export const TILE_SIZE = 48;
 export const MAP_SIZE = 120;
 
 // Terrain types

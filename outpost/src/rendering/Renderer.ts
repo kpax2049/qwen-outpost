@@ -180,6 +180,15 @@ export class Renderer {
     }
   }
 
+  /**
+   * Rebuild the terrain tile cache from the asset loader (call after assets finish loading).
+   * Replaces any fallback solid-color tiles with sprite-based tiles.
+   */
+  public updateTerrainCache(): void {
+    this.terrainCache.clear();
+    this.loadTerrainSprites();
+  }
+
   private spawnParticle(x: number, y: number, color: string, count: number = 5): void {
     for (let i = 0; i < count; i++) {
       this.particles.push({
