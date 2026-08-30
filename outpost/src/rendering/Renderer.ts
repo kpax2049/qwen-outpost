@@ -14,6 +14,7 @@ import {
   directionVector,
   Dir,
 } from '../types';
+import { AssetLoader } from './AssetLoader';
 
 export interface Camera {
   x: number;
@@ -81,12 +82,16 @@ class LcgRandom {
 export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private terrainCache: Map<string, HTMLCanvasElement> = new Map();
+  /** Pre-rendered terrain tiles (64x64 each). */
+  private terrainCache: Map<TerrainValue, HTMLCanvasElement> = new Map();
   private particles: Particle[] = [];
   private frameCount = 0;
   private lastTickBuildings: Map<string, boolean> = new Map();
   private conveyorAnims: Map<string, ConveyorAnim> = new Map();
   private waterTime = 0;
+
+  /** Sprite asset loader for Relay Seven assets. */
+  private assetLoader: AssetLoader;
 
   /**
    * Deterministic PRNG used ONLY for cosmetic terrain-tile texture generation
@@ -101,104 +106,77 @@ export class Renderer {
    */
   private particleRand = new LcgRandom(135797531);
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, assetLoader: AssetLoader) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
-    this.generateTerrainTiles();
+    this.assetLoader = assetLoader;
+    this.loadTerrainSprites();
   }
 
-  private generateTerrainTiles(): void {
-    const terrains: TerrainValue[] = ['grass', 'forest', 'sand', 'water', 'rock'];
+  /**
+   * Build the terrain tile cache from Relay Seven sprites.
+   * Each 32x32 sprite is pre-rendered at 64px (2x) with nearest-neighbor scaling.
+   * Deterministic variation is applied on top so identical terrain types still
+   * look slightly different across tiles (preserving the original visual polish).
+   */
+  private loadTerrainSprites(): void {
+    const spriteNames: Record<TerrainValue, string> = {
+      grass: 'R-grass',
+      forest: 'R-forest',
+      sand: 'R-sand',
+      water: 'R-water',
+      rock: 'R-rock',
+      dirt: 'R-grass',
+    };
 
-    for (const terrain of terrains) {
-      const tileCanvas = document.createElement('canvas');
-      tileCanvas.width = TILE_SIZE;
-      tileCanvas.height = TILE_SIZE;
-      const ctx = tileCanvas.getContext('2d')!;
+    for (const [terrain, name] of Object.entries(spriteNames) as [TerrainValue, string][]) {
+      const sprite = this.assetLoader.get(name);
+      if (sprite) {
+        // Create a variation canvas with subtle noise overlay for tile diversity.
+        const vc = document.createElement('canvas');
+        vc.width = TILE_SIZE;
+        vc.height = TILE_SIZE;
+        const vctx = vc.getContext('2d')!;
+        vctx.imageSmoothingEnabled = false;
+        vctx.drawImage(sprite.canvas, 0, 0);
 
-      switch (terrain) {
-        case 'grass': {
-          const shade = this.terrainRand.next() * 0.15;
-          ctx.fillStyle = `rgb(${50 + shade * 100}, ${120 + shade * 80}, ${40 + shade * 60})`;
-          ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-          for (let i = 0; i < 8; i++) {
-            ctx.fillStyle = `rgba(${30 + this.terrainRand.next() * 30}, ${100 + this.terrainRand.next() * 50}, ${20 + this.terrainRand.next() * 30}, 0.3)`;
-            ctx.fillRect(this.terrainRand.next() * TILE_SIZE, this.terrainRand.next() * TILE_SIZE, 2, 4);
+        // Deterministic noise: only add subtle variation on non-water, non-rock tiles
+        // to preserve the clean look of those.
+        if (terrain !== 'water' && terrain !== 'rock') {
+          for (let i = 0; i < 6; i++) {
+            const nx = this.terrainRand.next() * TILE_SIZE;
+            const ny = this.terrainRand.next() * TILE_SIZE;
+            const shade = this.terrainRand.next();
+            if (shade < 0.33) {
+              vctx.fillStyle = 'rgba(0,0,0,0.06)';
+            } else if (shade < 0.66) {
+              vctx.fillStyle = 'rgba(255,255,255,0.04)';
+            } else {
+              continue;
+            }
+            vctx.fillRect(nx, ny, 2, 2);
           }
-          ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
-          break;
         }
-        case 'forest': {
-          ctx.fillStyle = '#2d5a1e';
-          ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-          ctx.fillStyle = '#5a3a1a';
-          ctx.fillRect(TILE_SIZE / 2 - 3, TILE_SIZE / 2, 6, TILE_SIZE / 2);
-          ctx.fillStyle = '#1a4a0e';
-          ctx.beginPath();
-          ctx.arc(TILE_SIZE / 2, TILE_SIZE / 3, TILE_SIZE / 3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#2a6a1e';
-          ctx.beginPath();
-          ctx.arc(TILE_SIZE / 2 - 3, TILE_SIZE / 3 - 2, TILE_SIZE / 4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
-          break;
-        }
-        case 'sand': {
-          ctx.fillStyle = '#c4a35a';
-          ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-          for (let i = 0; i < 5; i++) {
-            ctx.fillStyle = `rgba(${180 + this.terrainRand.next() * 40}, ${160 + this.terrainRand.next() * 30}, ${80 + this.terrainRand.next() * 40}, 0.3)`;
-            ctx.beginPath();
-            ctx.arc(this.terrainRand.next() * TILE_SIZE, this.terrainRand.next() * TILE_SIZE, 2, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
-          break;
-        }
-        case 'water': {
-          ctx.fillStyle = '#1a4a7a';
-          ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-          const grad = ctx.createLinearGradient(0, 0, TILE_SIZE, TILE_SIZE);
-          grad.addColorStop(0, 'rgba(42, 106, 154, 0.3)');
-          grad.addColorStop(0.5, 'rgba(58, 122, 170, 0.2)');
-          grad.addColorStop(1, 'rgba(42, 106, 154, 0.3)');
-          ctx.fillStyle = grad;
-          ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-          ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
-          break;
-        }
-        case 'rock': {
-          ctx.fillStyle = '#6a6a6a';
-          ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-          ctx.fillStyle = '#7a7a7a';
-          ctx.beginPath();
-          ctx.moveTo(TILE_SIZE * 0.1, TILE_SIZE * 0.9);
-          ctx.lineTo(TILE_SIZE * 0.3, TILE_SIZE * 0.2);
-          ctx.lineTo(TILE_SIZE * 0.7, TILE_SIZE * 0.1);
-          ctx.lineTo(TILE_SIZE * 0.9, TILE_SIZE * 0.5);
-          ctx.lineTo(TILE_SIZE * 0.8, TILE_SIZE * 0.9);
-          ctx.closePath();
-          ctx.fill();
-          ctx.strokeStyle = '#5a5a5a';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-          ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(0, 0, TILE_SIZE, TILE_SIZE);
-          break;
-        }
+
+        this.terrainCache.set(terrain, vc);
+      } else {
+        // Fallback: if sprite isn't available, create a solid-color tile.
+        const fc = document.createElement('canvas');
+        fc.width = TILE_SIZE;
+        fc.height = TILE_SIZE;
+        const fctx = fc.getContext('2d')!;
+        const fallbackColors: Record<TerrainValue, string> = {
+          grass: '#3a7a2a',
+          forest: '#2d5a1e',
+          sand: '#c4a35a',
+          water: '#1a4a7a',
+          rock: '#6a6a6a',
+          dirt: '#8a7a5a',
+        };
+        fctx.fillStyle = fallbackColors[terrain] ?? '#333';
+        fctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+        this.terrainCache.set(terrain, fc);
       }
-
-      this.terrainCache.set(terrain, tileCanvas);
     }
   }
 
@@ -277,7 +255,7 @@ export class Renderer {
     const endTileX = startTileX + Math.ceil(this.canvas.width / (TILE_SIZE * camera.zoom)) + 1;
     const endTileY = startTileY + Math.ceil(this.canvas.height / (TILE_SIZE * camera.zoom)) + 1;
 
-    // Render terrain
+    // Render terrain tiles from sprite cache
     for (let y = Math.max(0, startTileY); y < Math.min(MAP_SIZE, endTileY); y++) {
       for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
         const tile = map[y][x];
@@ -291,7 +269,7 @@ export class Renderer {
       }
     }
 
-    // Render resource deposits
+    // Render resource deposits (sprite-based)
     for (let y = Math.max(0, startTileY); y < Math.min(MAP_SIZE, endTileY); y++) {
       for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
         const tile = map[y][x];
@@ -328,7 +306,7 @@ export class Renderer {
       this.lastTickBuildings.set(key, active);
     }
 
-    // Render buildings
+    // Render buildings (procedural — buildings are milestone 2)
     for (let y = Math.max(0, startTileY); y < Math.min(MAP_SIZE, endTileY); y++) {
       for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
         const tile = map[y][x];
@@ -342,7 +320,7 @@ export class Renderer {
     // the machines they power. Makes the shared-grid concept tangible.
     this.drawPowerLinks(map, startTileX, startTileY, endTileX, endTileY);
 
-    // Render player (hidden on the dev-only isolated asset boards via showPlayer:false)
+    // Render player (sprite-based, hidden on the dev-only isolated asset boards via showPlayer:false)
     if (options.showPlayer !== false) {
       this.drawPlayer(player.x, player.y, facing ?? player.facing);
     }
@@ -350,7 +328,7 @@ export class Renderer {
     // Render particles
     this.drawParticles();
 
-    // Grid lines
+    // Grid lines (subtle)
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
     ctx.lineWidth = 0.5;
     for (let x = Math.max(0, startTileX); x < Math.min(MAP_SIZE, endTileX); x++) {
@@ -368,7 +346,7 @@ export class Renderer {
 
     ctx.restore();
 
-    // UI overlays
+    // UI overlays (unchanged)
     if (selectedTile) {
       ctx.save();
       ctx.translate(camera.x, camera.y);
@@ -553,7 +531,54 @@ export class Renderer {
     this.updateParticles();
   }
 
+  /**
+   * Draw a resource deposit using the corresponding Relay Seven sprite.
+   * Resources are drawn at 32px center on the tile with deterministic depletion scaling.
+   */
   private drawResource(gx: number, gy: number, resource: { type: ResourceTypeValue; amount: number }): void {
+    const { ctx } = this;
+
+    // Map resource type to sprite key
+    const spriteKey = this.getResourceSpriteKey(resource.type);
+    const sprite = this.assetLoader.get(spriteKey);
+
+    if (sprite) {
+      // Draw at 32px center on tile (the deposit sprite is 32x32)
+      // Scale down slightly based on depletion
+      const depletion = Math.max(0.4, resource.amount / 100);
+      const size = Math.floor(32 * (0.6 + 0.4 * depletion));
+      const offset = (TILE_SIZE - size) / 2;
+
+      ctx.drawImage(sprite.canvas,
+        gx * TILE_SIZE + offset,
+        gy * TILE_SIZE + offset,
+        size, size
+      );
+    } else {
+      // Fallback: colored shape (same as before)
+      this.drawResourceFallback(gx, gy, resource);
+    }
+  }
+
+  /**
+   * Get the sprite key for a resource type.
+   */
+  private getResourceSpriteKey(type: ResourceTypeValue): string {
+    const map: Record<ResourceTypeValue, string> = {
+      wood: 'R-res-wood',
+      stone: 'R-res-stone',
+      iron: 'R-res-iron',
+      copper: 'R-res-copper',
+      coal: 'R-res-coal',
+      gold: 'R-res-gold',
+    };
+    return map[type] ?? 'R-res-stone';
+  }
+
+  /**
+   * Fallback resource draw using colored shapes (when sprites aren't available).
+   */
+  private drawResourceFallback(gx: number, gy: number, resource: { type: ResourceTypeValue; amount: number }): void {
     const { ctx } = this;
     const cx = gx * TILE_SIZE + TILE_SIZE / 2;
     const cy = gy * TILE_SIZE + TILE_SIZE / 2;
@@ -1139,7 +1164,37 @@ export class Renderer {
     ctx.restore();
   }
 
+  /**
+   * Draw the player character using Relay Seven directional sprites.
+   *
+   * Three sprites: up (hood back), down (visor forward), side (profile view).
+   * Each is 32x32 native, drawn at 64px (2x) with nearest-neighbor for crisp pixels.
+   */
   private drawPlayer(gx: number, gy: number, facing: DirectionValue): void {
+    const { ctx } = this;
+
+    // Determine sprite key based on facing direction
+    const spriteKey = facing === Dir.Up
+      ? 'R-player-up'
+      : facing === Dir.Down
+        ? 'R-player-down'
+        : 'R-player-side';
+
+    const sprite = this.assetLoader.get(spriteKey);
+
+    if (sprite) {
+      // Draw player sprite centered on tile at 64px (2x the 32px source)
+      ctx.drawImage(sprite.canvas, gx * TILE_SIZE, gy * TILE_SIZE);
+    } else {
+      // Fallback: original procedural player sprite
+      this.drawPlayerFallback(gx, gy, facing);
+    }
+  }
+
+  /**
+   * Fallback player draw using the original procedural sprite.
+   */
+  private drawPlayerFallback(gx: number, gy: number, facing: DirectionValue): void {
     const { ctx } = this;
     const cx = gx * TILE_SIZE + TILE_SIZE / 2;
     const cy = gy * TILE_SIZE + TILE_SIZE / 2;
@@ -1215,6 +1270,7 @@ export class Renderer {
       sand: '#c4a35a',
       water: '#1a4a7a',
       rock: '#6a6a6a',
+      dirt: '#6a5a3a',
     };
 
     for (let y = 0; y < MAP_SIZE; y += 2) {

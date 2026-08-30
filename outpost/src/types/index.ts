@@ -1,10 +1,10 @@
 // ==================== CORE TYPES ====================
 
-export const TILE_SIZE = 48;
+export const TILE_SIZE = 64;
 export const MAP_SIZE = 120;
 
 // Terrain types
-export type Terrain = 'grass' | 'forest' | 'water' | 'rock' | 'sand';
+export type Terrain = 'grass' | 'forest' | 'water' | 'rock' | 'sand' | 'dirt';
 
 export const TerrainMap = {
   grass: 'grass',
@@ -12,6 +12,7 @@ export const TerrainMap = {
   water: 'water',
   rock: 'rock',
   sand: 'sand',
+  dirt: 'dirt',
 } as const;
 
 export type TerrainValue = typeof TerrainMap[keyof typeof TerrainMap];

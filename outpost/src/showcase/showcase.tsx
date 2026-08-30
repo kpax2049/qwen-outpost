@@ -11,11 +11,12 @@
 // components (HUD, BuildMenu, InventoryPanel, HelpPanel, ObjectivesPanel, Tutorial,
 // InspectionPanel) with realistic props and real styling.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Renderer } from '../rendering/Renderer';
 import type { Camera, RenderOptions } from '../rendering/Renderer';
 import { GameEngine } from '../engine/GameEngine';
+import { AssetLoader } from '../rendering/AssetLoader';
 import {
   makeEngine,
   put,
@@ -57,19 +58,48 @@ function WorldCanvas({
   height: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const loaderRef = useRef<AssetLoader | null>(null);
+  const rendererRef = useRef<Renderer | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load assets once per canvas mount
   useEffect(() => {
+    if (loaderRef.current) return; // Already loaded for this canvas
     const canvas = ref.current;
     if (!canvas) return;
     canvas.width = width;
     canvas.height = height;
-    const renderer = new Renderer(canvas);
+
+    const loader = new AssetLoader();
+    loaderRef.current = loader;
+    const spriteKeys = [
+      'R-player-up', 'R-player-down', 'R-player-side',
+      'R-grass', 'R-forest', 'R-sand', 'R-water', 'R-rock',
+      'R-res-wood', 'R-res-stone', 'R-res-iron', 'R-res-copper', 'R-res-coal', 'R-res-gold',
+      'R-b-storage', 'R-b-chest', 'R-b-generator', 'R-b-miner',
+      'R-b-conveyor', 'R-b-smelter', 'R-b-steel', 'R-b-assembler',
+    ];
+    loader.load(spriteKeys).then(() => {
+      rendererRef.current = new Renderer(canvas, loader);
+      setLoaded(true);
+    }).catch(() => {
+      rendererRef.current = new Renderer(canvas, loader);
+      setLoaded(true);
+    });
+  }, [width, height]);
+
+  // Render scene once assets are loaded
+  useEffect(() => {
+    if (!loaded || !rendererRef.current) return;
     const { engine, camera, options } = buildScene();
     const resolved = options ?? showcaseOptions();
-    renderer.render(engine.map, engine.player, camera, resolved);
-    // Deterministic marker for the screenshot script / QA: records whether this
-    // canvas rendered the player (true) or is an isolated asset board (false).
-    canvas.dataset.showPlayer = String(resolved.showPlayer !== false);
-  }, [width, height, buildScene]);
+    rendererRef.current.render(engine.map, engine.player, camera, resolved);
+    const canvas = ref.current;
+    if (canvas) {
+      canvas.dataset.showPlayer = String(resolved.showPlayer !== false);
+    }
+  }, [loaded, buildScene]);
+
   return <canvas ref={ref} style={{ display: 'block', imageRendering: 'pixelated' }} />;
 }
 

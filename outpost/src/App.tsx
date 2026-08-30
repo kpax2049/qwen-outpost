@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { GameEngine } from './engine/GameEngine';
 import { Renderer } from './rendering/Renderer';
 import type { Camera } from './rendering/Renderer';
+import { AssetLoader } from './rendering/AssetLoader';
 import { Dir, BUILDING_COLORS } from './types';
 import type { BuildingTypeValue, PowerSummary, DirectionValue } from './types';
 import { HUD } from './ui/HUD';
@@ -14,7 +15,7 @@ import { InspectionPanel, type InspectionData } from './ui/InspectionPanel';
 import type { TutorialStep } from './ui/Tutorial';
 
 const SAVE_KEY = 'outpost-save';
-const TILE_SIZE = 48;
+const TILE_SIZE = 64;
 /** How far (Chebyshev distance) the player can place a building from their tile. */
 const BUILD_RANGE = 6;
 
@@ -74,7 +75,9 @@ const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine>(new GameEngine(42));
   const rendererRef = useRef<Renderer | null>(null);
+  const assetLoaderRef = useRef<AssetLoader | null>(null);
   const tickAccumulatorRef = useRef<number>(0);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
 
   const cameraRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -159,7 +162,32 @@ const App: React.FC = () => {
     setRenderTick(t => t + 1);
   }, []);
 
+  // Load relay-seven sprite assets before creating the renderer.
   useEffect(() => {
+    const loader = new AssetLoader();
+    assetLoaderRef.current = loader;
+
+    // Collect all R-*.png keys from the public assets directory.
+    const spriteKeys = [
+      'R-player-up', 'R-player-down', 'R-player-side',
+      'R-grass', 'R-forest', 'R-sand', 'R-water', 'R-rock',
+      'R-res-wood', 'R-res-stone', 'R-res-iron', 'R-res-copper', 'R-res-coal', 'R-res-gold',
+      'R-b-storage', 'R-b-chest', 'R-b-generator', 'R-b-miner',
+      'R-b-conveyor', 'R-b-smelter', 'R-b-steel', 'R-b-assembler',
+    ];
+
+    loader.load(spriteKeys).then(() => {
+      setAssetsLoaded(true);
+    }).catch(err => {
+      console.warn('Asset loading failed (proceeding with fallbacks):', err);
+      setAssetsLoaded(true);
+    });
+  }, []);
+
+  // Initialize renderer once assets are loaded.
+  useEffect(() => {
+    if (!assetsLoaded) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -176,7 +204,7 @@ const App: React.FC = () => {
     resize();
     window.addEventListener('resize', resize);
 
-    rendererRef.current = new Renderer(canvas);
+    rendererRef.current = new Renderer(canvas, assetLoaderRef.current!);
 
     (window as unknown as { __outpost?: unknown }).__outpost = {
       get engine() { return engineRef.current; },
