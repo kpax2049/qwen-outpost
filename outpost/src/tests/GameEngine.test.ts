@@ -1144,3 +1144,705 @@ function makeBelt(direction: DirectionValue): Building {
     progress: 0, maxProgress: 12, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
   };
 }
+
+// ==================== ENGINE PHASE B: CONVEYOR DATA MODEL TESTS ====================
+
+describe('Engine - computeIncomingSide', () => {
+  it('returns undefined when no belt feeds the tile', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.computeIncomingSide(60, 60)).toBeUndefined();
+  });
+
+  it('returns Dir.Up (North) when belt above points Down', () => {
+    // Belt at (x=60, y=59) = north of (60,60), dir=Down → feeds from North
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[59][60].terrain = 'grass';
+    engine.map[59][60].building = makeBelt(Dir.Down);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Up);
+  });
+
+  it('returns Dir.Right (East) when belt to the right points Left', () => {
+    // Belt at (x=61, y=60) = east of (60,60), dir=Left → feeds from East
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][61].terrain = 'grass';
+    engine.map[60][61].building = makeBelt(Dir.Left);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Right);
+  });
+
+  it('returns Dir.Down (South) when belt below points Up', () => {
+    // Belt at (x=60, y=61) = south of (60,60), dir=Up → feeds from South
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[61][60].terrain = 'grass';
+    engine.map[61][60].building = makeBelt(Dir.Up);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Down);
+  });
+
+  it('returns Dir.Left (West) when belt to the left points Right', () => {
+    // Belt at (x=59, y=60) = west of (60,60), dir=Right → feeds from West
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][59].terrain = 'grass';
+    engine.map[60][59].building = makeBelt(Dir.Right);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Left);
+  });
+
+  it('applies North priority when multiple belts feed the same tile', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    // Multiple belts pointing into (60,60)
+    setG(60, 59); setG(61, 60); setG(60, 61); setG(59, 60);
+    // North side (x=60, y=59): dir=Down → feeds from North
+    engine.map[59][60].building = makeBelt(Dir.Down);
+    // East side (x=61, y=60): dir=Left → feeds from East
+    engine.map[60][61].building = makeBelt(Dir.Left);
+    // South side (x=60, y=61): dir=Up → feeds from South
+    engine.map[61][60].building = makeBelt(Dir.Up);
+    // West side (x=59, y=60): dir=Right → feeds from West
+    engine.map[60][59].building = makeBelt(Dir.Right);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    // Priority: North > East > South > West
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Up);
+  });
+
+  it('does NOT treat a non-feeding adjacent belt as incoming', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[61][60].terrain = 'grass';
+    engine.map[61][60].building = makeBelt(Dir.Down); // does NOT point into (60,60)
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.computeIncomingSide(60, 60)).toBeUndefined();
+  });
+});
+
+describe('Engine - getBeltFlow', () => {
+  it('returns output=direction and incomingSide=computed', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    // Belt at (x=59, y=60) = West side of (60,60), dir=Right → feeds from West
+    engine.map[60][59].terrain = 'grass';
+    engine.map[60][59].building = makeBelt(Dir.Right);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Up);
+    const flow = engine.getBeltFlow(60, 60);
+    expect(flow).not.toBeNull();
+    if (flow) {
+      expect(flow.output).toBe(Dir.Up);
+      expect(flow.incomingSide).toBe(Dir.Left); // belt from left (West) feeds in
+    }
+  });
+
+  it('returns null for non-conveyor tiles', () => {
+    const engine = new GameEngine(42);
+    expect(engine.getBeltFlow(0, 0)).toBeNull();
+  });
+
+  it('returns null for out-of-bounds', () => {
+    const engine = new GameEngine(42);
+    expect(engine.getBeltFlow(-1, -1)).toBeNull();
+  });
+});
+
+describe('Engine - geometry derivation (all 16 combinations)', () => {
+  // §4.1 — Every (direction, incomingSide) combination maps to a valid geometry.
+  // Straight: incomingSide === undefined OR incomingSide === opposite(direction)
+  // Elbow: incomingSide is perpendicular to direction.
+
+  function isStraight(dir: DirectionValue, incoming?: DirectionValue): boolean {
+    return incoming === undefined || incoming === ((dir + 2) % 4) as DirectionValue;
+  }
+
+  function isElbow(dir: DirectionValue, incoming?: DirectionValue): boolean {
+    if (incoming === undefined) return false;
+    const diff = Math.abs((dir - incoming + 4) % 4);
+    return diff === 1 || diff === 3; // perpendicular = odd difference
+  }
+
+  // Straight combinations
+  it('Up + undefined = straight', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].building = makeBelt(Dir.Up);
+    expect(isStraight(Dir.Up, engine.computeIncomingSide(60, 60))).toBe(true);
+  });
+
+  it('Up + South = straight (entry from opposite)', () => {
+    // Belt at (x=60, y=61) = south, dir=Up → feeds from South → opposite of Up
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[61][60].terrain = 'grass';
+    engine.map[61][60].building = makeBelt(Dir.Up);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Up);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Down);
+    expect(isStraight(Dir.Up, Dir.Down)).toBe(true);
+  });
+
+  it('Right + undefined = straight', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].building = makeBelt(Dir.Right);
+    expect(isStraight(Dir.Right, engine.computeIncomingSide(60, 60))).toBe(true);
+  });
+
+  it('Right + West = straight (entry from opposite)', () => {
+    // Belt at (x=59, y=60) = west, dir=Right → feeds from West → opposite of Right
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][59].terrain = 'grass';
+    engine.map[60][59].building = makeBelt(Dir.Right);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Right);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Left);
+    expect(isStraight(Dir.Right, Dir.Left)).toBe(true);
+  });
+
+  it('Down + undefined = straight', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(isStraight(Dir.Down, engine.computeIncomingSide(60, 60))).toBe(true);
+  });
+
+  it('Down + North = straight (entry from opposite)', () => {
+    // Belt at (x=60, y=59) = north, dir=Down → feeds from North → opposite of Down
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[59][60].terrain = 'grass';
+    engine.map[59][60].building = makeBelt(Dir.Down);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Up);
+    expect(isStraight(Dir.Down, Dir.Up)).toBe(true);
+  });
+
+  it('Left + undefined = straight', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].building = makeBelt(Dir.Left);
+    expect(isStraight(Dir.Left, engine.computeIncomingSide(60, 60))).toBe(true);
+  });
+
+  it('Left + East = straight (entry from opposite)', () => {
+    // Belt at (x=61, y=60) = east, dir=Left → feeds from East → opposite of Left
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][61].terrain = 'grass';
+    engine.map[60][61].building = makeBelt(Dir.Left);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Left);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Right);
+    expect(isStraight(Dir.Left, Dir.Right)).toBe(true);
+  });
+
+  // Elbow combinations
+  // Elbow combinations: input belt on a perpendicular side, pointing INTO (60,60)
+  it('Up + East = elbow', () => {
+    // Belt at (61,60) [y=60, x=61] dir=Left → outputs to (60,60) from East side
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][61].terrain = 'grass';
+    engine.map[60][61].building = makeBelt(Dir.Left);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Up);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Right);
+    expect(isElbow(Dir.Up, Dir.Right)).toBe(true);
+  });
+
+  it('Up + West = elbow', () => {
+    // Belt at (59,60) [y=60, x=59] dir=Right → outputs to (60,60) from West side
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][59].terrain = 'grass';
+    engine.map[60][59].building = makeBelt(Dir.Right);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Up);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Left);
+    expect(isElbow(Dir.Up, Dir.Left)).toBe(true);
+  });
+
+  it('Right + North = elbow', () => {
+    // Belt at (60,59) [y=59, x=60] dir=Down → outputs to (60,60) from North side
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[59][60].terrain = 'grass';
+    engine.map[59][60].building = makeBelt(Dir.Down);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Right);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Up);
+    expect(isElbow(Dir.Right, Dir.Up)).toBe(true);
+  });
+
+  it('Right + South = elbow', () => {
+    // Belt at (60,61) [y=61, x=60] dir=Up → outputs to (60,60) from South side
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[61][60].terrain = 'grass';
+    engine.map[61][60].building = makeBelt(Dir.Up);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Right);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Down);
+    expect(isElbow(Dir.Right, Dir.Down)).toBe(true);
+  });
+
+  it('Down + East = elbow', () => {
+    // Belt at (61,60) [y=60, x=61] dir=Left → outputs to (60,60) from East side
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][61].terrain = 'grass';
+    engine.map[60][61].building = makeBelt(Dir.Left);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Right);
+    expect(isElbow(Dir.Down, Dir.Right)).toBe(true);
+  });
+
+  it('Down + West = elbow', () => {
+    // Belt at (59,60) [y=60, x=59] dir=Right → outputs to (60,60) from West side
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][59].terrain = 'grass';
+    engine.map[60][59].building = makeBelt(Dir.Right);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Left);
+    expect(isElbow(Dir.Down, Dir.Left)).toBe(true);
+  });
+
+  it('Left + North = elbow', () => {
+    // Belt at (60,59) [y=59, x=60] dir=Down → outputs to (60,60) from North side
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[59][60].terrain = 'grass';
+    engine.map[59][60].building = makeBelt(Dir.Down);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Left);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Up);
+    expect(isElbow(Dir.Left, Dir.Up)).toBe(true);
+  });
+
+  it('Left + South = elbow', () => {
+    // Belt at (60,61) [y=61, x=60] dir=Up → outputs to (60,60) from South side
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[61][60].terrain = 'grass';
+    engine.map[61][60].building = makeBelt(Dir.Up);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Left);
+    expect(engine.computeIncomingSide(60, 60)).toBe(Dir.Down);
+    expect(isElbow(Dir.Left, Dir.Down)).toBe(true);
+  });
+});
+
+describe('Engine - item transfer through all 8 elbow flows', () => {
+  // §14.4 — All eight directed elbow transfers.
+  // Belt A outputs to belt B's tile. B's direction is perpendicular to A's.
+
+  function placeElbowTransfer(
+    ax: number, ay: number, ad: DirectionValue,
+    bx: number, by: number, bd: DirectionValue,
+  ) {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[ay][ax].terrain = 'grass';
+    engine.map[ay][ax].building = makeBelt(ad);
+    engine.map[by][bx].terrain = 'grass';
+    engine.map[by][bx].building = makeBelt(bd);
+    engine.map[ay][ax]!.building!.inventory = [{ type: 'stone', amount: 1 }];
+    return engine;
+  }
+
+  it('Up→Right: A at (60,61) dir=Up feeds B at (60,60) dir=Right', () => {
+    // A: x=60,y=61 dir=Up → DELTA[Up]=(0,-1) → output (60,60)=B
+    const engine = placeElbowTransfer(60, 61, Dir.Up, 60, 60, Dir.Right);
+    for (let i = 0; i < 25; i++) engine.tick();
+    expect(engine.map[60][60]!.building!.inventory[0]?.type).toBe('stone');
+  });
+
+  it('Right→Up: A at (59,60) dir=Right feeds B at (60,60) dir=Up', () => {
+    // A: x=59,y=60 dir=Right → DELTA[Right]=(1,0) → output (60,60)=B
+    const engine = placeElbowTransfer(59, 60, Dir.Right, 60, 60, Dir.Up);
+    for (let i = 0; i < 25; i++) engine.tick();
+    expect(engine.map[60][60]!.building!.inventory[0]?.type).toBe('stone');
+  });
+
+  it('Right→Down: A at (59,60) dir=Right feeds B at (60,60) dir=Down', () => {
+    // A: x=59,y=60 dir=Right → output (60,60)=B
+    const engine = placeElbowTransfer(59, 60, Dir.Right, 60, 60, Dir.Down);
+    for (let i = 0; i < 25; i++) engine.tick();
+    expect(engine.map[60][60]!.building!.inventory[0]?.type).toBe('stone');
+  });
+
+  it('Down→Right: A at (60,59) dir=Down feeds B at (60,60) dir=Right', () => {
+    // A: x=60,y=59 dir=Down → DELTA[Down]=(0,1) → output (60,60)=B
+    const engine = placeElbowTransfer(60, 59, Dir.Down, 60, 60, Dir.Right);
+    for (let i = 0; i < 25; i++) engine.tick();
+    expect(engine.map[60][60]!.building!.inventory[0]?.type).toBe('stone');
+  });
+
+  it('Down→Left: A at (60,60) dir=Down feeds B at (60,61) dir=Left', () => {
+    // A: x=60,y=60 dir=Down → output (60,61)=B
+    const engine = placeElbowTransfer(60, 60, Dir.Down, 60, 61, Dir.Left);
+    for (let i = 0; i < 25; i++) engine.tick();
+    // B is at x=60, y=61 → engine.map[61][60]
+    expect(engine.map[61][60]!.building!.inventory[0]?.type).toBe('stone');
+  });
+
+  it('Left→Down: A at (61,60) dir=Left feeds B at (60,60) dir=Down', () => {
+    // A: x=61,y=60 dir=Left → DELTA[Left]=(-1,0) → output (60,60)=B
+    const engine = placeElbowTransfer(61, 60, Dir.Left, 60, 60, Dir.Down);
+    for (let i = 0; i < 25; i++) engine.tick();
+    expect(engine.map[60][60]!.building!.inventory[0]?.type).toBe('stone');
+  });
+
+  it('Left→Up: A at (61,60) dir=Left feeds B at (60,60) dir=Up', () => {
+    // A: x=61,y=60 dir=Left → output (60,60)=B
+    const engine = placeElbowTransfer(61, 60, Dir.Left, 60, 60, Dir.Up);
+    for (let i = 0; i < 25; i++) engine.tick();
+    expect(engine.map[60][60]!.building!.inventory[0]?.type).toBe('stone');
+  });
+
+  it('Up→Left: A at (60,61) dir=Up feeds B at (60,60) dir=Left', () => {
+    // A: x=60,y=61 dir=Up → output (60,60)=B
+    const engine = placeElbowTransfer(60, 61, Dir.Up, 60, 60, Dir.Left);
+    for (let i = 0; i < 25; i++) engine.tick();
+    expect(engine.map[60][60]!.building!.inventory[0]?.type).toBe('stone');
+  });
+});
+
+describe('Engine - blocked state propagation through a chain', () => {
+  it('third belt full blocks second belt which blocks first belt', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    setG(60, 61); setG(60, 62); setG(60, 63);
+
+    // Belt chain: (60,60)→(60,61)→(60,62), all pointing Down
+    // Belt 2 points to (60,63) which is empty terrain (no building) → belt 2 can't transfer
+    // This means belt 2 stays full, blocking belt 1, which blocks belt 0
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    engine.map[60][61].building = makeBelt(Dir.Down);
+    engine.map[60][62].building = makeBelt(Dir.Down);
+    // (60,63) is just grass - no building to accept items
+    // Belt 2's output goes to (60,63) which has no building → transfer fails
+
+    // Fill all belts
+    engine.map[60][62]!.building!.inventory = [{ type: 'stone', amount: 1 }];
+    engine.map[60][61]!.building!.inventory = [{ type: 'stone', amount: 1 }];
+    engine.map[60][60]!.building!.inventory = [{ type: 'stone', amount: 1 }];
+
+    for (let i = 0; i < 50; i++) engine.tick();
+
+    // Belt 0 should be blocked because belt 1 can't accept (belt 2 can't transfer to empty tile)
+    expect(engine.map[60][60]!.building!.blocked).toBe(true);
+    // Belt 1 should be blocked because belt 2 is full and can't transfer
+    expect(engine.map[60][61]!.building!.blocked).toBe(true);
+    // Belt 2 is full, its output goes to empty tile so it can't transfer → blocked
+    expect(engine.map[60][62]!.building!.blocked).toBe(true);
+    // Items should still be on all belts (not transferred)
+    expect(engine.map[60][60]!.building!.inventory[0]?.amount).toBe(1);
+    expect(engine.map[60][61]!.building!.inventory[0]?.amount).toBe(1);
+    expect(engine.map[60][62]!.building!.inventory[0]?.amount).toBe(1);
+  });
+});
+
+describe('Engine - adjacent but not connected belts', () => {
+  it('two vertically adjacent belts both pointing Right are not connected', () => {
+    // Belt A at (x=60, y=60) dir=Right → outputs to (61,60)
+    // Belt B at (x=60, y=61) dir=Right → outputs to (61,61)
+    // A is adjacent to B's south side, but A does NOT feed into B
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Right);
+    engine.map[61][60].terrain = 'grass';
+    engine.map[61][60].building = makeBelt(Dir.Right);
+
+    // Belt B's incoming: check all sides at (x=60, y=61)
+    // North side (60,60): belt dir=Right, opposite(Up)=Down, Right≠Down → no feed
+    // South side: nothing
+    // East side: nothing
+    // West side: nothing
+    expect(engine.computeIncomingSide(60, 61)).toBeUndefined();
+
+    // Belt A's outgoing should NOT be blocked by B
+    const outA = engine.getConnections(60, 60);
+    expect(outA).not.toBeNull();
+    if (outA) {
+      // A's output goes to (61,60) which is empty → 'none'
+      expect(outA.outgoing.kind).toBe('none');
+    }
+  });
+
+  it('head-on belts are mutually blocked', () => {
+    // Belt A at (60,60) dir=Right → outputs to (61,60)
+    // Belt B at (61,60) dir=Left → outputs to (60,60)
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Right);
+    engine.map[61][60].terrain = 'grass';
+    engine.map[61][60].building = makeBelt(Dir.Left);
+
+    engine.map[60][60]!.building!.inventory = [{ type: 'stone', amount: 1 }];
+    engine.map[61][60]!.building!.inventory = [{ type: 'coal', amount: 1 }];
+
+    for (let i = 0; i < 40; i++) engine.tick();
+
+    expect(engine.map[60][60]!.building!.blocked).toBe(true);
+    expect(engine.map[61][60]!.building!.blocked).toBe(true);
+    // Items should not have moved
+    expect(engine.map[60][60]!.building!.inventory[0]?.amount).toBe(1);
+    expect(engine.map[61][60]!.building!.inventory[0]?.amount).toBe(1);
+  });
+});
+
+describe('Engine - drag route direction assignment', () => {
+  // §7.2 — placeBuildingAt currently uses player._buildDirection.
+  // All placed conveyors get the active build direction.
+
+  it('L-shaped route: all tiles get the build direction', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.setBuildDirection(Dir.Right);
+
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    setG(60, 60); setG(61, 60); setG(61, 59);
+
+    // All conveyors get the build direction (Right)
+    engine.placeBuildingAt('conveyor', 60, 60);
+    expect(engine.map[60][60]!.building!.direction).toBe(Dir.Right);
+
+    engine.placeBuildingAt('conveyor', 61, 60);
+    expect(engine.map[60][61]!.building!.direction).toBe(Dir.Right);
+
+    engine.placeBuildingAt('conveyor', 61, 59);
+    expect(engine.map[59][61]!.building!.direction).toBe(Dir.Right);
+  });
+
+  it('zigzag route: all tiles get the build direction', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.setBuildDirection(Dir.Down);
+
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    setG(60, 60); setG(61, 60); setG(61, 61); setG(62, 61); setG(62, 62);
+
+    engine.placeBuildingAt('conveyor', 60, 60);
+    expect(engine.map[60][60]!.building!.direction).toBe(Dir.Down);
+
+    engine.placeBuildingAt('conveyor', 61, 60);
+    expect(engine.map[60][61]!.building!.direction).toBe(Dir.Down);
+
+    engine.placeBuildingAt('conveyor', 61, 61);
+    expect(engine.map[61][61]!.building!.direction).toBe(Dir.Down);
+
+    engine.placeBuildingAt('conveyor', 62, 61);
+    expect(engine.map[61][62]!.building!.direction).toBe(Dir.Down);
+
+    engine.placeBuildingAt('conveyor', 62, 62);
+    expect(engine.map[62][62]!.building!.direction).toBe(Dir.Down);
+  });
+});
+
+describe('Engine - remote rotation (rotateBuildingAt)', () => {
+  it('rotates a conveyor at arbitrary coordinates', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[65][65].terrain = 'grass';
+    engine.map[65][65].building = makeBelt(Dir.Right);
+    engine.player.x = 60; engine.player.y = 60; // not on the belt
+
+    engine.rotateBuildingAt(65, 65);
+    expect(engine.map[65][65]!.building!.direction).toBe(Dir.Down);
+
+    engine.rotateBuildingAt(65, 65);
+    expect(engine.map[65][65]!.building!.direction).toBe(Dir.Left);
+
+    engine.rotateBuildingAt(65, 65);
+    expect(engine.map[65][65]!.building!.direction).toBe(Dir.Up);
+
+    engine.rotateBuildingAt(65, 65);
+    expect(engine.map[65][65]!.building!.direction).toBe(Dir.Right); // full cycle
+  });
+
+  it('rotation changes incomingSide for neighbors', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    // Belt A at (x=60, y=60) dir=Right, Belt B at (x=61, y=60) dir=Left
+    setG(60, 60); setG(61, 60);
+    engine.map[60][60].building = makeBelt(Dir.Right);
+    engine.map[60][61].building = makeBelt(Dir.Left);
+
+    // B's incoming: A at (60,60) dir=Right feeds from West (A outputs to (61,60)=B's tile)
+    expect(engine.computeIncomingSide(61, 60)).toBe(Dir.Left);
+
+    // Rotate B: Left(3) → Right(1) via cycle Left→Up→Right
+    engine.rotateBuildingAt(61, 60);
+    expect(engine.map[60][61]!.building!.direction).toBe(Dir.Up); // (3+1)%4 = 0 = Up
+    engine.rotateBuildingAt(61, 60);
+    expect(engine.map[60][61]!.building!.direction).toBe(Dir.Right); // (0+1)%4 = 1 = Right
+
+    // Now B's incoming: A at (60,60) dir=Right, B at (61,60) dir=Right
+    // A feeds into B from West, and both have same direction → straight
+    expect(engine.computeIncomingSide(61, 60)).toBe(Dir.Left);
+  });
+
+  it('out-of-bounds rotation is a no-op', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Right);
+    engine.rotateBuildingAt(-1, 0);
+    engine.rotateBuildingAt(120, 0);
+    engine.rotateBuildingAt(0, -1);
+    expect(engine.map[60][60]!.building!.direction).toBe(Dir.Right);
+  });
+
+  it('rotation on non-conveyor is a no-op', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('storage');
+    engine.rotateBuildingAt(60, 60);
+    // Storage has no direction field (or it's the default)
+    expect(engine.getTile(60, 60)?.building?.type).toBe('storage');
+  });
+});
+
+describe('Engine - save/load direction preservation', () => {
+  it('save and load preserves conveyor direction', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    setG(60, 60); setG(61, 60); setG(60, 61);
+
+    engine.map[60][60].building = makeBelt(Dir.Right);
+    engine.map[61][60].building = makeBelt(Dir.Down);
+    engine.map[60][61].building = makeBelt(Dir.Up);
+
+    engine.map[60][60]!.building!.inventory = [{ type: 'stone', amount: 1 }];
+
+    const saved = engine.save();
+
+    const engine2 = new GameEngine(999);
+    engine2.load(saved);
+
+    expect(engine2.map[60][60]!.building!.direction).toBe(Dir.Right);
+    expect(engine2.map[61][60]!.building!.direction).toBe(Dir.Down);
+    expect(engine2.map[60][61]!.building!.direction).toBe(Dir.Up);
+    expect(engine2.map[60][60]!.building!.inventory[0]?.amount).toBe(1);
+
+    // incomingSide should be recomputed correctly after load
+    expect(engine2.computeIncomingSide(61, 60)).toBe(Dir.Left); // from belt at (60,60)
+  });
+
+  it('save/load round trip with item positions', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    engine.map[60][60]!.building!.inventory = [{ type: 'coal', amount: 1 }];
+    engine.map[60][60]!.building!.progress = 7;
+
+    const saved = engine.save();
+    const engine2 = new GameEngine(0);
+    engine2.load(saved);
+
+    expect(engine2.map[60][60]!.building!.progress).toBe(7);
+    expect(engine2.map[60][60]!.building!.inventory[0]?.type).toBe('coal');
+  });
+});
+
+describe('Engine - inspection direction matches rendering', () => {
+  it('all four cardinal directions have correct directionLabel', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    const dirs: DirectionValue[] = [Dir.Up, Dir.Right, Dir.Down, Dir.Left];
+    const labels = ['Up', 'Right', 'Down', 'Left'];
+
+    for (let i = 0; i < 4; i++) {
+      const [x, y] = [60 + (i % 2), 60 + Math.floor(i / 2)];
+      engine.map[y][x].terrain = 'grass';
+      engine.map[y][x].building = makeBelt(dirs[i]);
+      const info = engine.inspectBuilding(x, y);
+      expect(info!.direction).toBe(dirs[i]);
+      expect(info!.directionLabel).toContain(labels[i]);
+    }
+  });
+
+  it('elbow belt inspection shows correct direction and connection', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    // Belt A at (x=59, y=60) dir=Right → outputs to (60,60) = Belt B
+    // Belt B at (x=60, y=60) dir=Down
+    setG(59, 60); setG(60, 60);
+    engine.map[60][59].building = makeBelt(Dir.Right);
+    engine.map[60][60].building = makeBelt(Dir.Down);
+
+    // B's inspection: direction=Down, incoming=turn from Right (West side)
+    const infoB = engine.inspectBuilding(60, 60);
+    expect(infoB!.direction).toBe(Dir.Down);
+    expect(infoB!.connection!.incoming?.kind).toBe('turn');
+    expect(infoB!.connection!.outgoing.kind).toBe('none'); // down is empty
+
+    // A's inspection: direction=Right, incoming=null, outgoing=turn
+    const infoA = engine.inspectBuilding(59, 60);
+    expect(infoA!.direction).toBe(Dir.Right);
+    expect(infoA!.connection!.incoming).toBeNull();
+    expect(infoA!.connection!.outgoing.kind).toBe('turn');
+  });
+});
+
+describe('Engine - zero-power passive operation', () => {
+  it('conveyors are always active regardless of grid power state', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    // No generators — grid power = 0
+
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    engine.map[60][61].terrain = 'grass';
+    engine.map[60][61].building = makeBelt(Dir.Down);
+
+    engine.tick();
+
+    // Both belts should be active
+    expect(engine.map[60][60]!.building!.active).toBe(true);
+    expect(engine.map[60][61]!.building!.active).toBe(true);
+
+    // Power summary: no generators, no consumers (conveyors are passive)
+    const power = engine.getPowerSummary();
+    expect(power.produced).toBe(0);
+    expect(power.consumed).toBe(0);
+  });
+
+  it('conveyor powerConsumed is always 0', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBelt(Dir.Down);
+    expect(engine.map[60][60]!.building!.powerConsumed).toBe(0);
+  });
+});

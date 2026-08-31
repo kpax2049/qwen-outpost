@@ -939,57 +939,101 @@ export class GameEngine {
   }
 
   /**
-   * Connection info for what feeds into this conveyor:
-   *  - a belt behind pointing the same way (straight through)
-   *  - a belt on the left/right pointing into this tile (turn / elbow)
-   *  - a machine anywhere adjacent that can push items in
+   * §3.2 — Compute the incoming side for a conveyor at (x, y).
+   *
+   * Scans the four cardinal neighbor tiles. A neighbor at side D feeds this
+   * tile when the neighbor is a conveyor whose direction points INTO (x, y).
+   *
+   * Priority (tiebreaker for display only): North > East > South > West
+   * (i.e. scan order).
+   *
+   * Returns the DirectionValue of the side from which the first valid
+   * incoming belt enters, or undefined when no belt feeds this tile.
    */
-  private getInConnection(x: number, y: number, b: Building): ConveyorConnection | null {
-    const dir = b.direction;
-    const back = oppositeDirection(dir);
-    const bx = x + DELTA[back].x;
-    const by = y + DELTA[back].y;
-
-    // Same-direction belt directly behind (straight feed)
-    if (bx >= 0 && bx < MAP_SIZE && by >= 0 && by < MAP_SIZE) {
-      const tile = this._state.save.map[by][bx];
+  computeIncomingSide(x: number, y: number): DirectionValue | undefined {
+    const scanOrder: DirectionValue[] = [Dir.Up, Dir.Right, Dir.Down, Dir.Left];
+    for (const D of scanOrder) {
+      const nx = x + DELTA[D].x;
+      const ny = y + DELTA[D].y;
+      if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
+      const tile = this._state.save.map[ny][nx];
       if (tile.building?.type === BuildingTypeMap.conveyor) {
-        const bd = tile.building.direction;
-        if (bd === dir) return { kind: 'straight', label: 'Straight feed from behind' };
-        if (bd === back) return { kind: 'headon', label: 'Belt behind points at this belt' };
-      }
-    }
-
-    // A perpendicular belt to the left/right whose forward tile is this one = elbow entry
-    for (const side of [Dir.Left, Dir.Right]) {
-      const sx = x + DELTA[side].x;
-      const sy = y + DELTA[side].y;
-      if (sx < 0 || sx >= MAP_SIZE || sy < 0 || sy >= MAP_SIZE) continue;
-      const tile = this._state.save.map[sy][sx];
-      if (tile.building?.type !== BuildingTypeMap.conveyor) continue;
-      const sd = tile.building.direction;
-      const fx = sx + DELTA[sd].x;
-      const fy = sy + DELTA[sd].y;
-      if (fx === x && fy === y) {
-        return { kind: 'turn', label: `Enters via a turn from ${DIR_NAMES[sd].toLowerCase()}`, toDir: sd };
-      }
-    }
-
-    // Any adjacent machine can feed into this belt
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
-        const tile = this._state.save.map[ny][nx];
-        if (tile.building && tile.building.type !== BuildingTypeMap.conveyor) {
-          return { kind: 'machine', label: `Feeds from nearby ${BUILDING_NAMES[tile.building.type] ?? 'building'}`, machineType: tile.building.type };
+        // Neighbor points INTO this tile when its direction equals opposite(D)
+        if (tile.building.direction === oppositeDirection(D)) {
+          return D;
         }
       }
     }
+    return undefined;
+  }
+
+  /**
+   * §2.3 — Flow for a belt tile (internal, not persisted).
+   *
+   * Returns { output, incomingSide } where output is the belt's
+   * authoritative direction and incomingSide is derived from neighbor
+   * topology (§3.2).
+   */
+  getBeltFlow(x: number, y: number): { output: DirectionValue; incomingSide?: DirectionValue } | null {
+    const tile = this._state.save.map[y]?.[x];
+    if (!tile?.building || tile.building.type !== BuildingTypeMap.conveyor) return null;
+    return {
+      output: tile.building.direction,
+      incomingSide: this.computeIncomingSide(x, y),
+    };
+  }
+
+  /**
+   * Connection info for what feeds into this conveyor:
+   *   - a belt from a perpendicular neighbor pointing into this tile (turn / elbow)
+   *   - a belt from the opposite side pointing the same way (straight feed)
+   *
+   * Uses directional connectivity (§3.1): a neighbor feeds this tile iff
+   * neighbor.direction === opposite(D) where D is the side direction
+   * from this tile toward the neighbor.
+   */
+  private getInConnection(x: number, y: number, b: Building): ConveyorConnection | null {
+    // §3.2 — Scan all four cardinal sides for belts whose direction points INTO this tile.
+    // Priority: North > East > South > West (scan order).
+    const scanOrder: DirectionValue[] = [Dir.Up, Dir.Right, Dir.Down, Dir.Left];
+    for (const side of scanOrder) {
+      const nx = x + DELTA[side].x;
+      const ny = y + DELTA[side].y;
+      if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
+      const tile = this._state.save.map[ny][nx];
+      if (tile.building?.type !== BuildingTypeMap.conveyor) continue;
+      const nd = tile.building.direction;
+      // Neighbor feeds this tile when its direction points into (x, y).
+      if (nd !== oppositeDirection(side)) continue;
+
+      // Determine geometry relationship.
+      if (nd === b.direction) {
+        // Same direction — straight feed through (entry from opposite side).
+        return { kind: 'straight', label: 'Straight feed from behind' };
+      }
+
+      // Perpendicular — elbow entry.
+      return {
+        kind: 'turn',
+        label: `Enters via a turn from ${DIR_NAMES[nd].toLowerCase()}`,
+        toDir: nd,
+      };
+    }
 
     return null;
+  }
+
+  /**
+   * §8.4 — Rotate a conveyor at an arbitrary tile (remote rotation).
+   *
+   * Called from the InspectionPanel's rotate button. Does not require
+   * the player to be standing on the tile.
+   */
+  rotateBuildingAt(x: number, y: number): void {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return;
+    const tile = this._state.save.map[y][x];
+    if (!tile.building || tile.building.type !== BuildingTypeMap.conveyor) return;
+    tile.building.direction = ((tile.building.direction + 1) % 4) as DirectionValue;
   }
 
   /**
