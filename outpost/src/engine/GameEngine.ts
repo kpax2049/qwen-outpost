@@ -1129,6 +1129,31 @@ export class GameEngine {
     }
   }
 
+  /**
+   * Compute the output direction for each cell in a drag route path.
+   *
+   * Mirrors the direction assignment logic in the App layer:
+   *   - If there is a next cell, the direction is along the path to that cell.
+   *   - Otherwise (last cell), the build direction is used.
+   *
+   * @param path - Ordered list of tiles forming the route.
+   * @param lastDir - Build direction used when no next cell exists (last cell).
+   * @returns Array of directions, one per cell. Same length as path.
+   */
+  static computeRouteDirections(path: { x: number; y: number }[], lastDir: DirectionValue): DirectionValue[] {
+    const dirs: DirectionValue[] = [];
+    for (let i = 0; i < path.length; i++) {
+      const cell = path[i];
+      const next = path[i + 1];
+      const dir: DirectionValue =
+        next && next.x !== cell.x ? (next.x > cell.x ? Dir.Right : Dir.Left)
+        : next ? (next.y > cell.y ? Dir.Down : Dir.Up)
+        : lastDir;
+      dirs.push(dir);
+    }
+    return dirs;
+  }
+
   getConnections(x: number, y: number): { incoming: ConveyorConnection | null; outgoing: ConveyorConnection } | null {
     const tile = this._state.save.map[y]?.[x];
     if (!tile?.building || tile.building.type !== BuildingTypeMap.conveyor) return null;

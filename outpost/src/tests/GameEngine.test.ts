@@ -1636,6 +1636,130 @@ describe('Engine - drag route direction assignment', () => {
     expect(engine.map[59][61]!.building!.direction).toBe(Dir.Right);
   });
 
+  it('Route directions computed by path geometry, not build direction', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    // Simulate the path that buildOrthoPath produces for an L-shaped drag:
+    // start at (60,60), drag to (61,59)
+    // With |dx| >= |dy|, walks horizontal first then vertical:
+    //   [ {x:60,y:60}, {x:61,y:60}, {x:61,y:59} ]
+    const path = [
+      { x: 60, y: 60 },
+      { x: 61, y: 60 },
+      { x: 61, y: 59 },
+    ] as { x: number; y: number }[];
+
+    // Directions: each cell points toward the next cell; last cell falls back to build direction.
+    // Cell 0 → Cell 1: delta x = 1, delta y = 0 → Right
+    // Cell 1 → Cell 2: delta x = 0, delta y = -1 → Up
+    // Cell 2: no next → build direction (Right)
+    const dirs = GameEngine.computeRouteDirections(path, Dir.Right);
+    expect(dirs).toEqual([Dir.Right, Dir.Up, Dir.Right]);
+
+    // Now place conveyors with these directions (simulating handleMouseUp behavior)
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    setG(60, 60); setG(61, 60); setG(61, 59);
+
+    for (let i = 0; i < path.length; i++) {
+      engine.setBuildDirection(dirs[i]);
+      engine.placeBuildingAt('conveyor', path[i].x, path[i].y);
+    }
+
+    // Cell 0 (60,60): Right — outputs toward cell 1
+    expect(engine.map[60][60]!.building!.direction).toBe(Dir.Right);
+    // Cell 1 (61,60): Up — outputs toward cell 2 (turns at the corner)
+    expect(engine.map[60][61]!.building!.direction).toBe(Dir.Up);
+    // Cell 2 (61,59): Right — last cell, falls back to build direction
+    expect(engine.map[59][61]!.building!.direction).toBe(Dir.Right);
+  });
+
+  it('Zigzag route: directions follow path geometry through multiple turns', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    // Simulate a zigzag path: (60,60) -> (62,60) -> (62,62)
+    // Horizontal then vertical segment
+    const path = [
+      { x: 60, y: 60 },
+      { x: 61, y: 60 },
+      { x: 62, y: 60 },
+      { x: 62, y: 61 },
+      { x: 62, y: 62 },
+    ] as { x: number; y: number }[];
+
+    // Directions: Right, Right, Down, Down, build (Right)
+    const dirs = GameEngine.computeRouteDirections(path, Dir.Right);
+    expect(dirs).toEqual([Dir.Right, Dir.Right, Dir.Down, Dir.Down, Dir.Right]);
+  });
+
+  it('Vertical-dominant path: walks vertical first when |dy| > |dx|', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    // Simulate a path where vertical dominates:
+    // start at (60,60), target at (61,58)
+    // |dx|=1, |dy|=2, so |dy| > |dx| — walks vertical first
+    // Path: [ {x:60,y:60}, {x:60,y:59}, {x:60,y:58}, {x:61,y:58} ]
+    const path = [
+      { x: 60, y: 60 },
+      { x: 60, y: 59 },
+      { x: 60, y: 58 },
+      { x: 61, y: 58 },
+    ] as { x: number; y: number }[];
+
+    // Directions: Up, Up, Right, build (Right)
+    const dirs = GameEngine.computeRouteDirections(path, Dir.Right);
+    expect(dirs).toEqual([Dir.Up, Dir.Up, Dir.Right, Dir.Right]);
+  });
+
+  it('Single cell route: direction is the build direction', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    const path = [{ x: 60, y: 60 }];
+    const dirs = GameEngine.computeRouteDirections(path, Dir.Down);
+    expect(dirs).toEqual([Dir.Down]);
+  });
+
+  it('Straight horizontal route: all cells get Right', () => {
+    const path = [
+      { x: 60, y: 60 },
+      { x: 61, y: 60 },
+      { x: 62, y: 60 },
+      { x: 63, y: 60 },
+    ] as { x: number; y: number }[];
+
+    // Directions: Right, Right, Right, build (Right)
+    const dirs = GameEngine.computeRouteDirections(path, Dir.Right);
+    expect(dirs).toEqual([Dir.Right, Dir.Right, Dir.Right, Dir.Right]);
+  });
+
+  it('Straight vertical route: all cells get Down except last which falls back', () => {
+    const path = [
+      { x: 60, y: 60 },
+      { x: 60, y: 61 },
+      { x: 60, y: 62 },
+    ] as { x: number; y: number }[];
+
+    // Directions: Down, Down, build (Right — fallback since no next cell)
+    const dirs = GameEngine.computeRouteDirections(path, Dir.Right);
+    expect(dirs).toEqual([Dir.Down, Dir.Down, Dir.Right]);
+  });
+
+  it('Reverse direction route: Left and Down directions', () => {
+    const path = [
+      { x: 63, y: 60 },
+      { x: 62, y: 60 },
+      { x: 61, y: 60 },
+      { x: 61, y: 61 },
+    ] as { x: number; y: number }[];
+
+    // Directions: Left, Left, Down, build (Right — fallback)
+    const dirs = GameEngine.computeRouteDirections(path, Dir.Right);
+    expect(dirs).toEqual([Dir.Left, Dir.Left, Dir.Down, Dir.Right]);
+  });
+
   it('zigzag route: all tiles get the build direction', () => {
     const engine = new GameEngine(42);
     fundPlayer(engine);
@@ -1802,16 +1926,18 @@ describe('Engine - inspection direction matches rendering', () => {
     engine.map[60][60].building = makeBelt(Dir.Down);
 
     // B's inspection: direction=Down, incoming=turn from Right (West side)
-    const infoB = engine.inspectBuilding(60, 60);
-    expect(infoB!.direction).toBe(Dir.Down);
-    expect(infoB!.connection!.incoming?.kind).toBe('turn');
-    expect(infoB!.connection!.outgoing.kind).toBe('none'); // down is empty
+    const infoB = engine.inspectBuilding(60, 60)!;
+    expect(infoB.direction).toBe(Dir.Down);
+    const connB = infoB.connection as NonNullable<typeof infoB.connection>;
+    expect(connB.incoming?.kind).toBe('turn');
+    expect(connB.outgoing?.kind).toBe('none'); // down is empty
 
     // A's inspection: direction=Right, incoming=null, outgoing=turn
-    const infoA = engine.inspectBuilding(59, 60);
-    expect(infoA!.direction).toBe(Dir.Right);
-    expect(infoA!.connection!.incoming).toBeNull();
-    expect(infoA!.connection!.outgoing.kind).toBe('turn');
+    const infoA = engine.inspectBuilding(59, 60)!;
+    expect(infoA.direction).toBe(Dir.Right);
+    const connA = infoA.connection as NonNullable<typeof infoA.connection>;
+    expect(connA.incoming).toBeNull();
+    expect(connA.outgoing?.kind).toBe('turn');
   });
 });
 

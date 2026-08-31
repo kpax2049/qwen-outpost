@@ -152,7 +152,7 @@ Geometry is a pure function of `(direction, incomingSide)`:
 | Up        | West        | Elbow NW | Entry from West, output North |
 | Right     | undefined   | Straight (horizontal) | Output Right, no entry |
 | Right     | Left        | Straight (horizontal) | Entry from Left, output Right |
-| Right     | Up          | Elbow NE | Entry from North, output East |
+| Right     | Up          | Elbow SE | Entry from North, output East |
 | Right     | Down        | Elbow SE | Entry from South, output East |
 | Down      | undefined   | Straight (vertical) | Output Down, no entry |
 | Down      | North       | Straight (vertical) | Entry from North, output South |
@@ -175,10 +175,10 @@ Every ordered pair of perpendicular directions produces one of four physical cor
 | Flow (from → to) | Corner | Entry Side |
 |------------------|--------|------------|
 | Up → Right       | NE     | South belt enters from its South side |
-| Right → Up       | NE     | West belt enters from its West side |
-| Right → Down     | SE     | North belt enters from its North side |
-| Down → Right     | SE     | West belt enters from its West side |
-| Down → Left      | SW     | North belt enters from its North side |
+| Right → Up       | SE     | West belt enters from its West side |
+| Right → Down     | NE     | North belt enters from its North side |
+| Down → Right     | NE     | West belt enters from its West side |
+| Down → Left      | NW     | North belt enters from its North side |
 | Left → Down      | SW     | East belt enters from its East side |
 | Left → Up        | NW     | South belt enters from its South side |
 | Up → Left        | NW     | East belt enters from its East side |
@@ -186,18 +186,20 @@ Every ordered pair of perpendicular directions produces one of four physical cor
 **Proof of unambiguous representation:**
 
 For the flow Up → Right:
-- The "Up" belt at (x, y-1) has direction = Up, outputting into (x, y).
-- The "Right" belt at (x, y) has direction = Right, incomingSide = South (the belt from above).
-- Geometry: Elbow SE (entry from South, output East).
+- The "Right" belt at (x, y-1) has direction = Right, outputting into (x+1, y-1).
+- The "Up" belt at (x, y) has direction = Up, outputting into (x, y-1).
+- The "Right" belt at (x, y-1) has incomingSide = South (the belt from below at (x, y)).
+- Geometry: Elbow NE (entry from South, output East).
 - Sprite: `R-belt-elbow` rotated so the path curves from bottom (South) to right (East).
 
 For the flow Right → Up:
 - The "Right" belt at (x-1, y) has direction = Right, outputting into (x, y).
-- The "Up" belt at (x, y) has direction = Up, incomingSide = West (the belt from the left).
-- Geometry: Elbow NE (entry from West, output North).
+- The "Up" belt at (x, y) has direction = Up, outputting into (x, y-1).
+- The "Up" belt at (x, y) has incomingSide = West (the belt from the left at (x-1, y)).
+- Geometry: Elbow NW (entry from West, output North).
 - Sprite: `R-belt-elbow` rotated so the path curves from left (West) to top (North).
 
-Both use the same physical corner tile (NE corner), but:
+Both use different physical corner tiles (NE vs NW), but:
 - The *entry side* differs (South vs. West), which changes the sprite rotation.
 - The *output direction* differs (Right vs. Up), which changes the simulation flow.
 - Each belt's `direction` field is different (Right vs. Up), so inspection is unambiguous.
