@@ -3,7 +3,7 @@ import { GameEngine } from './engine/GameEngine';
 import { Renderer } from './rendering/Renderer';
 import type { Camera } from './rendering/Renderer';
 import { AssetLoader } from './rendering/AssetLoader';
-import { Dir, BUILDING_COLORS } from './types';
+import { BUILDING_COLORS } from './types';
 import type { BuildingTypeValue, PowerSummary, DirectionValue } from './types';
 import { HUD } from './ui/HUD';
 import { BuildMenu } from './ui/BuildMenu';
@@ -570,17 +570,11 @@ const App: React.FC = () => {
       buildDragPathRef.current = [];
       if (buildTypeRef.current === 'conveyor' && path.length > 0) {
         const engine = engineRef.current;
-        for (let i = 0; i < path.length; i++) {
-          const cell = path[i];
-          // Orient each belt toward the next tile in the route (corners included).
-          const next = path[i + 1];
-          const dir: DirectionValue =
-            next && next.x !== cell.x ? (next.x > cell.x ? Dir.Right : Dir.Left)
-            : next ? (next.y > cell.y ? Dir.Down : Dir.Up)
-            : engine.getBuildDirection();
+        const dirs = GameEngine.computeRouteDirections(path, engine.getBuildDirection());
+        dirs.forEach((dir, i) => {
           engine.setBuildDirection(dir);
-          engine.placeBuildingAt('conveyor', cell.x, cell.y);
-        }
+          engine.placeBuildingAt('conveyor', path[i].x, path[i].y);
+        });
         setRenderTick(t => t + 1);
       }
     }
