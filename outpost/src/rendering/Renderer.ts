@@ -938,6 +938,80 @@ export class Renderer {
 
   // ======================== Conveyor / Belt Rendering ========================
 
+  /** Geometry derived from (direction, incomingSide). */
+  private getGeometry(dir: DirectionValue, incomingSide?: DirectionValue): 'straight' | 'elbow' {
+    if (incomingSide === undefined) return 'straight';
+    const opp = ((incomingSide + 2) % 4) as DirectionValue;
+    if (dir === opp) return 'straight';
+    return 'elbow';
+  }
+
+  /**
+   * Elbow rotation angle: rotates the base elbow sprite so the curve
+   * points from entry toward output.  Uses the angle-difference formula
+   * from CONVEYOR_DESIGN.md §5.3.
+   */
+  private elbowRotation(dir: DirectionValue, incomingSide: DirectionValue): number {
+    // Entry vector angle (from tile center toward entry side)
+    const entryAngles: Record<DirectionValue, number> = {
+      [Dir.Up]: -Math.PI / 2,
+      [Dir.Right]: 0,
+      [Dir.Down]: Math.PI / 2,
+      [Dir.Left]: Math.PI,
+    };
+    // Output vector angle
+    const outAngles: Record<DirectionValue, number> = {
+      [Dir.Up]: -Math.PI / 2,
+      [Dir.Right]: 0,
+      [Dir.Down]: Math.PI / 2,
+      [Dir.Left]: Math.PI,
+    };
+    return outAngles[dir] - entryAngles[incomingSide];
+  }
+
+  /**
+   * Elbow path point at parameter t ∈ [0,1].
+   * t=0 → entry side midpoint, t=1 → output side midpoint.
+   * Dots travel along the arc from entry to output.
+   */
+  private getElbowPoint(gx: number, gy: number, dir: DirectionValue, incomingSide: DirectionValue, t: number): { x: number; y: number } {
+    const bx = gx * TILE_SIZE;
+    const by = gy * TILE_SIZE;
+    const cx = bx + TILE_SIZE / 2;
+    const cy = by + TILE_SIZE / 2;
+    const inset = 6;
+
+    // Determine entry and output angles in canvas coordinates
+    const entryAngles: Record<DirectionValue, number> = {
+      [Dir.Up]: -Math.PI / 2,
+      [Dir.Right]: 0,
+      [Dir.Down]: Math.PI / 2,
+      [Dir.Left]: Math.PI,
+    };
+    const outputAngles: Record<DirectionValue, number> = {
+      [Dir.Up]: -Math.PI / 2,
+      [Dir.Right]: 0,
+      [Dir.Down]: Math.PI / 2,
+      [Dir.Left]: Math.PI,
+    };
+
+    const entryAngle = entryAngles[incomingSide];
+    const outputAngle = outputAngles[dir];
+
+    // Determine shortest arc direction (CW or CCW)
+    let delta = outputAngle - entryAngle;
+    if (delta > Math.PI) delta -= 2 * Math.PI;
+    if (delta < -Math.PI) delta += 2 * Math.PI;
+
+    const angle = entryAngle + delta * t;
+    const radius = TILE_SIZE / 2 - inset;
+
+    return {
+      x: cx + Math.cos(angle) * radius,
+      y: cy + Math.sin(angle) * radius,
+    };
+  }
+
   private drawConveyor(gx: number, gy: number, building: Building, map: Tile[][]): void {
     const { ctx } = this;
     const dir = building.direction;
@@ -947,6 +1021,11 @@ export class Renderer {
       this.conveyorAnims.set(key, { offset: 0 });
     }
     const anim = this.conveyorAnims.get(key)!;
+
+    // Compute geometry from engine flow state
+    const incomingSide = this.computeIncomingSideFromMap(gx, gy, map);
+    const geometry = this.getGeometry(dir, incomingSide);
+
     const moving = building.active && !building.blocked;
     if (moving) {
       anim.offset = (anim.offset + 1) % 12;
@@ -956,26 +1035,60 @@ export class Renderer {
     const bx = gx * TILE_SIZE;
     const by = gy * TILE_SIZE;
 
-    // Get belt sprite based on direction
-    const beltSpriteKey = this.getBeltSpriteKey(dir);
-    const cachedKey = `${beltSpriteKey}_${dir}`;
-
-    if (!this.beltSpriteCache.has(cachedKey)) {
-      this.beltSpriteCache.set(cachedKey, this.rotateBeltSprite(beltSpriteKey, dir));
-    }
-    const beltCanvas = this.beltSpriteCache.get(cachedKey);
-
     // Dark base underneath
     ctx.fillStyle = '#2a2a30';
     ctx.fillRect(bx + 2, by + 2, TILE_SIZE - 4, TILE_SIZE - 4);
 
-    if (beltCanvas) {
-      // Draw the belt sprite
-      ctx.drawImage(beltCanvas, bx, by);
+    // Sprite selection based on geometry
+    if (geometry === 'straight') {
+      // Use direction-specific sprite (already faces output direction)
+      const beltSpriteKey = this.getBeltSpriteKey(dir);
+      const cachedKey = `straight_${dir}`;
+
+      if (!this.beltSpriteCache.has(cachedKey)) {
+        const sprite = this.assetLoader.get(beltSpriteKey);
+        if (sprite) {
+          // Pre-scaled canvas at TILE_SIZE with nearest-neighbor
+          const c = document.createElement('canvas');
+          c.width = TILE_SIZE;
+          c.height = TILE_SIZE;
+          const sctx = c.getContext('2d')!;
+          sctx.imageSmoothingEnabled = false;
+          sctx.drawImage(sprite.canvas, 0, 0, TILE_SIZE, TILE_SIZE);
+          this.beltSpriteCache.set(cachedKey, c);
+        } else {
+          this.beltSpriteCache.set(cachedKey, this.createBeltErrorMarker('missing belt sprite'));
+        }
+      }
+      const beltCanvas = this.beltSpriteCache.get(cachedKey);
+      if (beltCanvas) {
+        ctx.drawImage(beltCanvas, bx, by);
+      }
     } else {
-      // Fallback: procedural belt
-      ctx.fillStyle = '#3a3a42';
-      ctx.fillRect(bx + 5, by + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+      // Elbow: rotate base R-belt-elbow sprite
+      const cachedKey = `elbow_${dir}_${incomingSide}`;
+
+      if (!this.beltSpriteCache.has(cachedKey)) {
+        const sprite = this.assetLoader.get('R-belt-elbow');
+        if (sprite) {
+          const c = document.createElement('canvas');
+          c.width = TILE_SIZE;
+          c.height = TILE_SIZE;
+          const sctx = c.getContext('2d')!;
+          sctx.imageSmoothingEnabled = false;
+          const angle = this.elbowRotation(dir, incomingSide!);
+          sctx.translate(TILE_SIZE / 2, TILE_SIZE / 2);
+          sctx.rotate(angle);
+          sctx.drawImage(sprite.canvas, -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
+          this.beltSpriteCache.set(cachedKey, c);
+        } else {
+          this.beltSpriteCache.set(cachedKey, this.createBeltErrorMarker('missing elbow sprite'));
+        }
+      }
+      const beltCanvas = this.beltSpriteCache.get(cachedKey);
+      if (beltCanvas) {
+        ctx.drawImage(beltCanvas, bx, by);
+      }
     }
 
     // Draw connected belt edges (seamless chains)
@@ -983,7 +1096,7 @@ export class Renderer {
 
     // Subtle belt tread animation (restrained, industrial)
     if (moving) {
-      this.drawBeltTread(gx, gy, dir, phase);
+      this.drawBeltTread(gx, gy, dir, phase, geometry, incomingSide);
     }
 
     // Blocked state (red gate + overlay)
@@ -1017,7 +1130,24 @@ export class Renderer {
     }
 
     // Belt item (sprite-based)
-    this.drawBeltItem(building, dir, map);
+    this.drawBeltItem(gx, gy, building, dir, geometry, incomingSide);
+  }
+
+  /** Compute incomingSide by scanning neighbors in the map (CONVEYOR_DESIGN.md §3.2). */
+  private computeIncomingSideFromMap(gx: number, gy: number, map: Tile[][]): DirectionValue | undefined {
+    const scanOrder: DirectionValue[] = [Dir.Up, Dir.Right, Dir.Down, Dir.Left];
+    for (const side of scanOrder) {
+      const nx = gx + directionVector(side).x;
+      const ny = gy + directionVector(side).y;
+      if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
+      const neighbor = map[ny][nx];
+      if (neighbor.building?.type !== 'conveyor') continue;
+      const nd = neighbor.building.direction;
+      // Neighbor feeds this tile when its direction points into (gx, gy).
+      if (nd !== ((side + 2) % 4) as DirectionValue) continue;
+      return side;
+    }
+    return undefined;
   }
 
   /** Draw seamless connections between adjacent belts. */
@@ -1027,7 +1157,6 @@ export class Renderer {
     const bx = gx * TILE_SIZE;
     const by = gy * TILE_SIZE;
 
-    // On each side, if there's no adjacent belt, draw a dark gap to show the open end
     for (const side of [Dir.Up, Dir.Right, Dir.Down, Dir.Left] as DirectionValue[]) {
       const nx = gx + directionVector(side).x;
       const ny = gy + directionVector(side).y;
@@ -1045,104 +1174,39 @@ export class Renderer {
     }
   }
 
-  /** Rotate a belt sprite for the given direction. */
-  private rotateBeltSprite(beltSpriteKey: string, dir: DirectionValue): HTMLCanvasElement {
-    const sprite = this.assetLoader.get(beltSpriteKey);
-    if (!sprite) {
-      // Fallback: create a simple belt sprite
-      return this.createBeltSpriteFallback(dir);
-    }
-
+  /** Create an error marker canvas when a belt sprite is missing. */
+  private createBeltErrorMarker(reason: string): HTMLCanvasElement {
     const c = document.createElement('canvas');
     c.width = TILE_SIZE;
     c.height = TILE_SIZE;
     const ctx = c.getContext('2d')!;
-    ctx.imageSmoothingEnabled = false;
-
-    ctx.translate(TILE_SIZE / 2, TILE_SIZE / 2);
-
-    // Rotation angles for each direction (from the base "right" sprite)
-    let angle = 0;
-    switch (dir) {
-      case Dir.Right: angle = 0; break;
-      case Dir.Up: angle = -Math.PI / 2; break;
-      case Dir.Down: angle = Math.PI; break;
-      case Dir.Left: angle = Math.PI / 2; break;
-    }
-
-    ctx.rotate(angle);
-    ctx.drawImage(sprite.canvas, -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
-
-    return c;
-  }
-
-  /** Create a fallback belt sprite procedurally. */
-  private createBeltSpriteFallback(dir: DirectionValue): HTMLCanvasElement {
-    const c = document.createElement('canvas');
-    c.width = TILE_SIZE;
-    c.height = TILE_SIZE;
-    const ctx = c.getContext('2d')!;
-
-    ctx.fillStyle = '#3a3a42';
-    ctx.fillRect(4, 4, TILE_SIZE - 8, TILE_SIZE - 8);
-
-    // Belt tread lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 1;
-    const isHorizontal = dir === Dir.Right || dir === Dir.Left;
-    for (let i = 0; i < 6; i++) {
-      if (isHorizontal) {
-        const y = 8 + i * 7;
-        ctx.beginPath();
-        ctx.moveTo(6, y);
-        ctx.lineTo(TILE_SIZE - 6, y);
-        ctx.stroke();
-      } else {
-        const x = 8 + i * 7;
-        ctx.beginPath();
-        ctx.moveTo(x, 6);
-        ctx.lineTo(x, TILE_SIZE - 6);
-        ctx.stroke();
-      }
-    }
-
-    // Direction chevron
-    ctx.fillStyle = 'rgba(235, 235, 235, 0.5)';
-    ctx.save();
-    ctx.translate(TILE_SIZE / 2, TILE_SIZE / 2);
-    let angle = 0;
-    switch (dir) {
-      case Dir.Right: angle = 0; break;
-      case Dir.Up: angle = -Math.PI / 2; break;
-      case Dir.Down: angle = Math.PI; break;
-      case Dir.Left: angle = Math.PI / 2; break;
-    }
-    ctx.rotate(angle);
-    ctx.beginPath();
-    ctx.moveTo(8, 0);
-    ctx.lineTo(-4, -5);
-    ctx.lineTo(-4, 5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
+    ctx.fillStyle = '#3a2020';
+    ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    ctx.strokeStyle = '#ff4444';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    console.error(`[Renderer] Belt sprite error: ${reason}`);
     return c;
   }
 
   /**
-   * Subtle belt tread animation: a thin semi-transparent dot that moves along the
-   * belt direction, indicating flow without obscuring the sprite artwork.
+   * Subtle belt tread animation: thin semi-transparent dots moving along the belt flow.
+   * For straight belts: linear motion. For elbow belts: curved arc from entry to output.
    */
-  private drawBeltTread(gx: number, gy: number, dir: DirectionValue, phase: number): void {
+  private drawBeltTread(gx: number, gy: number, dir: DirectionValue, phase: number, geometry: 'straight' | 'elbow', incomingSide?: DirectionValue): void {
     const { ctx } = this;
 
     for (let i = 0; i < 3; i++) {
       let t = (i + phase) / 3;
       if (t > 1) t -= 1;
 
-      const pos = this.getBeltPoint(gx, gy, dir, t);
+      let pos: { x: number; y: number };
+      if (geometry === 'elbow' && incomingSide) {
+        pos = this.getElbowPoint(gx, gy, dir, incomingSide, t);
+      } else {
+        pos = this.getBeltPoint(gx, gy, dir, t);
+      }
 
-      // Thin tread dot (industrial style)
       ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, 1.5, 0, Math.PI * 2);
@@ -1193,7 +1257,7 @@ export class Renderer {
 
   // ======================== Belt Item Rendering ========================
 
-  private drawBeltItem(building: Building, dir: DirectionValue, _map: Tile[][]): void {
+  private drawBeltItem(gx: number, gy: number, building: Building, dir: DirectionValue, geometry: 'straight' | 'elbow', incomingSide?: DirectionValue): void {
     const { ctx } = this;
 
     // Find the first item type on this belt
@@ -1202,26 +1266,19 @@ export class Renderer {
 
     // Position along belt based on progress
     const t = building.blocked ? 0.95 : Math.min(0.92, building.maxProgress > 0 ? building.progress / building.maxProgress : 0.5);
-    const pos = this.getBeltPoint(0, 0, dir, t);
+    let pos: { x: number; y: number };
+    if (geometry === 'elbow' && incomingSide) {
+      pos = this.getElbowPoint(gx, gy, dir, incomingSide, t);
+    } else {
+      pos = this.getBeltPoint(gx, gy, dir, t);
+    }
 
     // Get item sprite
     const itemSpriteKey = this.getItemSpriteKey(invItem.type as ItemType);
     const itemSprite = itemSpriteKey ? this.assetLoader.get(itemSpriteKey) : null;
 
-    // Use world-space position relative to the building tile
-    const worldX = dir === Dir.Right
-      ? pos.x
-      : dir === Dir.Left
-        ? pos.x
-        : 0;
-    const worldY = dir === Dir.Down
-      ? pos.y
-      : dir === Dir.Up
-        ? pos.y
-        : 0;
-
-    const spriteX = worldX + (dir === Dir.Right || dir === Dir.Left ? 0 : TILE_SIZE / 2);
-    const spriteY = worldY + (dir === Dir.Up || dir === Dir.Down ? 0 : TILE_SIZE / 2);
+    const spriteX = pos.x;
+    const spriteY = pos.y;
 
     if (itemSprite) {
       // Draw item sprite with shadow

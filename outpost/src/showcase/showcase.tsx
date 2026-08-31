@@ -243,9 +243,9 @@ function buildGameplayBase() {
   // Miner on a coal deposit -> belts -> storage (a small automated chain)
   setResource(e, 54, 54, 'coal', 150);
   put(e, 54, 54, makeBuilding('miner', { active: true, powerConsumed: 5, direction: Dir.Down, maxProgress: 30, progress: 9, inventory: [{ type: 'coal', amount: 2 }] }));
-  put(e, 54, 55, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Down, maxProgress: 12, progress: 4, inventory: [{ type: 'coal', amount: 1 }] }));
-  put(e, 54, 56, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Down, maxProgress: 12, progress: 8, inventory: [{ type: 'coal', amount: 1 }] }));
-  put(e, 54, 57, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Down, maxProgress: 12, progress: 1, inventory: [{ type: 'coal', amount: 1 }] }));
+  put(e, 54, 55, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 4, inventory: [{ type: 'coal', amount: 1 }] }));
+  put(e, 54, 56, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 8, inventory: [{ type: 'coal', amount: 1 }] }));
+  put(e, 54, 57, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 1, inventory: [{ type: 'coal', amount: 1 }] }));
   put(e, 54, 58, makeBuilding('storage', { active: true, maxInventory: 100, inventory: [{ type: 'coal', amount: 7 }, { type: 'stone', amount: 12 }] }));
 
   // Two fueled generators (power the whole base; links drawn to consumers)
@@ -262,8 +262,8 @@ function buildGameplayBase() {
   put(e, 66, 58, makeBuilding('chest', { active: true, maxInventory: 20, inventory: [{ type: 'copper', amount: 8 }] }));
 
   // A second belt run to give the scene more conveyor variety
-  put(e, 57, 58, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 5, inventory: [{ type: 'iron_ingot', amount: 1 }] }));
-  put(e, 58, 58, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 10, inventory: [{ type: 'iron_ingot', amount: 1 }] }));
+  put(e, 57, 58, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 5, inventory: [{ type: 'iron_ingot', amount: 1 }] }));
+  put(e, 58, 58, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 10, inventory: [{ type: 'iron_ingot', amount: 1 }] }));
 
   const origin = { x: 50, y: 50 };
   const { camera, width, height } = frameBoard(origin, 12, 18, 0.95, 20);
@@ -362,19 +362,19 @@ const MACHINE_STATES: { caption: string; build: (e: GameEngine) => void }[] = [
   },
   {
     caption: `Conveyor — Transporting (item moving)`,
-    build: (e) => put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'iron_ingot', amount: 1 }] })),
+    build: (e) => put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'iron_ingot', amount: 1 }] })),
   },
   {
     caption: `Conveyor — Idle (waiting for item)`,
-    build: (e) => put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 0, inventory: [] })),
+    build: (e) => put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 0, inventory: [] })),
   },
   {
     caption: `Conveyor — Blocked (jam / red gate)`,
-    build: (e) => put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 12, inventory: [{ type: 'stone', amount: 1 }], blocked: true })),
+    build: (e) => put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 12, inventory: [{ type: 'stone', amount: 1 }], blocked: true })),
   },
   {
     caption: `Conveyor — No Power`,
-    build: (e) => put(e, 60, 60, makeBuilding('conveyor', { active: false, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 0, inventory: [{ type: 'stone', amount: 1 }] })),
+    build: (e) => put(e, 60, 60, makeBuilding('conveyor', { active: false, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 0, inventory: [{ type: 'stone', amount: 1 }] })),
   },
   {
     caption: `Storage — Filled (count bubble)`,
@@ -762,7 +762,7 @@ function Showcase() {
             caption="Horizontal straight run → (5 belts, items flowing right)"
             setup={(e) => {
               for (let i = 0; i < 5; i++) {
-                put(e, 40 + i, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: i === 0 ? 6 : 2, inventory: i === 0 ? [{ type: 'coal', amount: 1 }] : [] }));
+                put(e, 40 + i, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: i === 0 ? 6 : 2, inventory: i === 0 ? [{ type: 'coal', amount: 1 }] : [] }));
               }
             }}
           />
@@ -773,7 +773,7 @@ function Showcase() {
             caption="Vertical straight run ↓ (4 belts)"
             setup={(e) => {
               for (let i = 0; i < 4; i++) {
-                put(e, 60, 40 + i, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Down, maxProgress: 12, progress: i === 1 ? 7 : 1, inventory: i === 1 ? [{ type: 'iron_ingot', amount: 1 }] : [] }));
+                put(e, 60, 40 + i, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: i === 1 ? 7 : 1, inventory: i === 1 ? [{ type: 'iron_ingot', amount: 1 }] : [] }));
               }
             }}
           />
@@ -787,8 +787,8 @@ function Showcase() {
             origin={{ x: 44, y: 60 }}
             caption="Right → Down corner"
             setup={(e) => {
-              put(e, 44, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 3, inventory: [{ type: 'stone', amount: 1 }] }));
-              put(e, 45, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Down, maxProgress: 12, progress: 8 }));
+              put(e, 44, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 3, inventory: [{ type: 'stone', amount: 1 }] }));
+              put(e, 45, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 8 }));
             }}
           />
           <TileBoard
@@ -797,8 +797,8 @@ function Showcase() {
             origin={{ x: 48, y: 52 }}
             caption="Down → Right corner"
             setup={(e) => {
-              put(e, 48, 52, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Down, maxProgress: 12, progress: 8 }));
-              put(e, 48, 53, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 3, inventory: [{ type: 'copper_wire', amount: 1 }] }));
+              put(e, 48, 52, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 8 }));
+              put(e, 48, 53, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 3, inventory: [{ type: 'copper_wire', amount: 1 }] }));
             }}
           />
           <TileBoard
@@ -807,8 +807,8 @@ function Showcase() {
             origin={{ x: 52, y: 62 }}
             caption="Right → Up corner"
             setup={(e) => {
-              put(e, 52, 62, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 3 }));
-              put(e, 53, 62, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Up, maxProgress: 12, progress: 8, inventory: [{ type: 'gear', amount: 1 }] }));
+              put(e, 52, 62, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 3 }));
+              put(e, 53, 62, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Up, maxProgress: 12, progress: 8, inventory: [{ type: 'gear', amount: 1 }] }));
             }}
           />
         </div>
@@ -820,8 +820,8 @@ function Showcase() {
           origin={{ x: 42, y: 46 }}
           caption="Connected L/zigzag route — belts chain together, corners auto-orient"
           setup={(e) => {
-            for (let i = 0; i < 4; i++) put(e, 44, 46 + i, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Down, maxProgress: 12, progress: (i * 3) % 10 }));
-            for (let i = 0; i < 4; i++) put(e, 44 + i, 49, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: (i + 1) * 2 }));
+            for (let i = 0; i < 4; i++) put(e, 44, 46 + i, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: (i * 3) % 10 }));
+            for (let i = 0; i < 4; i++) put(e, 44 + i, 49, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: (i + 1) * 2 }));
           }}
         />
 
@@ -833,7 +833,7 @@ function Showcase() {
             origin={{ x: 56, y: 52 }}
             zoom={2.2}
             caption="Moving item mid-belt (iron ingot travelling)"
-            setup={(e) => put(e, 56, 52, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Down, maxProgress: 12, progress: 6, inventory: [{ type: 'iron_ingot', amount: 1 }] }))}
+            setup={(e) => put(e, 56, 52, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 6, inventory: [{ type: 'iron_ingot', amount: 1 }] }))}
           />
           <TileBoard
             rows={1}
@@ -842,8 +842,8 @@ function Showcase() {
             zoom={1.8}
             caption="Head-on conflict — belts face each other → both block (red gate)"
             setup={(e) => {
-              put(e, 58, 52, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 12, inventory: [{ type: 'stone', amount: 1 }], blocked: true }));
-              put(e, 59, 52, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Left, maxProgress: 12, progress: 12, inventory: [{ type: 'coal', amount: 1 }], blocked: true }));
+              put(e, 58, 52, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 12, inventory: [{ type: 'stone', amount: 1 }], blocked: true }));
+              put(e, 59, 52, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Left, maxProgress: 12, progress: 12, inventory: [{ type: 'coal', amount: 1 }], blocked: true }));
             }}
           />
           <TileBoard
@@ -852,7 +852,7 @@ function Showcase() {
             origin={{ x: 62, y: 52 }}
             zoom={2.2}
             caption="Blocked open-end belt (jam at belt end — red gate)"
-            setup={(e) => put(e, 62, 52, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Down, maxProgress: 12, progress: 12, inventory: [{ type: 'stone', amount: 1 }], blocked: true }))}
+            setup={(e) => put(e, 62, 52, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Down, maxProgress: 12, progress: 12, inventory: [{ type: 'stone', amount: 1 }], blocked: true }))}
           />
         </div>
 
@@ -916,7 +916,7 @@ function Showcase() {
             origin={{ x: 56, y: 60 }}
             zoom={2.5}
             caption="Coal on belt (R-item-coal sprite, 16×16 → 32px)"
-            setup={(e) => put(e, 56, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'coal', amount: 1 }] }))}
+            setup={(e) => put(e, 56, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'coal', amount: 1 }] }))}
           />
           <TileBoard
             rows={1}
@@ -924,7 +924,7 @@ function Showcase() {
             origin={{ x: 60, y: 60 }}
             zoom={2.5}
             caption="Iron Ingot on belt (R-item-ingot sprite, 16×16 → 32px)"
-            setup={(e) => put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'iron_ingot', amount: 1 }] }))}
+            setup={(e) => put(e, 60, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'iron_ingot', amount: 1 }] }))}
           />
           <TileBoard
             rows={1}
@@ -932,7 +932,7 @@ function Showcase() {
             origin={{ x: 64, y: 60 }}
             zoom={2.5}
             caption="Copper Wire on belt (R-item-wire sprite, 16×16 → 32px)"
-            setup={(e) => put(e, 64, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'copper_wire', amount: 1 }] }))}
+            setup={(e) => put(e, 64, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'copper_wire', amount: 1 }] }))}
           />
           <TileBoard
             rows={1}
@@ -940,7 +940,7 @@ function Showcase() {
             origin={{ x: 68, y: 60 }}
             zoom={2.5}
             caption="Circuit Board on belt (R-item-circuit sprite, 16×16 → 32px)"
-            setup={(e) => put(e, 68, 60, makeBuilding('conveyor', { active: true, powerConsumed: 1, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'circuit', amount: 1 }] }))}
+            setup={(e) => put(e, 68, 60, makeBuilding('conveyor', { active: true, powerConsumed: 0, direction: Dir.Right, maxProgress: 12, progress: 6, inventory: [{ type: 'circuit', amount: 1 }] }))}
           />
         </div>
       </Section>
