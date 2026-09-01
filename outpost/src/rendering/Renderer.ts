@@ -948,54 +948,70 @@ export class Renderer {
 
   // ======================== Conveyor / Belt Rendering ========================
 
-  /** Geometry derived from (direction, incomingSide). */
+  /**
+   * Geometry derived from (direction, incomingSide).
+   *
+   * A belt keeps straight art whenever it is NOT turning: when it has no
+   * incoming feed, when it is fed along its own axis (straight-through from
+   * the opposite side), or when a neighbor on the EXIT side points back at it
+   * head-on (incomingSide === dir — rotating a neighbour must never flip this
+   * belt, since the belt's own stored output direction is unchanged). Only a
+   * perpendicular incoming feed turns the belt into an elbow.
+   */
   private getGeometry(dir: DirectionValue, incomingSide?: DirectionValue): 'straight' | 'elbow' {
     if (incomingSide === undefined) return 'straight';
+    if (dir === incomingSide) return 'straight';
     const opp = ((incomingSide + 2) % 4) as DirectionValue;
     if (dir === opp) return 'straight';
     return 'elbow';
   }
 
   /**
-   * Elbow orientation (rotation + optional mirror).
+   * Pre-rendered canvas for a 90° elbow tile.
    *
-   * The base `R-belt-elbow.png` sprite at 0° shows a belt turning from the
-   * East edge to the South edge (a clockwise quarter turn in canvas coords).
-   * For a target elbow (incomingSide → output):
-   *   - rotate the sprite so its entry rail sits on the incoming edge;
-   *   - when the output is reached by a counter-clockwise turn (shortest-arc
-   *     delta is negative), mirror across the incoming edge's axis so the
-   *     band bulges the other way.
-   * This is the single mapping shared by the belt artwork, its flow direction,
-   * and the transported-item path (getElbowPoint uses the same shortest arc).
+   * The elbow is composed from the STRAIGHT belt sprites so it mates
+   * seamlessly into the adjacent straight belts: every shared tile edge gets
+   * the exact same band thickness, edge alignment and scrolling-chevron phase
+   * as the belt that feeds it and the belt it feeds into.
+   *   - the ENTRY arm is the straight belt carrying flow INTO the tile along
+   *     the incoming edge (full length);
+   *   - the EXIT arm is the straight belt for the output direction, drawn from
+   *     the tile centre out to the output edge.
+   * Both arms keep their flow-true amber chevrons, giving a continuous flow
+   * marking around the whole turn.
    */
-  private elbowRotation(dir: DirectionValue, incomingSide: DirectionValue): { angle: number; flipH: boolean; flipV: boolean } {
-    // Angle to rotate the base sprite so its entry (East) rail lands on the
-    // incoming edge. Positive = clockwise in canvas coordinates.
-    const rotateToIncoming: Record<DirectionValue, number> = {
-      [Dir.Up]: -Math.PI / 2,
-      [Dir.Right]: 0,
-      [Dir.Down]: Math.PI / 2,
-      [Dir.Left]: Math.PI,
-    };
-    const angle = rotateToIncoming[incomingSide];
+  private getElbowCanvas(dir: DirectionValue, incomingSide: DirectionValue): HTMLCanvasElement {
+    const cachedKey = `elbow_${dir}_${incomingSide}`;
+    const cached = this.beltSpriteCache.get(cachedKey);
+    if (cached) return cached;
 
-    // Does the item's arc travel counter-clockwise? (shortest-arc delta)
-    let delta = DIR_ANGLE[dir] - DIR_ANGLE[incomingSide];
-    if (delta > Math.PI) delta -= 2 * Math.PI;
-    if (delta < -Math.PI) delta += 2 * Math.PI;
-    const counterClockwise = delta < 0;
-    if (counterClockwise) {
-      // Mirror keeps the incoming edge fixed while flipping the bulge to the
-      // other side of the turn. Incoming West/East -> vertical mirror;
-      // incoming North/South -> horizontal mirror.
-      return {
-        angle,
-        flipH: incomingSide === Dir.Up || incomingSide === Dir.Down,
-        flipV: incomingSide === Dir.Left || incomingSide === Dir.Right,
-      };
+    const entryDir = ((incomingSide + 2) % 4) as DirectionValue;
+    const entry = this.getStraightBeltCanvas(entryDir);
+    const exit = this.getStraightBeltCanvas(dir);
+
+    if (entry && exit) {
+      const c = document.createElement('canvas');
+      c.width = TILE_SIZE;
+      c.height = TILE_SIZE;
+      const sctx = c.getContext('2d')!;
+      sctx.imageSmoothingEnabled = false;
+      const half = TILE_SIZE / 2;
+
+      // Full-length entry arm along the incoming edge...
+      sctx.drawImage(entry, 0, 0);
+      // ...then the exit arm from the tile centre to the output edge.
+      if (dir === Dir.Right) sctx.drawImage(exit, half, 0, half, TILE_SIZE, half, 0, half, TILE_SIZE);
+      else if (dir === Dir.Left) sctx.drawImage(exit, 0, 0, half, TILE_SIZE, 0, 0, half, TILE_SIZE);
+      else if (dir === Dir.Down) sctx.drawImage(exit, 0, half, TILE_SIZE, half, 0, half, TILE_SIZE, half);
+      else sctx.drawImage(exit, 0, 0, TILE_SIZE, half, 0, 0, TILE_SIZE, half);
+
+      this.beltSpriteCache.set(cachedKey, c);
+      return c;
     }
-    return { angle, flipH: false, flipV: false };
+
+    const marker = this.createBeltErrorMarker('missing belt sprite');
+    this.beltSpriteCache.set(cachedKey, marker);
+    return marker;
   }
 
   /**
@@ -1053,7 +1069,7 @@ export class Renderer {
   /**
    * Elbow path point at parameter t ∈ [0,1].
    * t=0 → entry side midpoint, t=1 → output side midpoint.
-   * The shortest-arc sweep matches the elbow sprite's band from elbowRotation.
+   * The shortest-arc sweep matches the composed elbow arms' edges.
    */
   private getElbowPoint(gx: number, gy: number, dir: DirectionValue, incomingSide: DirectionValue, t: number): { x: number; y: number } {
     const bx = gx * TILE_SIZE;
@@ -1110,31 +1126,9 @@ export class Renderer {
     if (geometry === 'straight') {
       ctx.drawImage(this.getStraightBeltCanvas(dir), bx, by);
     } else {
-      // Elbow: rotate (and mirror when CCW) the base R-belt-elbow sprite so its
-      // band connects the same two edges and bulges the same way as the item arc.
-      const cachedKey = `elbow_${dir}_${incomingSide}`;
-      let beltCanvas = this.beltSpriteCache.get(cachedKey);
-      if (!beltCanvas) {
-        const sprite = this.assetLoader.get('R-belt-elbow');
-        if (sprite) {
-          const c = document.createElement('canvas');
-          c.width = TILE_SIZE;
-          c.height = TILE_SIZE;
-          const sctx = c.getContext('2d')!;
-          sctx.imageSmoothingEnabled = false;
-          const { angle, flipH, flipV } = this.elbowRotation(dir, incomingSide!);
-          sctx.translate(TILE_SIZE / 2, TILE_SIZE / 2);
-          if (flipH) sctx.scale(-1, 1);
-          if (flipV) sctx.scale(1, -1);
-          sctx.rotate(angle);
-          sctx.drawImage(sprite.canvas, -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
-          beltCanvas = c;
-          this.beltSpriteCache.set(cachedKey, c);
-        } else {
-          beltCanvas = this.createBeltErrorMarker('missing elbow sprite');
-          this.beltSpriteCache.set(cachedKey, beltCanvas);
-        }
-      }
+      // Elbow: composed from the straight belt sprites so the turn blends
+      // seamlessly into the straight belts it connects (see getElbowCanvas).
+      const beltCanvas = this.getElbowCanvas(dir, incomingSide!);
       ctx.drawImage(beltCanvas, bx, by);
     }
 
