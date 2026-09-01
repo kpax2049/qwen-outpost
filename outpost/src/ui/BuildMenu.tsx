@@ -25,15 +25,29 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({ onSelectBuild, activeBuild
   return (
     <div style={{
       position: 'absolute', top: 50, left: 8,
-      background: 'rgba(20,20,40,0.95)', border: '1px solid rgba(255,255,255,0.1)',
-      borderRadius: 6, padding: 0, zIndex: 20, minWidth: 300,
+      background: '#141922', border: '1px solid rgba(255,255,255,.1)',
+      borderRadius: 5, zIndex: 20, minWidth: 310,
       maxHeight: 'calc(100vh - 100px)', overflowY: 'auto',
+      boxShadow: '0 18px 44px rgba(0,0,0,.55)',
     }}>
       <div style={{
-        padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)',
-        color: '#ffaa00', fontSize: 14, fontWeight: 'bold',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 14px', background: '#1d242e',
+        borderBottom: '1px solid rgba(255,255,255,.08)',
       }}>
-        Build Menu
+        <span style={{
+          fontFamily: "'Chakra Petch', sans-serif",
+          fontSize: 12, fontWeight: 700, letterSpacing: '.16em',
+          color: '#e8edf2',
+        }}>
+          BUILD
+        </span>
+        <span style={{
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: 10, color: '#6e7b88',
+        }}>
+          ESC to close
+        </span>
       </div>
       <div style={{ padding: 8 }}>
         {BUILD_ORDER.map(type => {
@@ -45,50 +59,59 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({ onSelectBuild, activeBuild
               key={type}
               onClick={() => affordable && onSelectBuild(type)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '8px 10px', marginBottom: 4,
-                background: activeBuild === type ? 'rgba(255,170,0,0.2)' :
-                  affordable ? 'rgba(255,255,255,0.05)' : 'rgba(255,0,0,0.1)',
-                border: activeBuild === type ? '1px solid rgba(255,170,0,0.5)' :
-                  affordable ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,0,0,0.2)',
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '9px 10px',
+                background: activeBuild === type ? '#1f2732' : '#171d26',
+                border: activeBuild === type ? '1px solid #e8ae4a' : '1px solid rgba(255,255,255,.07)',
                 borderRadius: 4, cursor: affordable ? 'pointer' : 'not-allowed',
-                opacity: affordable ? 1 : 0.5,
+                opacity: affordable ? 1 : 0.45,
               }}
             >
               <div style={{
-                width: 32, height: 32, borderRadius: 4, background: def.color,
+                width: 40, height: 40, borderRadius: 3, background: def.color, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontSize: 16, flexShrink: 0,
+                color: '#fff', fontSize: 18,
               }}>
                 {def.shape === 'circle' ? '\u2699' : def.shape === 'diamond' ? '\u25C6' : def.shape === 'arrow' ? '\u27A1' : '\u25A0'}
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: '#ddd', fontSize: 12, fontWeight: 'bold' }}>{def.name}</div>
-                <div style={{ color: '#888', fontSize: 10 }}>{def.description}</div>
-                <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontFamily: "'Chakra Petch', sans-serif",
+                  fontSize: 13, fontWeight: 600, letterSpacing: '.06em',
+                  color: '#e8edf2',
+                }}>
+                  {def.name}
+                </div>
+                <div style={{
+                  display: 'flex', gap: 6, marginTop: 5,
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: 10,
+                }}>
                   {def.cost.map((c, i) => (
                     <span key={i} style={{
-                      fontSize: 9, padding: '1px 4px', borderRadius: 2,
-                      background: affordable ? 'rgba(0,0,0,0.3)' : 'rgba(255,0,0,0.2)',
-                      color: affordable ? '#aaa' : '#ff6666',
+                      padding: '2px 5px', borderRadius: 2,
+                      background: affordable ? '#101418' : '#101418',
+                      color: affordable ? '#c6cdd4' : '#ec6058',
                     }}>
-                      {c.amount}x {ITEM_DISPLAY_NAMES[c.resource] || c.resource}
+                      {c.amount} {ITEM_DISPLAY_NAMES[c.resource] || c.resource}
                     </span>
                   ))}
                   {def.powerConsumed > 0 && (
                     <span style={{
-                      fontSize: 9, padding: '1px 4px', borderRadius: 2,
-                      background: 'rgba(255,200,0,0.2)', color: '#ffcc00',
+                      padding: '2px 5px', borderRadius: 2,
+                      background: '#101418',
+                      color: '#5fcb93',
                     }}>
-                      {'\u26A1'}{def.powerConsumed}
+                      -{def.powerConsumed} {'\u26A1'}
                     </span>
                   )}
                   {def.powerProduced && (
                     <span style={{
-                      fontSize: 9, padding: '1px 4px', borderRadius: 2,
-                      background: 'rgba(0,255,0,0.2)', color: '#44ff44',
+                      padding: '2px 5px', borderRadius: 2,
+                      background: '#101418',
+                      color: '#5fcb93',
                     }}>
-                      {'\u26A1+'}{def.powerProduced}
+                      +{def.powerProduced} {'\u26A1'}
                     </span>
                   )}
                 </div>

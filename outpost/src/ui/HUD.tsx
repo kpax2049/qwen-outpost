@@ -23,202 +23,350 @@ interface HUDProps {
   power?: PowerSummary;
 }
 
-const DIR_HINT: Record<number, string> = { 0: 'Up ▲', 1: 'Right ▶', 2: 'Down ▼', 3: 'Left ◀' };
+const DIR_HINT: Record<number, string> = { 0: 'Up \u25B2', 1: 'Right \u25B6', 2: 'Down \u25BC', 3: 'Left \u25C0' };
 
 export const HUD: React.FC<HUDProps> = ({
-  tickRate, paused,
-  onTogglePause, onIncreaseSpeed, onDecreaseSpeed, onResetSpeed,
+  tickRate,
+  onIncreaseSpeed, onDecreaseSpeed, onResetSpeed,
   onToggleBuildMenu, onToggleInventory, onToggleHelp, onToggleObjectives,
   onSave, onLoad, onNewGame,
   buildType, buildDirection, onDeselectBuild,
   saveStatus, power,
 }) => {
+  const speedRates = [1, 5, 10, 20];
+  const isSpeedActive = (rate: number) => {
+    if (rate === 10 && tickRate === 10) return true;
+    return tickRate === rate;
+  };
+
+  const buildLabel = buildType ? BUILDING_NAMES[buildType] : null;
+
   return (
     <>
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 16px',
-        background: 'linear-gradient(180deg, rgba(20,20,40,0.95) 0%, rgba(20,20,40,0.7) 80%, transparent 100%)',
+        height: 56,
+        display: 'flex', alignItems: 'center',
+        padding: '0 14px',
+        background: '#141a20',
+        borderBottom: '1px solid #2a333c',
+        boxShadow: 'inset 0 1px 0 #39434d',
         zIndex: 10,
+        boxSizing: 'border-box',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: '#4488ff', fontSize: 16, fontWeight: 'bold', letterSpacing: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 18, fontWeight: 700, letterSpacing: '.22em',
+            color: '#e6ebef',
+          }}>
             OUTPOST
           </span>
-          <span style={{ color: '#666', fontSize: 11 }}>v1.0</span>
+          <span style={{
+            fontFamily: "'IBM Plex Mono', monospace",
+            fontSize: 10, color: '#6e7b88',
+          }}>
+            v1.0
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 4, padding: '2px 4px' }}>
-            {[1, 5, 10, 20].map(rate => (
+        <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,.1)', margin: '0 8px' }} />
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 2,
+          padding: 3, background: '#0d1318', border: '1px solid #2a333c', borderRadius: 4,
+        }}>
+          {speedRates.map(rate => {
+            const active = isSpeedActive(rate);
+            const isReset = rate === 10;
+            const label = isReset ? 'II' : `x${rate}`;
+            return (
               <button
                 key={rate}
-                onClick={() => rate === 10 ? onResetSpeed() : null}
+                onClick={() => {
+                  if (isReset) { onResetSpeed(); return; }
+                  onResetSpeed();
+                  if (rate !== 10) onIncreaseSpeed();
+                }}
                 style={{
-                  padding: '2px 6px', background: tickRate === rate ? 'rgba(68,136,255,0.3)' : 'transparent',
-                  color: tickRate === rate ? '#4488ff' : '#888',
-                  border: 'none', borderRadius: 2, fontSize: 11, cursor: 'pointer', minWidth: 24,
+                  width: 30, height: 22,
+                  display: 'grid', placeItems: 'center',
+                  background: active ? '#ffb347' : rate === 10 ? '#1f2831' : '#0d1318',
+                  color: active ? '#1b1204' : rate === 10 ? '#6f7d89' : '#cbd6e0',
+                  border: rate === 10 ? 'none' : active ? 'none' : '1px solid #2a333c',
+                  borderRadius: 3,
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: 11, fontWeight: active ? 600 : 400,
+                  cursor: 'pointer',
                 }}
               >
-                {rate === 10 ? 'x1' : `x${rate}`}
+                {label}
               </button>
-            ))}
-            <button onClick={onIncreaseSpeed} style={{
-              padding: '2px 4px', background: 'transparent', color: '#888',
-              border: 'none', fontSize: 12, cursor: 'pointer',
-            }}>+</button>
-            <button onClick={onDecreaseSpeed} style={{
-              padding: '2px 4px', background: 'transparent', color: '#888',
-              border: 'none', fontSize: 12, cursor: 'pointer',
-            }}>-</button>
+            );
+          })}
+          <button onClick={onIncreaseSpeed} style={{
+            width: 28, height: 22, display: 'grid', placeItems: 'center',
+            background: 'transparent', color: '#6f7d89',
+            border: 'none', fontSize: 12, cursor: 'pointer',
+          }}>+</button>
+          <button onClick={onDecreaseSpeed} style={{
+            width: 28, height: 22, display: 'grid', placeItems: 'center',
+            background: 'transparent', color: '#6f7d89',
+            border: 'none', fontSize: 12, cursor: 'pointer',
+          }}>-</button>
+        </div>
+
+        {power && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 9,
+            height: 30, padding: '0 12px',
+            background: '#0d1318', border: '1px solid #2a333c', borderRadius: 4,
+          }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: power.enough ? '#7ddc8a' : '#ec6058',
+              ...(power.enough ? {} : { animation: 'emberpulse 1.2s ease-in-out infinite' }),
+            }} />
+            <span style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 12, color: '#e6ebef',
+            }}>
+              {power.produced}
+            </span>
+            <span style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 11, color: '#6f7d89',
+            }}>
+              / {power.consumed}
+            </span>
+            <span style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 12, fontWeight: 600,
+              color: power.surplus >= 0 ? '#7ddc8a' : '#ec6058',
+            }}>
+              {power.surplus >= 0 ? '+' : ''}{power.surplus}
+            </span>
+            <span style={{
+              fontFamily: "'Chakra Petch', sans-serif",
+              fontSize: 10, letterSpacing: '.14em',
+              color: '#6f7d89',
+            }}>
+              POWER
+            </span>
           </div>
+        )}
 
-          <button onClick={onTogglePause} style={{
-            padding: '4px 12px',
-            background: paused ? 'rgba(204,68,68,0.3)' : 'rgba(68,204,68,0.3)',
-            color: paused ? '#cc4444' : '#44cc44',
-            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
-          }}>
-            {paused ? '\u25B6 PLAY' : '\u23F8 PAUSE'}
-          </button>
+        <div style={{ flex: 1 }} />
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button onClick={onToggleBuildMenu} style={{
-            padding: '4px 10px', background: 'rgba(255,170,0,0.2)', color: '#ffaa00',
-            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+            height: 30, padding: '0 13px',
+            display: 'grid', placeItems: 'center',
+            background: '#ffb347',
+            color: '#1b1204',
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 12, fontWeight: 700, letterSpacing: '.1em',
+            border: 'none', borderRadius: 4,
+            cursor: 'pointer',
           }}>
-            Build [B]
+            BUILD <span style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 10, opacity: 0.6,
+            }}>B</span>
           </button>
           <button onClick={onToggleInventory} style={{
-            padding: '4px 10px', background: 'rgba(68,170,255,0.2)', color: '#44aaff',
-            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+            height: 30, padding: '0 13px',
+            display: 'grid', placeItems: 'center',
+            background: '#1f2831',
+            color: '#cbd6e0',
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 12, fontWeight: 600, letterSpacing: '.1em',
+            border: '1px solid #2f3a45', borderRadius: 4,
+            cursor: 'pointer',
           }}>
-            Inventory [I]
+            INVENTORY <span style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 10, color: '#6e7b88',
+            }}>I</span>
           </button>
           <button onClick={onToggleObjectives} style={{
-            padding: '4px 10px', background: 'rgba(255,200,0,0.2)', color: '#ffcc00',
-            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+            height: 30, padding: '0 13px',
+            display: 'grid', placeItems: 'center',
+            background: '#1f2831',
+            color: '#cbd6e0',
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 12, fontWeight: 600, letterSpacing: '.1em',
+            border: '1px solid #2f3a45', borderRadius: 4,
+            cursor: 'pointer',
           }}>
-            Objectives [O]
+            OBJECTIVES <span style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 10, color: '#6e7b88',
+            }}>O</span>
           </button>
           <button onClick={onToggleHelp} style={{
-            padding: '4px 10px', background: 'rgba(100,100,100,0.3)', color: '#aaa',
-            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+            width: 30, height: 30,
+            display: 'grid', placeItems: 'center',
+            background: '#1f2831',
+            color: '#cbd6e0',
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 13, fontWeight: 700,
+            border: '1px solid #2f3a45', borderRadius: 4,
+            cursor: 'pointer',
           }}>
-            Help [H]
+            ?
           </button>
 
+          <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,.1)', margin: '0 4px' }} />
+
           <button onClick={onSave} style={{
-            padding: '4px 10px', background: 'rgba(0,200,100,0.2)', color: '#44cc88',
-            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+            width: 30, height: 30,
+            display: 'grid', placeItems: 'center',
+            background: '#1f2831',
+            color: '#cbd6e0',
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 12, fontWeight: 600,
+            border: '1px solid #2f3a45', borderRadius: 4,
+            cursor: 'pointer',
           }}>
-            Save [Ctrl+S]
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="2" y="1" width="8" height="9" rx="1" stroke="currentColor" strokeWidth="1.5" />
+              <line x1="4" y1="1" x2="4" y2="3" stroke="currentColor" strokeWidth="1.5" />
+              <line x1="8" y1="1" x2="8" y2="3" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
           </button>
           <button onClick={onLoad} style={{
-            padding: '4px 10px', background: 'rgba(100,150,255,0.2)', color: '#88aaff',
-            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+            width: 30, height: 30,
+            display: 'grid', placeItems: 'center',
+            background: '#1f2831',
+            color: '#cbd6e0',
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 12, fontWeight: 600,
+            border: '1px solid #2f3a45', borderRadius: 4,
+            cursor: 'pointer',
           }}>
-            Load [Ctrl+L]
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M6 3v3l2 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
           </button>
           <button onClick={onNewGame} style={{
-            padding: '4px 10px', background: 'rgba(200,50,50,0.2)', color: '#cc6666',
-            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
+            width: 30, height: 30,
+            display: 'grid', placeItems: 'center',
+            background: '#1f2831',
+            color: '#cbd6e0',
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 12, fontWeight: 600,
+            border: '1px solid #2f3a45', borderRadius: 4,
+            cursor: 'pointer',
           }}>
-            New Game
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="3" width="10" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+              <line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
           </button>
         </div>
       </div>
 
       {buildType && (
         <div style={{
-          position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(255,170,0,0.9)', color: '#000', padding: '6px 16px',
-          borderRadius: 4, fontSize: 13, fontWeight: 'bold', zIndex: 10,
+          position: 'absolute', top: 56, left: '50%', transform: 'translateX(-50%)',
           display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 14px',
+          background: '#ffb347',
+          color: '#1b1204',
+          fontFamily: "'Chakra Petch', sans-serif",
+          fontSize: 12, fontWeight: 700, letterSpacing: '.1em',
+          borderRadius: '0 0 4px 4px',
+          zIndex: 10,
+          whiteSpace: 'nowrap',
         }}>
-          <span>Building: {BUILDING_NAMES[buildType] ?? buildType}</span>
+          <span>Building: {buildLabel}</span>
           {buildDirection !== undefined && (
-            <span style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 3, padding: '2px 7px', fontSize: 12 }}>
-              dir {DIR_HINT[buildDirection] ?? ''}
+            <span style={{
+              background: 'rgba(0,0,0,0.15)', borderRadius: 3,
+              padding: '2px 7px', fontSize: 11,
+              fontFamily: "'IBM Plex Mono', monospace",
+            }}>
+              {DIR_HINT[buildDirection]}
             </span>
           )}
           <button onClick={onDeselectBuild} style={{
-            background: 'rgba(0,0,0,0.2)', color: '#000', border: 'none',
-            borderRadius: 2, cursor: 'pointer', padding: '2px 6px', fontSize: 11,
+            background: 'rgba(0,0,0,0.15)', color: '#1b1204',
+            border: 'none', borderRadius: 3,
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 11, fontWeight: 600, letterSpacing: '.1em',
+            padding: '2px 8px', cursor: 'pointer', marginLeft: 4,
           }}>
-            Cancel
+            CANCEL
           </button>
         </div>
       )}
 
       {buildType === 'conveyor' && (
         <div style={{
-          position: 'absolute', top: 80, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(20,20,40,0.8)', color: '#ddd', padding: '5px 12px',
-          borderRadius: 4, fontSize: 11, zIndex: 10,
+          position: 'absolute', top: 88, left: '50%', transform: 'translateX(-50%)',
+          background: '#141a20', color: '#94a3af',
+          padding: '5px 12px', borderRadius: 4,
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: 11,
+          border: '1px solid #2a333c',
+          zIndex: 10, whiteSpace: 'nowrap',
         }}>
-          Move to walk · Click-drag to lay a belt route (auto-corners) · R rotates a single belt · click places
+          Move to walk &middot; Click-drag to lay a belt route (auto-corners) &middot; R rotates a single belt &middot; click places
         </div>
       )}
       {buildType && buildType !== 'conveyor' && (
         <div style={{
-          position: 'absolute', top: 80, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(20,20,40,0.8)', color: '#ddd', padding: '5px 12px',
-          borderRadius: 4, fontSize: 11, zIndex: 10,
+          position: 'absolute', top: 88, left: '50%', transform: 'translateX(-50%)',
+          background: '#141a20', color: '#94a3af',
+          padding: '5px 12px', borderRadius: 4,
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: 11,
+          border: '1px solid #2a333c',
+          zIndex: 10, whiteSpace: 'nowrap',
         }}>
-          Move to walk · click to place — stays selected until you Cancel or press Esc
-        </div>
-      )}
-
-      {power && (
-        <div style={{
-          position: 'absolute', right: 8, top: 52,
-          background: 'rgba(20,20,40,0.85)', border: `1px solid ${power.enough ? 'rgba(68,204,68,0.4)' : 'rgba(255,68,68,0.5)'}`,
-          borderRadius: 5, padding: '7px 10px', fontSize: 11, zIndex: 10, minWidth: 200,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-            <span style={{ color: '#aaa', fontWeight: 'bold', letterSpacing: 1 }}>OUTPOST POWER GRID</span>
-            <span style={{ color: power.enough ? '#44cc44' : '#ff4444', fontWeight: 'bold' }}>
-              {power.enough ? 'OK' : 'LOW'}
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#ddd' }}>{power.produced} ⚡ produced</span>
-            <span style={{ color: '#ddd' }}>{power.consumed} ⚡ used</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, color: power.surplus >= 0 ? '#88cc88' : '#ff8888' }}>
-            <span>Surplus {power.surplus >= 0 ? '+' : ''}{power.surplus}</span>
-            <span>{power.fueledGenerators}/{power.generatorCount} generators fueled</span>
-          </div>
-          <div style={{ color: '#7a9bff', marginTop: 3, fontSize: 10 }}>
-            One shared grid for the whole map — no cables needed.
-          </div>
-          {!power.enough && power.generatorCount > 0 && (
-            <div style={{ color: '#ffaa55', marginTop: 3 }}>
-              Add Coal to generators or remove machines.
-            </div>
-          )}
+          Move to walk &middot; click to place &mdash; stays selected until you Cancel or press Esc
         </div>
       )}
 
       <div style={{
-        position: 'absolute', bottom: 8, left: 8,
-        background: 'rgba(20,20,40,0.7)', borderRadius: 4, padding: '6px 10px',
-        color: '#666', fontSize: 10, lineHeight: 1.6, zIndex: 10,
+        position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+        display: 'flex', gap: 6,
+        padding: '7px 12px',
+        background: 'rgba(20,25,34,.92)',
+        border: '1px solid rgba(255,255,255,.09)',
+        borderRadius: 4,
+        zIndex: 10,
+        fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 11,
+        color: '#94a3af',
+        whiteSpace: 'nowrap',
       }}>
-        <div>WASD/Arrows: Move | E: Harvest (facing tile) | R: Rotate | Q: Remove</div>
-        <div>Left-drag with a belt tool: lay a route | Alt+Click: Pan | Scroll: Zoom | Space: Pause</div>
-        <div>Build mode: keep moving with WASD; click places; R sets a single belt's direction; Esc deselects</div>
+        <span style={{ color: '#e6ebef' }}>WASD</span> move
+        <span style={{ color: '#3e4a57' }}>&middot;</span>
+        <span style={{ color: '#e6ebef' }}>E</span> harvest
+        <span style={{ color: '#3e4a57' }}>&middot;</span>
+        <span style={{ color: '#e6ebef' }}>drag</span> lay belt
+        <span style={{ color: '#3e4a57' }}>&middot;</span>
+        <span style={{ color: '#e6ebef' }}>R</span> rotate
+        <span style={{ color: '#3e4a57' }}>&middot;</span>
+        <span style={{ color: '#e6ebef' }}>Q</span> remove
+        <span style={{ color: '#3e4a57' }}>&middot;</span>
+        <span style={{ color: '#e6ebef' }}>SPACE</span> pause
       </div>
 
       {saveStatus && (
         <div style={{
-          position: 'absolute', top: 50, left: '50%', transform: 'translateX(-50%)',
-          background: saveStatus.type === 'success' ? 'rgba(0,150,80,0.9)' :
-            saveStatus.type === 'error' ? 'rgba(180,40,40,0.9)' : 'rgba(40,100,180,0.9)',
-          color: '#fff', padding: '8px 20px',
-          borderRadius: 4, fontSize: 13, fontWeight: 'bold', zIndex: 30,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          position: 'absolute', top: 56, left: '50%', transform: 'translateX(-50%)',
+          background: saveStatus.type === 'success' ? '#7ddc8a' :
+            saveStatus.type === 'error' ? '#ec6058' : '#5faee0',
+          color: '#141a20',
+          padding: '6px 16px',
+          fontFamily: "'Chakra Petch', sans-serif",
+          fontSize: 12, fontWeight: 700, letterSpacing: '.1em',
+          borderRadius: '0 0 4px 4px',
+          zIndex: 30,
         }}>
           {saveStatus.message}
         </div>

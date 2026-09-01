@@ -15,16 +15,16 @@ interface TutorialProps {
   onManualNext: (id: string) => void;
 }
 
-const TUTORIAL_COLORS: Record<string, string> = {
-  move: '#4488ff',
-  wood: '#8a5a2a',
-  stone: '#8a8a8a',
-  build: '#ffaa00',
-  place: '#ffaa00',
-  belt: '#888888',
-  power: '#cc4400',
-  inspect: '#88ccff',
-  next: '#44cc44',
+const STEP_COLORS: Record<string, string> = {
+  move: '#5faee0',
+  wood: '#e8ae4a',
+  stone: '#c6cdd4',
+  build: '#e8ae4a',
+  place: '#5fcb93',
+  belt: '#94a2b0',
+  power: '#f0774a',
+  inspect: '#5faee0',
+  next: '#5fcb93',
 };
 
 export const Tutorial: React.FC<TutorialProps> = ({ steps, dismissed, onDismiss, onManualNext }) => {
@@ -38,17 +38,34 @@ export const Tutorial: React.FC<TutorialProps> = ({ steps, dismissed, onDismiss,
     return (
       <div style={{
         position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(20,40,20,0.95)', border: '1px solid rgba(68,204,68,0.4)',
-        borderRadius: 6, padding: '10px 16px', zIndex: 30,
+        background: '#141922', border: '1px solid rgba(95,203,147,.3)',
+        borderRadius: 5, padding: '12px 16px', zIndex: 30,
         display: 'flex', alignItems: 'center', gap: 12,
+        boxShadow: '0 18px 44px rgba(0,0,0,.55)',
       }}>
-        <span style={{ color: '#44cc44', fontSize: 14 }}>✓</span>
-        <span style={{ color: '#ddd', fontSize: 13 }}>
-          Tutorial complete! Build your outpost — open the build menu with{' '}
-          <strong style={{ color: '#ffaa00' }}>B</strong>.
+        <span style={{
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: 14, color: '#5fcb93',
+        }}>
+          ✓
         </span>
-        <button onClick={onDismiss}
-          style={{ background: 'rgba(255,255,255,0.1)', color: '#aaa', border: 'none', borderRadius: 3, padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
+        <span style={{
+          fontFamily: "'IBM Plex Sans', sans-serif",
+          fontSize: 13, color: '#c6d2de', flex: 1,
+        }}>
+          Tutorial complete! Build your outpost — open the build menu with{' '}
+          <strong style={{ color: '#e8ae4a' }}>B</strong>.
+        </span>
+        <button onClick={onDismiss} style={{
+          height: 28, padding: '0 12px',
+          display: 'grid', placeItems: 'center',
+          background: '#101720', color: '#94a2b0',
+          border: '1px solid rgba(255,255,255,.09)',
+          borderRadius: 3,
+          fontFamily: "'Chakra Petch', sans-serif",
+          fontSize: 11, fontWeight: 600, letterSpacing: '.1em',
+          cursor: 'pointer',
+        }}>
           OK
         </button>
       </div>
@@ -58,48 +75,83 @@ export const Tutorial: React.FC<TutorialProps> = ({ steps, dismissed, onDismiss,
   return (
     <div style={{
       position: 'absolute', top: 64, left: '50%', transform: 'translateX(-50%)',
-      width: 440, maxWidth: '90vw',
-      background: 'rgba(20,20,40,0.96)', border: '1px solid rgba(255,255,255,0.15)',
-      borderRadius: 8, padding: 14, zIndex: 30, boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+      width: 460, maxWidth: '90vw',
+      background: '#141922', border: '1px solid rgba(255,255,255,.1)',
+      borderRadius: 5, zIndex: 30,
+      boxShadow: '0 18px 44px rgba(0,0,0,.55)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div style={{ color: '#ffcc00', fontSize: 12, fontWeight: 'bold', letterSpacing: 1 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 14px', background: '#1d242e',
+        borderBottom: '1px solid rgba(255,255,255,.08)',
+      }}>
+        <div style={{
+          fontFamily: "'Chakra Petch', sans-serif",
+          fontSize: 12, fontWeight: 700, letterSpacing: '.16em',
+          color: '#e8ae4a',
+        }}>
           TUTORIAL
         </div>
         <button onClick={onDismiss} style={{
-          background: 'transparent', color: '#888', border: 'none', fontSize: 11, cursor: 'pointer',
+          height: 24, padding: '0 10px',
+          display: 'grid', placeItems: 'center',
+          background: 'transparent', color: '#7e8c9a',
+          border: 'none',
+          fontFamily: "'IBM Plex Sans', sans-serif",
+          fontSize: 11, cursor: 'pointer',
         }}>
           Skip tutorial
         </button>
       </div>
 
-      <div style={{ color: TUTORIAL_COLORS[current.id] || '#ffaa00', fontSize: 15, fontWeight: 'bold', marginBottom: 4 }}>
-        {current.title}
-      </div>
-      <div style={{ color: '#ddd', fontSize: 12, lineHeight: 1.6, marginBottom: 12 }}>
-        {current.body}
-      </div>
-
-      {current.manual ? (
-        <button onClick={() => onManualNext(current.id)} style={{
-          background: '#ffaa00', color: '#1a1a2e', border: 'none', borderRadius: 4,
-          padding: '6px 16px', fontSize: 12, fontWeight: 'bold', cursor: 'pointer',
+      <div style={{ padding: 14 }}>
+        <div style={{
+          fontFamily: "'Chakra Petch', sans-serif",
+          fontSize: 15, fontWeight: 700, letterSpacing: '.06em',
+          color: STEP_COLORS[current.id] || '#e8ae4a', marginBottom: 8,
         }}>
-          Continue
-        </button>
-      ) : (
-        <div style={{ color: '#888', fontSize: 11, fontStyle: 'italic' }}>
-          {current.id === 'move' ? 'Use WASD / Arrow keys to move to a nearby goal.' : 'Complete the action above — it will auto-advance.'}
+          {current.title}
         </div>
-      )}
+        <div style={{
+          fontFamily: "'IBM Plex Sans', sans-serif",
+          fontSize: 13, color: '#c6d2de', lineHeight: 1.6, marginBottom: 14,
+        }}>
+          {current.body}
+        </div>
 
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 12 }}>
-        {steps.map(s => (
-          <div key={s.id} style={{
-            height: 4, flex: 1, borderRadius: 2,
-            background: s.done ? '#44cc44' : (s.id === current.id ? '#ffaa00' : 'rgba(255,255,255,0.15)'),
-          }} />
-        ))}
+        {current.manual ? (
+          <button onClick={() => onManualNext(current.id)} style={{
+            height: 32, padding: '0 20px',
+            display: 'grid', placeItems: 'center',
+            background: '#e8ae4a',
+            color: '#0b0e12',
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 12, fontWeight: 700, letterSpacing: '.1em',
+            border: 'none', borderRadius: 4,
+            cursor: 'pointer',
+          }}>
+            CONTINUE
+          </button>
+        ) : (
+          <div style={{
+            fontFamily: "'IBM Plex Mono', monospace",
+            fontSize: 11, color: '#7e8c9a', fontStyle: 'italic',
+          }}>
+            {current.id === 'move' ? 'Use WASD / Arrow keys to move to a nearby goal.' : 'Complete the action above — it will auto-advance.'}
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex', gap: 6, alignItems: 'center', marginTop: 14,
+          paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.08)',
+        }}>
+          {steps.map(s => (
+            <div key={s.id} style={{
+              height: 4, flex: 1, borderRadius: 2,
+              background: s.done ? '#5fcb93' : (s.id === current.id ? '#e8ae4a' : 'rgba(255,255,255,.1)'),
+            }} />
+          ))}
+        </div>
       </div>
     </div>
   );

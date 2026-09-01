@@ -747,7 +747,7 @@ const App: React.FC = () => {
   ];
 
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#1a1a2e', position: 'relative', userSelect: 'none' }}>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#0b0e12', position: 'relative', userSelect: 'none' }}>
       <canvas
         ref={canvasRef}
         onMouseMove={handleMouseMove}

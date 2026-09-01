@@ -1,5 +1,6 @@
 import React from 'react';
-import type { BuildingInspection, PowerSummary } from '../types';
+import { BUILDING_DEFS, BUILDING_COLORS } from '../types';
+import type { BuildingInspection, PowerSummary, BuildingTypeValue } from '../types';
 
 export interface InspectionData {
   building: BuildingInspection | null;
@@ -15,11 +16,21 @@ interface InspectionPanelProps {
   onRotate: () => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  ok: '#44cc44',
-  warn: '#ffcc00',
-  bad: '#ff4444',
+const STATUS_CONFIG: Record<string, { color: string; bg: string }> = {
+  ok: { color: '#5fcb93', bg: 'rgba(95,203,147,.1)' },
+  warn: { color: '#5faee0', bg: 'rgba(95,174,224,.1)' },
+  bad: { color: '#ec6058', bg: 'rgba(236,96,88,.1)' },
+  blocked: { color: '#f6bb45', bg: 'rgba(246,187,69,.1)' },
+  idle: { color: '#98a0a9', bg: 'rgba(152,160,169,.1)' },
 };
+
+function getBuildingColor(type: BuildingTypeValue): string {
+  return BUILDING_COLORS[type] || '#666';
+}
+
+function getBuildingShape(type: BuildingTypeValue): string {
+  return BUILDING_DEFS[type].shape;
+}
 
 const DEPOSIT_DISPLAY: Record<string, string> = {
   coal: 'Coal',
@@ -41,169 +52,407 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
 
   return (
     <div style={{
-      position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-      background: 'rgba(20,20,40,0.96)', border: '1px solid rgba(140,200,255,0.35)',
-      borderRadius: 8, padding: 14, zIndex: 20, width: 300,
-      boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+      position: 'absolute', right: 8, top: 50,
+      background: '#141922', border: '1px solid rgba(255,255,255,.1)',
+      borderRadius: 5, zIndex: 20, width: 320,
+      boxShadow: '0 18px 44px rgba(0,0,0,.55)',
+      maxHeight: 'calc(100vh - 60px)', overflowY: 'auto',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 10, height: 10, borderRadius: '50%', background: building ? STATUS_COLORS[building.statusColor] || '#999' : '#666' }} />
-          <span style={{ color: '#eee', fontSize: 14, fontWeight: 'bold' }}>
-            {building ? building.name : 'Nothing Inspected'}
-          </span>
-        </div>
-        <button onClick={onClose} style={{
-          background: 'rgba(255,255,255,0.08)', color: '#aaa', border: 'none',
-          borderRadius: 3, cursor: 'pointer', padding: '2px 7px', fontSize: 12,
-        }}>×</button>
-      </div>
-
       {!building ? (
-        <div style={{ color: '#888', fontSize: 12, lineHeight: 1.6 }}>
-          Click any tile to inspect its building. Buildings have a status code; blocked belts show a red gate in the world.
-          <div style={{ marginTop: 10 }}>
-            <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>Power: </span>
-            <span style={{ color: power.enough ? '#44cc44' : '#ff4444' }}>
-              {power.produced} ⚡ produced / {power.consumed} ⚡ used
+        <>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 14px', background: '#1d242e',
+            borderBottom: '1px solid rgba(255,255,255,.08)',
+          }}>
+            <span style={{
+              fontFamily: "'Chakra Petch', sans-serif",
+              fontSize: 12, fontWeight: 700, letterSpacing: '.16em',
+              color: '#e8edf2',
+            }}>
+              POWER GRID
             </span>
-            <div style={{ color: '#9ab', fontSize: 11, marginTop: 4 }}>
-              All machines share ONE outpost-wide power grid. Fuel a Generator (add Coal) to power every machine on the map.
-            </div>
-            {power.generatorCount === 0 && (
-              <div style={{ color: '#ffaa00', fontSize: 11, marginTop: 4 }}>
-                Place a Coal Generator and feed it Coal to power your machines.
-              </div>
-            )}
           </div>
-        </div>
+          <div style={{ padding: 14 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12,
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: power.enough ? '#5fcb93' : '#ec6058',
+                animation: power.enough ? undefined : 'emberpulse 1.2s ease-in-out infinite',
+              }} />
+              <span style={{
+                fontFamily: "'Chakra Petch', sans-serif",
+                fontSize: 11, fontWeight: 700, letterSpacing: '.12em',
+                color: power.enough ? '#5fcb93' : '#ec6058',
+              }}>
+                {power.enough ? 'OK' : 'NOT ENOUGH'}
+              </span>
+            </div>
+
+            <div style={{
+              display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12,
+            }}>
+              <span style={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 30, fontWeight: 600,
+                color: power.surplus >= 0 ? '#5fcb93' : '#ec6058',
+              }}>
+                {power.surplus >= 0 ? '+' : ''}{power.surplus}
+              </span>
+              <span style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 12, color: '#94a2b0',
+              }}>
+                {power.produced} produced · {power.consumed} demanded
+              </span>
+            </div>
+
+            <div style={{
+              height: 10, background: '#0e131a', border: '1px solid rgba(255,255,255,.08)',
+              borderRadius: 2, display: 'flex', overflow: 'hidden', marginBottom: 12,
+            }}>
+              {(() => {
+                const pct = power.consumed > 0 ? Math.min(100, (power.produced / power.consumed) * 100) : 100;
+                return (
+                  <>
+                    <div style={{ width: `${pct}%`, background: '#5fcb93' }} />
+                    <div style={{
+                      width: `${100 - pct}%`,
+                      background: power.enough ? '#101720' : 'repeating-linear-gradient(45deg,#ec6058 0 4px,#b8433c 4px 8px)',
+                    }} />
+                  </>
+                );
+              })()}
+            </div>
+
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+            }}>
+              <div style={{
+                padding: '8px 10px', background: '#101720', borderRadius: 3,
+              }}>
+                <div style={{
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: 15, color: '#e8edf2',
+                }}>
+                  {power.fueledGenerators} / {power.generatorCount}
+                </div>
+                <div style={{
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 11, color: '#94a2b0', marginTop: 2,
+                }}>
+                  generators fuelled · 50 {'\u26A1'} each
+                </div>
+              </div>
+              <div style={{
+                padding: '8px 10px', background: '#101720', borderRadius: 3,
+              }}>
+              <div style={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 15, color: power.enough ? '#e8edf2' : '#ec6058',
+              }}>
+                {power.consumerCount}
+              </div>
+              <div style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 11, color: '#94a2b0', marginTop: 2,
+              }}>
+                machine{power.consumerCount !== 1 ? 's' : ''} powered
+              </div>
+              </div>
+            </div>
+
+            <div style={{
+              marginTop: 12, fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 11, lineHeight: 1.5, color: '#7e8c9a',
+            }}>
+              The whole outpost shares one power grid. Fuel a Generator (add Coal) to power every machine on the map.
+            </div>
+          </div>
+        </>
       ) : (
         <>
-          <div style={{ color: STATUS_COLORS[building.statusColor] || '#ccc', fontSize: 12, marginBottom: 8, fontWeight: 'bold' }}>
-            {building.status}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 14px', background: '#1d242e',
+            borderBottom: '1px solid rgba(255,255,255,.08)',
+          }}>
+            <div style={{
+              width: 22, height: 22, borderRadius: 3, background: getBuildingColor(building.type),
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: 12, flexShrink: 0,
+            }}>
+              {getBuildingShape(building.type) === 'circle' ? '\u2699' : getBuildingShape(building.type) === 'diamond' ? '\u25C6' : getBuildingShape(building.type) === 'arrow' ? '\u27A1' : '\u25A0'}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontFamily: "'Chakra Petch', sans-serif",
+                fontSize: 13, fontWeight: 700, letterSpacing: '.1em',
+                color: '#e8edf2',
+              }}>
+                {building.name}
+              </div>
+              <div style={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 10, color: '#6e7b88', marginTop: 2,
+              }}>
+                tile {building.x}, {building.y}
+              </div>
+            </div>
+            <button onClick={onClose} style={{
+              width: 22, height: 22, display: 'grid', placeItems: 'center',
+              borderRadius: 3, background: '#101418', color: '#94a2b0',
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: 12, cursor: 'pointer', border: 'none',
+            }}>
+              ×
+            </button>
           </div>
 
-          {building.type === 'conveyor' && (
-            <button onClick={onRotate} style={{
-              display: 'block', width: '100%', marginBottom: 8, background: 'rgba(140,200,255,0.14)',
-              color: '#cfe6ff', border: '1px solid rgba(140,200,255,0.4)', borderRadius: 4,
-              padding: '6px 10px', fontSize: 12, cursor: 'pointer', textAlign: 'center',
-            }}>
-              ⟳ Rotate ({building.directionLabel})
-            </button>
-          )}
-
-          <div style={{ fontSize: 12, color: '#ccc', lineHeight: 1.7 }}>
-            {building.direction !== undefined && (
-              <div><span style={{ color: '#888' }}>Direction:</span> {building.directionLabel}</div>
-            )}
-            <div>
-              <span style={{ color: '#888' }}>Power:</span>{' '}
-              {building.powerConsumed > 0 && (
-                <span style={{ color: building.active ? '#44cc44' : '#ff4444' }}>
-                  {building.active ? 'Powered' : 'No Power'} —{' '}
-                  <span style={{ fontSize: 11 }}>
-                    shared Outpost Grid ({power.produced}⚡ / {power.consumed}⚡)
-                  </span>
-                </span>
-              )}
-              {building.powerProduced > 0 && <span>{building.active ? 'Producing' : 'Not Producing'} ({building.powerProduced}⚡)</span>}
-              {building.powerConsumed === 0 && building.powerProduced === 0 && <span>Passive (no power needed)</span>}
-            </div>
-
-            {building.powerConsumed > 0 && !building.active && (
-              <div style={{ marginTop: 6, padding: 6, background: 'rgba(255,68,68,0.12)', borderRadius: 4, fontSize: 11, color: '#ff8a8a', lineHeight: 1.5 }}>
-                The whole outpost shares ONE power grid — no cables needed. This machine is
-                stopped because the grid lacks power ({power.produced}⚡ produced vs {power.consumed}⚡ used).
-                Add Coal to a Generator, or remove machines until surplus is positive.
-              </div>
-            )}
-
-            {(building.progress !== undefined && building.maxProgress > 1) && (
-              <div style={{ marginTop: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', fontSize: 11 }}>
-                  <span>Cycle</span>
-                  <span>{building.progressPct}%</span>
-                </div>
-                <div style={{ background: 'rgba(0,0,0,0.6)', borderRadius: 3, height: 6, marginTop: 2 }}>
+          <div style={{ padding: 14 }}>
+            {/* Status badge */}
+            {(() => {
+              const config = STATUS_CONFIG[building.statusColor] || STATUS_CONFIG.idle;
+              return (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '9px 11px',
+                  background: config.bg,
+                  borderLeft: `3px solid ${config.color}`,
+                  borderRadius: 2, marginBottom: 12,
+                }}>
                   <div style={{
-                    width: `${building.progressPct}%`, height: 6, borderRadius: 3,
-                    background: building.active ? '#44cc44' : '#cc4444',
+                    display: 'flex', gap: 3,
+                  }}>
+                    <div style={{ width: 4, height: 14, background: config.color }} />
+                    <div style={{ width: 4, height: 14, background: config.color }} />
+                  </div>
+                  <div>
+                    <div style={{
+                      fontFamily: "'Chakra Petch', sans-serif",
+                      fontSize: 12, fontWeight: 700, letterSpacing: '.1em',
+                      color: config.color,
+                    }}>
+                      {building.status}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Rotation button for conveyors */}
+            {building.type === 'conveyor' && (
+              <button onClick={onRotate} style={{
+                display: 'block', width: '100%', marginBottom: 12, height: 30,
+                background: '#1d242e',
+                border: '1px solid rgba(255,255,255,.09)',
+                borderRadius: 3,
+                fontFamily: "'Chakra Petch', sans-serif",
+                fontSize: 11, fontWeight: 600, letterSpacing: '.12em',
+                color: '#c6d2de', cursor: 'pointer', textAlign: 'center',
+              }}>
+                ROTATE R — {building.directionLabel}
+              </button>
+            )}
+
+            {/* Cycle progress */}
+            {building.progress !== undefined && building.maxProgress > 1 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: 11, color: '#94a2b0', marginBottom: 5,
+                }}>
+                  <span>CYCLE</span>
+                  <span style={{ color: '#e8edf2' }}>{Math.round(building.progressPct)}%</span>
+                </div>
+                <div style={{
+                  height: 8, background: '#0e131a', borderRadius: 2, overflow: 'hidden',
+                }}>
+                  <div style={{
+                    width: `${building.progressPct}%`, height: 8,
+                    borderRadius: 2,
+                    background: building.active ? '#5fcb93' : '#ec6058',
                   }} />
                 </div>
               </div>
             )}
 
+            {/* Power info */}
+            {building.powerConsumed > 0 && (
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 11, color: '#94a2b0', marginBottom: 10,
+              }}>
+                <span>POWER</span>
+                <span style={{ color: building.active ? '#5fcb93' : '#ec6058' }}>
+                  {building.active ? `${building.powerConsumed} {'\u26A1'} drawn · OK` : 'No Power'}
+                </span>
+              </div>
+            )}
+            {building.powerProduced > 0 && (
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 11, color: '#94a2b0', marginBottom: 10,
+              }}>
+                <span>POWER</span>
+                <span style={{ color: building.active ? '#5fcb93' : '#98a0a9' }}>
+                  {building.active ? `Producing ${building.powerProduced} {'\u26A1'}` : 'Not Producing'}
+                </span>
+              </div>
+            )}
+
+            {/* Fuel */}
             {building.fuelCoal !== undefined && (
-              <div style={{ marginTop: 6, padding: 6, background: 'rgba(204,68,0,0.12)', borderRadius: 4 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ff9955', fontSize: 11 }}>
-                  <span>Fuel (Coal)</span>
-                  <span>{building.fuelCoal} left · {building.fuelBurned ?? 0} burned</span>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: 11, color: '#94a2b0', marginBottom: 5,
+                }}>
+                  <span>FUEL (COAL)</span>
+                  <span style={{ color: '#e8edf2' }}>
+                    {building.fuelCoal} left · {building.fuelBurned ?? 0} burned
+                  </span>
                 </div>
-                <div style={{ background: 'rgba(0,0,0,0.5)', borderRadius: 3, height: 5, marginTop: 3 }}>
-                  <div style={{ width: `${building.fuelPct ?? 0}%`, height: 5, borderRadius: 3, background: '#ff7733' }} />
+                <div style={{
+                  height: 8, background: '#0e131a', borderRadius: 2, overflow: 'hidden',
+                }}>
+                  <div style={{
+                    width: `${building.fuelPct ?? 0}%`, height: 8,
+                    borderRadius: 2, background: '#e8ae4a',
+                  }} />
                 </div>
               </div>
             )}
 
+            {/* Belt item */}
             {building.beltItem !== undefined && (
-              <div><span style={{ color: '#888' }}>Carrying:</span> <span style={{ color: '#eee' }}>{building.beltItem ?? '—'}</span></div>
-            )}
-
-            {building.connection && (
-              <div style={{ marginTop: 4 }}>
-                <div style={{ color: '#888' }}>Connections</div>
-                <div style={{ fontSize: 11, color: '#bbb' }}>
-                  <div>← {building.connection.incoming ? building.connection.incoming.label : 'Nothing feeds in'}</div>
-                  <div>→ {building.connection.outgoing ? building.connection.outgoing.label : 'Open end'}</div>
-                </div>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 11, color: '#94a2b0', marginBottom: 10,
+              }}>
+                <span>CARRYING</span>
+                <span style={{ color: '#e8edf2' }}>{building.beltItem ?? '—'}</span>
               </div>
             )}
 
-            <div style={{ marginTop: 6 }}>
-              <span style={{ color: '#888' }}>Storage:</span>{' '}
-              {building.inventory.length === 0 ? (
-                <span style={{ color: '#666' }}>Empty</span>
-              ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 3 }}>
-                  {building.inventory.map((item, idx) => (
-                    <span key={idx} style={{
-                      background: 'rgba(255,255,255,0.08)', color: '#ddd', padding: '2px 6px',
-                      borderRadius: 3, fontSize: 11,
-                    }}>
-                      {item.type}: {item.amount}
-                    </span>
-                  ))}
-                </div>
-              )}
+            {/* Storage */}
+            <div style={{
+              fontFamily: "'Chakra Petch', sans-serif",
+              fontSize: 10, letterSpacing: '.16em',
+              color: '#6e7b88', marginBottom: 8,
+            }}>
+              CONTENTS
             </div>
-          </div>
-
-          {playerItems.length > 0 && (
-            <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
-              <div style={{ color: '#888', fontSize: 11, marginBottom: 5 }}>Give one from your inventory</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {playerItems.map((item, idx) => {
-                  const ok = canDeposit(item.type);
+            {building.inventory.length === 0 ? (
+              <div style={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 11, color: '#6e7b88', marginBottom: 12,
+              }}>
+                Empty
+              </div>
+            ) : (
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12,
+              }}>
+                {building.inventory.map((item, idx) => {
+                  const color = '#94a2b0';
                   return (
-                    <button
-                      key={idx}
-                      disabled={!ok || item.amount <= 0}
-                      onClick={() => onDeposit(item.type)}
-                      style={{
-                        background: ok ? 'rgba(0,180,120,0.2)' : 'rgba(255,255,255,0.05)',
-                        color: ok ? '#44cc88' : '#666',
-                        border: ok ? '1px solid rgba(68,204,136,0.4)' : '1px solid transparent',
-                        borderRadius: 3, padding: '3px 8px', fontSize: 11, cursor: ok ? 'pointer' : 'not-allowed',
-                      }}
-                    >
-                      {DEPOSIT_DISPLAY[item.type] ?? item.type} +1
-                    </button>
+                    <div key={idx} style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '5px 8px',
+                      background: '#101720',
+                      border: '1px solid rgba(255,255,255,.07)',
+                      borderRadius: 3,
+                    }}>
+                      <span style={{
+                        width: 11, height: 11, background: color,
+                        border: '1px solid #101418',
+                      }} />
+                      <span style={{
+                        fontFamily: "'IBM Plex Mono', monospace",
+                        fontSize: 11, color: '#e8edf2',
+                      }}>
+                        {item.type}: {item.amount}
+                      </span>
+                    </div>
                   );
                 })}
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Direction */}
+            {building.direction !== undefined && (
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: 11, color: '#94a2b0', marginBottom: 10,
+              }}>
+                <span>DIRECTION</span>
+                <span style={{ color: '#e8edf2' }}>{building.directionLabel}</span>
+              </div>
+            )}
+
+            {/* Remove button */}
+            {building.type !== 'conveyor' && (
+              <button style={{
+                display: 'block', width: '100%', height: 30, marginTop: 8,
+                background: '#1d242e', border: '1px solid rgba(255,255,255,.09)',
+                borderRadius: 3,
+                fontFamily: "'Chakra Petch', sans-serif",
+                fontSize: 11, fontWeight: 600, letterSpacing: '.12em',
+                color: '#ec6058', cursor: 'pointer', textAlign: 'center',
+              }}>
+                REMOVE Q
+              </button>
+            )}
+
+            {/* Deposit buttons */}
+            {playerItems.length > 0 && (
+              <>
+                <div style={{
+                  fontFamily: "'Chakra Petch', sans-serif",
+                  fontSize: 10, letterSpacing: '.16em',
+                  color: '#6e7b88', marginTop: 14, marginBottom: 8,
+                  paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.08)',
+                }}>
+                  GIVE FROM INVENTORY
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                  {playerItems.map((item, idx) => {
+                    const ok = canDeposit(item.type);
+                    return (
+                      <button
+                        key={idx}
+                        disabled={!ok || item.amount <= 0}
+                        onClick={() => onDeposit(item.type)}
+                        style={{
+                          height: 30, padding: '0 12px',
+                          display: 'grid', placeItems: 'center',
+                          background: ok ? '#1f2732' : '#101418',
+                          border: ok ? '1px solid rgba(95,203,147,.3)' : '1px solid rgba(255,255,255,.07)',
+                          borderRadius: 3,
+                          fontFamily: "'Chakra Petch', sans-serif",
+                          fontSize: 11, fontWeight: 600, letterSpacing: '.1em',
+                          color: ok ? '#5fcb93' : '#5e6873',
+                          cursor: ok ? 'pointer' : 'not-allowed',
+                          opacity: ok ? 1 : 0.5,
+                        }}
+                      >
+                        {DEPOSIT_DISPLAY[item.type] ?? item.type} +1
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </>
       )}
     </div>
