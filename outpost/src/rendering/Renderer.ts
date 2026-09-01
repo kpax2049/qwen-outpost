@@ -1111,16 +1111,23 @@ export class Renderer {
 
     const moving = building.active && !building.blocked;
     if (moving) {
-      anim.offset = (anim.offset + 1) % 12;
+      // Time-based scrolling tread. The Relay Seven motion is a linear scroll
+      // of one tile-width per 0.9s; at TILE_SIZE the chevron/tread pattern
+      // repeats every 24px (16px in the 32px sprite x1.5), so one pattern
+      // period scrolls every 24/64 * 0.9s = 0.3375s == 337.5ms. Using a wall
+      // clock keeps the cadence correct at any frame rate (and matches the
+      // reference's "0.9s" animation, which the old per-frame 12-step counter
+      // ran ~1.7x too fast).
+      anim.offset = (performance.now() % 337.5) / 337.5;
     }
-    const phase = anim.offset / 12;
+    const phase = anim.offset;
 
     const bx = gx * TILE_SIZE;
     const by = gy * TILE_SIZE;
 
-    // Dark base underneath
-    ctx.fillStyle = '#2a2a30';
-    ctx.fillRect(bx + 2, by + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    // Relay Seven renders the belt as a clean band that sits directly on the
+    // terrain (the approved R-belt-* sprites are transparent around the band).
+    // No dark full-tile base plate behind the belt.
 
     // Sprite selection based on geometry
     if (geometry === 'straight') {
@@ -1131,9 +1138,6 @@ export class Renderer {
       const beltCanvas = this.getElbowCanvas(dir, incomingSide!);
       ctx.drawImage(beltCanvas, bx, by);
     }
-
-    // Draw connected belt edges (seamless chains)
-    this.drawBeltConnections(gx, gy, map);
 
     // Scrolling tread on straight belts: the sprite's own chevrons travel in
     // the flow direction (Relay Seven motion). Elbows keep their static
@@ -1191,30 +1195,6 @@ export class Renderer {
       return side;
     }
     return undefined;
-  }
-
-  /** Draw seamless connections between adjacent belts. */
-  private drawBeltConnections(gx: number, gy: number, map: Tile[][]): void {
-    const { ctx } = this;
-    const inset = 4;
-    const bx = gx * TILE_SIZE;
-    const by = gy * TILE_SIZE;
-
-    for (const side of [Dir.Up, Dir.Right, Dir.Down, Dir.Left] as DirectionValue[]) {
-      const nx = gx + directionVector(side).x;
-      const ny = gy + directionVector(side).y;
-      const isConnected =
-        nx >= 0 && nx < MAP_SIZE && ny >= 0 && ny < MAP_SIZE &&
-        map[ny][nx].building?.type === 'conveyor';
-
-      if (!isConnected) {
-        ctx.fillStyle = 'rgba(26, 26, 46, 0.6)';
-        if (side === Dir.Up) ctx.fillRect(bx + inset, by, TILE_SIZE - inset * 2, inset);
-        if (side === Dir.Down) ctx.fillRect(bx + inset, by + TILE_SIZE - inset, TILE_SIZE - inset * 2, inset);
-        if (side === Dir.Left) ctx.fillRect(bx, by + inset, inset, TILE_SIZE - inset * 2);
-        if (side === Dir.Right) ctx.fillRect(bx + TILE_SIZE - inset, by + inset, inset, TILE_SIZE - inset * 2);
-      }
-    }
   }
 
   /** Create an error marker canvas when a belt sprite is missing. */
