@@ -3,7 +3,7 @@ import { GameEngine } from './engine/GameEngine';
 import { Renderer } from './rendering/Renderer';
 import type { Camera } from './rendering/Renderer';
 import { AssetLoader } from './rendering/AssetLoader';
-import { BUILDING_COLORS } from './types';
+import { BUILDING_COLORS, BuildingTypeMap } from './types';
 import type { BuildingTypeValue, PowerSummary, DirectionValue } from './types';
 import { HUD } from './ui/HUD';
 import { BuildMenu } from './ui/BuildMenu';
@@ -242,13 +242,21 @@ const App: React.FC = () => {
       }
 
       // R rotates: with a build tool armed it rotates the direction the (single-click)
-      // building will face; otherwise it rotates the building underfoot.
+      // building will face; otherwise, if a conveyor is inspected, it rotates that
+      // conveyor REMOTELY (no need to stand on it). With nothing inspected it rotates
+      // the building underfoot.
       if (e.key.toLowerCase() === 'r') {
         if (bt) {
           engine.setBuildDirection(((engine.getBuildDirection() + 1) % 4) as DirectionValue);
           setRenderTick(t => t + 1);
         } else {
-          engine.rotateBuilding();
+          const insp = inspectedRef.current;
+          const inspectedBuilding = insp ? engine.inspectBuilding(insp.x, insp.y) : null;
+          if (insp && inspectedBuilding && inspectedBuilding.type === BuildingTypeMap.conveyor) {
+            engine.rotateBuildingAt(insp.x, insp.y);
+          } else {
+            engine.rotateBuilding();
+          }
           setRenderTick(t => t + 1);
         }
         return;
@@ -638,6 +646,21 @@ const App: React.FC = () => {
     return engineRef.current.buildingAcceptsItem(ip.x, ip.y, type);
   }, []);
 
+  const handleRotateInspected = useCallback(() => {
+    const ip = inspectedRef.current;
+    const engine = engineRef.current;
+    if (!ip) return;
+    engine.rotateBuildingAt(ip.x, ip.y);
+    setRenderTick(t => t + 1);
+    setInspectedData({
+      building: engine.inspectBuilding(ip.x, ip.y),
+      power: engine.getPowerSummary(),
+      playerItems: engine.player.inventory
+        .filter(i => i.amount > 0)
+        .map(i => ({ type: i.type as string, amount: i.amount })),
+    });
+  }, []);
+
   const eng = engineRef.current;
   const playerInv = eng.player.inventory;
   const cMove = eng.player.x !== 60 || eng.player.y !== 60;
@@ -808,6 +831,7 @@ const App: React.FC = () => {
           onClose={closeInspection}
           onDeposit={handleDeposit}
           canDeposit={canDeposit}
+          onRotate={handleRotateInspected}
         />
       )}
 

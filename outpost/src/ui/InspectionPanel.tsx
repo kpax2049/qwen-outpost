@@ -12,6 +12,7 @@ interface InspectionPanelProps {
   onClose: () => void;
   onDeposit: (type: string) => void;
   canDeposit: (type: string) => boolean;
+  onRotate: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -35,7 +36,7 @@ const DEPOSIT_DISPLAY: Record<string, string> = {
   engine: 'Engine',
 };
 
-export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose, onDeposit, canDeposit }) => {
+export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose, onDeposit, canDeposit, onRotate }) => {
   const { building, power, playerItems } = data;
 
   return (
@@ -81,6 +82,16 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
           <div style={{ color: STATUS_COLORS[building.statusColor] || '#ccc', fontSize: 12, marginBottom: 8, fontWeight: 'bold' }}>
             {building.status}
           </div>
+
+          {building.type === 'conveyor' && (
+            <button onClick={onRotate} style={{
+              display: 'block', width: '100%', marginBottom: 8, background: 'rgba(140,200,255,0.14)',
+              color: '#cfe6ff', border: '1px solid rgba(140,200,255,0.4)', borderRadius: 4,
+              padding: '6px 10px', fontSize: 12, cursor: 'pointer', textAlign: 'center',
+            }}>
+              ⟳ Rotate ({building.directionLabel})
+            </button>
+          )}
 
           <div style={{ fontSize: 12, color: '#ccc', lineHeight: 1.7 }}>
             {building.direction !== undefined && (

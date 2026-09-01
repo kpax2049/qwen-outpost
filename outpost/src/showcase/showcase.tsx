@@ -1088,7 +1088,7 @@ function Showcase() {
               power={power}
             />
             {(inspection && (
-              <InspectionPanel data={inspection} onClose={() => {}} onDeposit={() => {}} canDeposit={() => false} />
+              <InspectionPanel data={inspection} onClose={() => {}} onDeposit={() => {}} canDeposit={() => false} onRotate={() => {}} />
             )) || <></>}
           </Stage>
         </div>

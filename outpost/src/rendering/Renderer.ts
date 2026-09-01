@@ -1190,27 +1190,53 @@ export class Renderer {
   }
 
   /**
-   * Subtle belt tread animation: thin semi-transparent dots moving along the belt flow.
-   * For straight belts: linear motion. For elbow belts: curved arc from entry to output.
+   * Belt tread animation: a continuous set of chevron marks that scroll along the
+   * belt in the flow direction (Relay Seven "scrolling tread"). Straight belts move
+   * linearly; elbow belts follow the curved arc from entry to output.
    */
   private drawBeltTread(gx: number, gy: number, dir: DirectionValue, phase: number, geometry: 'straight' | 'elbow', incomingSide?: DirectionValue): void {
     const { ctx } = this;
+    const count = 4;
+    const size = 4;
 
-    for (let i = 0; i < 3; i++) {
-      let t = (i + phase) / 3;
+    for (let i = 0; i < count; i++) {
+      let t = (i + phase) / count;
       if (t > 1) t -= 1;
 
-      let pos: { x: number; y: number };
+      // Sample position and a nearby point to derive the local flow direction.
+      let at: { x: number; y: number };
       if (geometry === 'elbow' && incomingSide) {
-        pos = this.getElbowPoint(gx, gy, dir, incomingSide, t);
+        at = this.getElbowPoint(gx, gy, dir, incomingSide, t);
       } else {
-        pos = this.getBeltPoint(gx, gy, dir, t);
+        at = this.getBeltPoint(gx, gy, dir, t);
       }
 
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      const t2 = Math.min(1, t + 0.02);
+      let ahead: { x: number; y: number };
+      if (geometry === 'elbow' && incomingSide) {
+        ahead = this.getElbowPoint(gx, gy, dir, incomingSide, t2);
+      } else {
+        ahead = this.getBeltPoint(gx, gy, dir, t2);
+      }
+
+      let dx = ahead.x - at.x;
+      let dy = ahead.y - at.y;
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
+
+      // Perpendicular for the chevron wings.
+      const px = -dy;
+      const py = dx;
+
+      ctx.strokeStyle = 'rgba(110, 120, 132, 0.55)';
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 1.5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(at.x - dx * size - px * size * 0.6, at.y - dy * size - py * size * 0.6);
+      ctx.lineTo(at.x, at.y);
+      ctx.lineTo(at.x - dx * size + px * size * 0.6, at.y - dy * size + py * size * 0.6);
+      ctx.stroke();
     }
   }
 
