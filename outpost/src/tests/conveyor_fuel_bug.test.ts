@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../engine/GameEngine';
-import { BuildingTypeMap, Dir, ItemType, MAP_SIZE, BUILDING_DEFS } from '../types';
+import { Dir, MAP_SIZE, BUILDING_DEFS } from '../types';
+import type { ItemType } from '../types';
 
 function makeBuilding(type: string, overrides: Partial<import('../types').Building> = {}) {
   const def = BUILDING_DEFS[type as keyof typeof BUILDING_DEFS];
   return {
-    type,
+    type: type as import('../types').BuildingTypeValue,
     direction: Dir.Down,
     active: false,
     powerConsumed: def.powerConsumed,
@@ -22,7 +23,7 @@ function makeBuilding(type: string, overrides: Partial<import('../types').Buildi
 }
 
 describe('Bug fix: conveyor-to-Coal-Generator fuel transfer', () => {
-  function setupGeneratorWithBelt(below: boolean = true) {
+  function setupGeneratorWithBelt(_below: boolean = true) {
     const engine = new GameEngine(42);
     const { map, player } = engine;
     const cx = Math.floor(MAP_SIZE / 2);

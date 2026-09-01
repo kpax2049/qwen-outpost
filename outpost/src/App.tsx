@@ -7,7 +7,7 @@ import { BUILDING_COLORS, BuildingTypeMap } from './types';
 import type { BuildingTypeValue, PowerSummary, DirectionValue } from './types';
 import { HUD } from './ui/HUD';
 import { BuildMenu } from './ui/BuildMenu';
-import { InventoryPanel } from './ui/InventoryPanel';
+import { InventoryPanel, MinimizedInventoryBar } from './ui/InventoryPanel';
 import { HelpPanel } from './ui/HelpPanel';
 import { ObjectivesPanel } from './ui/ObjectivesPanel';
 import { Tutorial } from './ui/Tutorial';
@@ -821,6 +821,8 @@ const App: React.FC = () => {
           playerStats={engineRef.current.player.stats}
         />
       )}
+
+      <MinimizedInventoryBar playerInventory={engineRef.current.player.inventory} />
 
       {showHelp && <HelpPanel />}
       {showObjectives && <ObjectivesPanel enginesCrafted={engineRef.current.player.stats.enginesCrafted} stonesMined={engineRef.current.player.stats.stonesMined} />}

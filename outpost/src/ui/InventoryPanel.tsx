@@ -1,6 +1,45 @@
 import React from 'react';
-import { ITEM_DISPLAY_NAMES, ITEM_COLORS, BUILDING_NAMES } from '../types';
-import type { Item, Tile } from '../types';
+import { ITEM_DISPLAY_NAMES, BUILDING_NAMES } from '../types';
+import type { Item, Tile, ItemType } from '../types';
+
+const SPRITE_BASE = '/assets/relay-seven';
+
+function itemSpritePath(type: string): string {
+  const map: Record<string, string> = {
+    stone: 'R-item-stone',
+    iron: 'R-item-iron',
+    copper: 'R-item-copper',
+    coal: 'R-item-coal',
+    gold: 'R-item-gold',
+    iron_ingot: 'R-item-ingot',
+    copper_wire: 'R-item-wire',
+    steel_plate: 'R-item-plate',
+    circuit: 'R-item-circuit',
+    gear: 'R-item-gear',
+    engine: 'R-item-engine',
+    wood: 'R-item-wood',
+  };
+  return map[type] ?? null;
+}
+
+function buildingSpritePath(type: string): string {
+  const map: Record<string, string> = {
+    storage: 'R-b-storage',
+    chest: 'R-b-chest',
+    generator: 'R-b-generator',
+    miner: 'R-b-miner',
+    conveyor: 'R-b-conveyor',
+    smelter: 'R-b-smelter',
+    steel_smelter: 'R-b-steel',
+    assembler: 'R-b-assembler',
+  };
+  return map[type] ?? null;
+}
+
+const COMMON_MATERIALS: string[] = [
+  'stone', 'iron', 'copper', 'coal', 'gold',
+  'iron_ingot', 'copper_wire', 'steel_plate', 'circuit', 'gear', 'engine',
+];
 
 interface InventoryPanelProps {
   playerInventory: Item[];
@@ -13,152 +52,325 @@ interface InventoryPanelProps {
   };
 }
 
-export const InventoryPanel: React.FC<InventoryPanelProps> = ({ playerInventory, nearbyBuildings, playerStats }) => {
-  const formatTime = (seconds: number): string => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+/** Minimized inventory bar — always visible at bottom center. */
+export const MinimizedInventoryBar: React.FC<{ playerInventory: Item[] }> = ({ playerInventory }) => (
+  <div style={{
+    position: 'absolute',
+    bottom: 8,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    gap: 1,
+    padding: '5px 8px',
+    background: '#141a20',
+    border: '1px solid #2a333c',
+    boxShadow: 'inset 0 1px 0 #39434d',
+    borderRadius: 2,
+    zIndex: 15,
+    overflow: 'hidden',
+  }}>
+    {COMMON_MATERIALS.map(type => {
+      const invItem = playerInventory.find(i => i.type === type);
+      if (!invItem || invItem.amount <= 0) return null;
+      const spritePath = itemSpritePath(type);
+      const displayName = ITEM_DISPLAY_NAMES[type as ItemType] || type;
+      return (
+        <div
+          key={type}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '3px 6px',
+            background: '#0f151b',
+            border: '1px solid #232c34',
+            borderRadius: 2,
+            whiteSpace: 'nowrap',
+            minWidth: 0,
+          }}
+        >
+          {spritePath && (
+            <img
+              src={`${SPRITE_BASE}/${spritePath}.png`}
+              width={16}
+              height={16}
+              alt={displayName}
+              style={{ imageRendering: 'pixelated', flexShrink: 0 }}
+            />
+          )}
+          <span style={{
+            fontSize: 10, color: '#94a3af',
+            fontFamily: "'IBM Plex Sans', sans-serif",
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            maxWidth: 60,
+          }}>
+            {displayName}
+          </span>
+          <span style={{
+            fontSize: 10, color: '#e6ebef', fontWeight: 600,
+            fontFamily: "'IBM Plex Mono', monospace",
+            flexShrink: 0,
+          }}>
+            x{invItem.amount}
+          </span>
+        </div>
+      );
+    })}
+    {playerInventory.every(i => i.amount <= 0) && (
+      <span style={{
+        fontSize: 10, color: '#5a6a7a',
+        fontFamily: "'IBM Plex Mono', monospace",
+      }}>
+        Empty
+      </span>
+    )}
+  </div>
+);
 
-  const totalItems = playerInventory.reduce((sum, item) => sum + item.amount, 0);
-  const totalTypes = playerInventory.filter(i => i.amount > 0).length;
+/** Expanded inventory panel — shown when inventory is toggled open. */
+export const InventoryPanel: React.FC<InventoryPanelProps> = ({ playerInventory, nearbyBuildings }) => {
+  const totalTypes = playerInventory.length;
+  const totalItems = playerInventory.reduce((s, i) => s + i.amount, 0);
 
   return (
     <div style={{
-      position: 'absolute', bottom: 8, left: 8, right: 8,
-      background: '#141922', border: '1px solid rgba(255,255,255,.1)',
-      borderRadius: 5, zIndex: 20, display: 'flex', flexDirection: 'column',
-      maxHeight: '50vh',
-      boxShadow: '0 18px 44px rgba(0,0,0,.55)',
+      position: 'absolute', top: 56, right: 8, bottom: 36,
+      width: 272,
+      background: '#141a20',
+      border: '1px solid #2a333c',
+      boxShadow: 'inset 0 1px 0 #39434d',
+      zIndex: 20,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
     }}>
+      {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 14px', background: '#1d242e',
-        borderBottom: '1px solid rgba(255,255,255,.08)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '6px 10px',
+        background: '#1b232c',
+        borderBottom: '1px solid #2a333c',
+        flexShrink: 0,
       }}>
         <span style={{
           fontFamily: "'Chakra Petch', sans-serif",
-          fontSize: 12, fontWeight: 700, letterSpacing: '.16em',
-          color: '#e8edf2',
+          fontSize: 10, fontWeight: 700, letterSpacing: '.16em', color: '#cbd6e0',
         }}>
-          CARRYING
+          INVENTORY
         </span>
         <span style={{
           fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: 10, color: '#6e7b88',
+          fontSize: 10, color: '#6f7d89',
         }}>
-          {totalTypes} types · {totalItems} items
+          {totalTypes} types, {totalItems} items
         </span>
       </div>
 
-      <div style={{ padding: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, overflowY: 'auto' }}>
-        {playerInventory.length === 0 && (
+      {/* Player Inventory */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '8px 10px',
+      }}>
+        {playerInventory.length === 0 ? (
           <div style={{
-            gridColumn: '1 / -1',
+            color: '#5a6a7a',
+            fontSize: 11,
             fontFamily: "'IBM Plex Mono', monospace",
-            fontSize: 11, color: '#6e7b88',
+            padding: '12px 0',
+            textAlign: 'center',
           }}>
-            Empty — mine resources with [E]
+            Empty - mine resources with [E]
           </div>
-        )}
-        {playerInventory.map((item, idx) => {
-          if (item.amount <= 0) return null;
-          const color = ITEM_COLORS[item.type] || '#94a2b0';
-          const isCoal = item.type === 'coal';
-          const isOre = ['iron', 'copper', 'gold'].includes(item.type);
-
-          return (
-            <div key={idx} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '6px 8px', background: '#101720', borderRadius: 3,
-            }}>
-              <div style={{
-                width: 14, height: 14,
-                background: color,
-                border: '2px solid #101418',
-                borderRadius: isCoal ? '50%' : isOre ? '2px' : '2px',
-                transform: isOre ? 'rotate(45deg)' : undefined,
-                flexShrink: 0,
-              }} />
-              <span style={{
-                flex: 1,
-                fontFamily: "'IBM Plex Sans', sans-serif",
-                fontSize: 12, color: '#c6d2de',
-              }}>
-                {ITEM_DISPLAY_NAMES[item.type] || item.type}
-              </span>
-              <span style={{
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontSize: 12, color: '#e8edf2',
-              }}>
-                {item.amount}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {nearbyBuildings.length > 0 && (
-        <>
-          <div style={{
-            padding: '8px 14px', background: '#101720',
-            borderTop: '1px solid rgba(255,255,255,.08)',
-          }}>
-            <div style={{
-              fontFamily: "'Chakra Petch', sans-serif",
-              fontSize: 10, letterSpacing: '.16em',
-              color: '#6e7b88', marginBottom: 6,
-            }}>
-              NEARBY BUILDINGS
-            </div>
-          </div>
-          <div style={{
-            padding: '0 10px 10px',
-            display: 'flex', flexWrap: 'wrap', gap: 6,
-          }}>
-            {nearbyBuildings.map((tile, idx) => {
-              if (!tile.building) return null;
-              const b = tile.building;
-              const totalItems = b.inventory.reduce((s, i) => s + i.amount, 0);
-
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {playerInventory.map((item, idx) => {
+              const spritePath = itemSpritePath(item.type);
+              const displayName = ITEM_DISPLAY_NAMES[item.type as ItemType] || item.type;
               return (
                 <div key={idx} style={{
-                  padding: '4px 8px',
-                  background: b.active ? '#2e4a2c' : '#101418',
-                  border: `1px solid ${b.active ? 'rgba(95,203,147,.3)' : 'rgba(236,96,88,.3)'}`,
-                  borderRadius: 3,
-                  minWidth: 100,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '4px 6px',
+                  background: '#0f151b',
+                  border: '1px solid #232c34',
+                  borderRadius: 2,
                 }}>
-                  <div style={{
-                    fontFamily: "'IBM Plex Mono', monospace",
-                    fontSize: 10, color: b.active ? '#e8edf2' : '#5e6873',
+                  {spritePath ? (
+                    <img
+                      src={`${SPRITE_BASE}/${spritePath}.png`}
+                      width={24}
+                      height={24}
+                      alt={displayName}
+                      style={{ imageRendering: 'pixelated', flexShrink: 0 }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: 14, height: 14, borderRadius: 2, background: '#555',
+                      flexShrink: 0,
+                    }} />
+                  )}
+                  <span style={{
+                    fontSize: 11, color: '#cbd6e0', flex: 1,
+                    fontFamily: "'IBM Plex Sans', sans-serif",
                   }}>
-                    {b.active ? '\u25CF' : '\u25CB'} {BUILDING_NAMES[b.type] || b.type}
-                  </div>
-                  <div style={{
+                    {displayName}
+                  </span>
+                  <span style={{
+                    fontSize: 12, color: '#e6ebef', fontWeight: 600,
                     fontFamily: "'IBM Plex Mono', monospace",
-                    fontSize: 9, color: '#7e8c9a', marginTop: 2,
                   }}>
-                    {totalItems > 0 ? `${totalItems} items` : 'empty'}
-                  </div>
+                    x{item.amount}
+                  </span>
                 </div>
               );
             })}
           </div>
-        </>
-      )}
+        )}
+      </div>
 
+      {/* Divider */}
       <div style={{
-        padding: '8px 14px', background: '#101720',
-        borderTop: '1px solid rgba(255,255,255,.08)',
-        display: 'flex', justifyContent: 'space-between',
-        fontFamily: "'IBM Plex Mono', monospace",
-        fontSize: 10, color: '#7e8c9a',
+        height: 1,
+        background: '#2a333c',
+        flexShrink: 0,
+      }} />
+
+      {/* Nearby Buildings */}
+      <div style={{
+        maxHeight: '45%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
       }}>
-        <span>Stones: {playerStats.stonesMined}</span>
-        <span>Ingots: {playerStats.ingotsCrafted}</span>
-        <span>Engines: {playerStats.enginesCrafted}</span>
-        <span>Time: {formatTime(playerStats.timePlayed)}</span>
+        <div style={{
+          padding: '6px 10px 4px',
+          borderBottom: '1px solid #2a333c',
+          background: '#1b232c',
+          flexShrink: 0,
+        }}>
+          <span style={{
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 10, fontWeight: 700, letterSpacing: '.16em', color: '#ffb347',
+          }}>
+            NEARBY BUILDINGS
+          </span>
+        </div>
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '6px 8px',
+        }}>
+          {nearbyBuildings.length === 0 ? (
+            <div style={{
+              color: '#5a6a7a',
+              fontSize: 10,
+              fontFamily: "'IBM Plex Mono', monospace",
+              padding: '8px 0',
+              textAlign: 'center',
+            }}>
+              No buildings nearby.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {nearbyBuildings.map((tile, idx) => {
+                if (!tile.building) return null;
+                const b = tile.building;
+                const totalItems = b.inventory.reduce((s, i) => s + i.amount, 0);
+                const name = BUILDING_NAMES[b.type] || b.type;
+                const spritePath = buildingSpritePath(b.type);
+                const progressPct = b.maxProgress > 1
+                  ? Math.floor((b.progress / b.maxProgress) * 100)
+                  : 0;
+
+                return (
+                  <div key={idx} style={{
+                    background: b.active ? '#0f151b' : '#1a0f0f',
+                    border: `1px solid ${b.active ? '#232c34' : '#3a1a1a'}`,
+                    borderRadius: 2,
+                    padding: '5px 6px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {spritePath ? (
+                        <img
+                          src={`${SPRITE_BASE}/${spritePath}.png`}
+                          width={32}
+                          height={32}
+                          alt={name}
+                          style={{
+                            imageRendering: 'pixelated',
+                            opacity: b.active ? 1 : 0.5,
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : null}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          marginBottom: 1,
+                        }}>
+                          <span style={{
+                            width: 6, height: 6, borderRadius: '50%',
+                            background: b.active ? '#7ddc8a' : '#ec6058',
+                            flexShrink: 0,
+                          }} />
+                          <span style={{
+                            fontSize: 11, color: b.active ? '#cbd6e0' : '#7a6a6a',
+                            fontFamily: "'Chakra Petch', sans-serif",
+                            fontWeight: 600, letterSpacing: '.06em',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {name}
+                          </span>
+                        </div>
+                        <div style={{
+                          fontSize: 9, color: '#5a6a7a',
+                          fontFamily: "'IBM Plex Mono', monospace",
+                        }}>
+                          {totalItems > 0 ? `${totalItems} items` : 'empty'}
+                          {b.maxProgress > 1 && ` · ${progressPct}%`}
+                        </div>
+                        {b.maxProgress > 1 && (
+                          <div style={{
+                            marginTop: 4,
+                            position: 'relative',
+                            height: 10,
+                            background: '#080b0e',
+                            boxShadow: '0 0 0 1px #12161a, inset 0 -1px 0 #3d454c',
+                            overflow: 'hidden',
+                            borderRadius: 1,
+                          }}>
+                            <div style={{
+                              position: 'absolute',
+                              left: 1, right: 1, top: 2, bottom: 2,
+                              background: 'repeating-linear-gradient(90deg, #161e24 0 5.5%, #080b0e 5.5% 7%)',
+                            }} />
+                            <div style={{
+                              position: 'absolute',
+                              left: 1, top: 2, bottom: 2,
+                              width: `${Math.max(0, progressPct)}%`,
+                              background: 'repeating-linear-gradient(90deg, #7ddc8a 0 5.5%, #0d1a12 5.5% 7%)',
+                            }} />
+                            <div style={{
+                              position: 'absolute',
+                              left: 1, right: 1, top: 2, height: 1,
+                              background: 'rgba(255,255,255,.12)',
+                            }} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
