@@ -103,6 +103,7 @@ const App: React.FC = () => {
   const [showObjectives, setShowObjectives] = useState(true);
   const [showPowerPanel, setShowPowerPanel] = useState(false);
   const [buildType, setBuildType] = useState<BuildingTypeValue | null>(null);
+  const [selectedBuild, setSelectedBuild] = useState<BuildingTypeValue | null>(null);
   const [showWinMessage, setShowWinMessage] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [nearbyBuildings, setNearbyBuildings] = useState<import('./types').Tile[]>([]);
@@ -318,6 +319,7 @@ const App: React.FC = () => {
         if (bt) {
           setBuildType(null);
           buildTypeRef.current = null;
+          setSelectedBuild(null);
         } else if (inspectedRef.current) {
           closeInspection();
         } else if (buildMenuOpenRef.current || inventoryOpenRef.current || helpOpenRef.current) {
@@ -626,8 +628,13 @@ const App: React.FC = () => {
     } else {
       setBuildType(type);
       buildTypeRef.current = type;
+      setSelectedBuild(type);
     }
   };
+
+  const handleBuildDetailSelect = useCallback((type: BuildingTypeValue | null) => {
+    setSelectedBuild(type);
+  }, []);
 
   const handleDeposit = useCallback((type: string) => {
     const ip = inspectedRef.current;
@@ -815,6 +822,8 @@ const App: React.FC = () => {
         <BuildMenu
           onSelectBuild={handleBuildSelect}
           activeBuild={buildType}
+          selectedBuild={selectedBuild}
+          onDetailSelect={handleBuildDetailSelect}
           playerInventory={engineRef.current.player.inventory}
         />
       )}

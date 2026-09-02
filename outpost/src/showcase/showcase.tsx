@@ -1017,7 +1017,7 @@ function Showcase() {
               playerInventory={playerItems}
             />
             <div style={{ position: 'absolute', top: 50, left: 8, zIndex: 20 }}>
-              <BuildMenu onSelectBuild={() => {}} activeBuild={'miner'} playerInventory={playerItems} />
+              <BuildMenu onSelectBuild={() => {}} activeBuild={'miner'} selectedBuild={null} onDetailSelect={() => {}} playerInventory={playerItems} />
             </div>
           </div>
         </Stage>
@@ -1058,7 +1058,7 @@ function Showcase() {
             playerInventory={playerItems}
           />
           <div style={{ position: 'absolute', top: 50, left: 8, zIndex: 20 }}>
-            <BuildMenu onSelectBuild={() => {}} activeBuild={'conveyor'} playerInventory={playerItems} />
+            <BuildMenu onSelectBuild={() => {}} activeBuild={'conveyor'} selectedBuild={null} onDetailSelect={() => {}} playerInventory={playerItems} />
           </div>
           <div style={{ position: 'absolute', bottom: 8, left: 8, right: 8, zIndex: 20 }}>
             <InventoryPanel
