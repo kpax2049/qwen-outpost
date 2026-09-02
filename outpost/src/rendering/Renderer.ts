@@ -800,8 +800,8 @@ export class Renderer {
       ctx.lineWidth = 2;
       ctx.strokeRect(bx + 1, by + 1, TILE_SIZE - 2, TILE_SIZE - 2);
     } else if (!hasPower) {
-      // No power: blue-gray wash over sprite
-      ctx.fillStyle = 'rgba(40, 50, 70, 0.35)';
+      // No power: subtle blue-gray wash over sprite
+      ctx.fillStyle = 'rgba(40, 50, 70, 0.18)';
       ctx.fillRect(bx, by, TILE_SIZE, TILE_SIZE);
     } else if (isWorking) {
       // Working: warm amber glow/pulse around edges
@@ -840,9 +840,9 @@ export class Renderer {
       ctx.beginPath();
       ctx.rect(bx, by, TILE_SIZE, TILE_SIZE);
       ctx.clip();
-      const hatchSpacing = Math.round(TILE_SIZE * 0.11);
+      const hatchSpacing = Math.round(TILE_SIZE * 0.16);
       for (let offset = -(TILE_SIZE * 2); offset < TILE_SIZE * 3; offset += hatchSpacing) {
-        ctx.fillStyle = 'rgba(16, 20, 24, 0.62)';
+        ctx.fillStyle = 'rgba(16, 20, 24, 0.22)';
         ctx.beginPath();
         ctx.moveTo(bx + offset, by);
         ctx.lineTo(bx + offset + TILE_SIZE * 0.6, by);
