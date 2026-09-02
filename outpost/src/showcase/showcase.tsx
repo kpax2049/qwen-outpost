@@ -971,6 +971,7 @@ function Showcase() {
             onToggleInventory={() => {}}
             onToggleHelp={() => {}}
             onToggleObjectives={() => {}}
+            onTogglePower={() => {}}
             onSave={() => {}}
             onLoad={() => {}}
             onNewGame={() => {}}
@@ -978,6 +979,8 @@ function Showcase() {
             onDeselectBuild={() => {}}
             saveStatus={null}
             power={power}
+            showPowerPanel={false}
+            playerInventory={playerItems}
           />
           <ObjectivesPanel enginesCrafted={1} stonesMined={12} />
         </Stage>
@@ -1002,6 +1005,7 @@ function Showcase() {
               onToggleInventory={() => {}}
               onToggleHelp={() => {}}
               onToggleObjectives={() => {}}
+              onTogglePower={() => {}}
               onSave={() => {}}
               onLoad={() => {}}
               onNewGame={() => {}}
@@ -1009,6 +1013,8 @@ function Showcase() {
               buildDirection={Dir.Down}
               onDeselectBuild={() => {}}
               saveStatus={null}
+              showPowerPanel={false}
+              playerInventory={playerItems}
             />
             <div style={{ position: 'absolute', top: 50, left: 8, zIndex: 20 }}>
               <BuildMenu onSelectBuild={() => {}} activeBuild={'miner'} playerInventory={playerItems} />
@@ -1039,6 +1045,7 @@ function Showcase() {
             onToggleInventory={() => {}}
             onToggleHelp={() => {}}
             onToggleObjectives={() => {}}
+            onTogglePower={() => {}}
             onSave={() => {}}
             onLoad={() => {}}
             onNewGame={() => {}}
@@ -1047,6 +1054,8 @@ function Showcase() {
             onDeselectBuild={() => {}}
             saveStatus={{ message: 'Game saved!', type: 'success' }}
             power={power}
+            showPowerPanel={false}
+            playerInventory={playerItems}
           />
           <div style={{ position: 'absolute', top: 50, left: 8, zIndex: 20 }}>
             <BuildMenu onSelectBuild={() => {}} activeBuild={'conveyor'} playerInventory={playerItems} />
@@ -1079,6 +1088,7 @@ function Showcase() {
               onToggleInventory={() => {}}
               onToggleHelp={() => {}}
               onToggleObjectives={() => {}}
+              onTogglePower={() => {}}
               onSave={() => {}}
               onLoad={() => {}}
               onNewGame={() => {}}
@@ -1086,6 +1096,8 @@ function Showcase() {
               onDeselectBuild={() => {}}
               saveStatus={null}
               power={power}
+              showPowerPanel={false}
+              playerInventory={playerItems}
             />
             {(inspection && (
               <InspectionPanel data={inspection} onClose={() => {}} onDeposit={() => {}} canDeposit={() => false} onRotate={() => {}} />

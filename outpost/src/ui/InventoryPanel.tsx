@@ -36,11 +36,6 @@ function buildingSpritePath(type: string): string {
   return map[type] ?? null;
 }
 
-const COMMON_MATERIALS: string[] = [
-  'stone', 'iron', 'copper', 'coal', 'gold',
-  'iron_ingot', 'copper_wire', 'steel_plate', 'circuit', 'gear', 'engine',
-];
-
 interface InventoryPanelProps {
   playerInventory: Item[];
   nearbyBuildings: Tile[];
@@ -51,81 +46,6 @@ interface InventoryPanelProps {
     timePlayed: number;
   };
 }
-
-/** Minimized inventory bar — always visible at bottom center. */
-export const MinimizedInventoryBar: React.FC<{ playerInventory: Item[] }> = ({ playerInventory }) => (
-  <div style={{
-    position: 'absolute',
-    bottom: 8,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    display: 'flex',
-    gap: 1,
-    padding: '5px 8px',
-    background: '#141a20',
-    border: '1px solid #2a333c',
-    boxShadow: 'inset 0 1px 0 #39434d',
-    borderRadius: 2,
-    zIndex: 15,
-    overflow: 'hidden',
-  }}>
-    {COMMON_MATERIALS.map(type => {
-      const invItem = playerInventory.find(i => i.type === type);
-      if (!invItem || invItem.amount <= 0) return null;
-      const spritePath = itemSpritePath(type);
-      const displayName = ITEM_DISPLAY_NAMES[type as ItemType] || type;
-      return (
-        <div
-          key={type}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '3px 6px',
-            background: '#0f151b',
-            border: '1px solid #232c34',
-            borderRadius: 2,
-            whiteSpace: 'nowrap',
-            minWidth: 0,
-          }}
-        >
-          {spritePath && (
-            <img
-              src={`${SPRITE_BASE}/${spritePath}.png`}
-              width={16}
-              height={16}
-              alt={displayName}
-              style={{ imageRendering: 'pixelated', flexShrink: 0 }}
-            />
-          )}
-          <span style={{
-            fontSize: 10, color: '#94a3af',
-            fontFamily: "'IBM Plex Sans', sans-serif",
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            maxWidth: 60,
-          }}>
-            {displayName}
-          </span>
-          <span style={{
-            fontSize: 10, color: '#e6ebef', fontWeight: 600,
-            fontFamily: "'IBM Plex Mono', monospace",
-            flexShrink: 0,
-          }}>
-            x{invItem.amount}
-          </span>
-        </div>
-      );
-    })}
-    {playerInventory.every(i => i.amount <= 0) && (
-      <span style={{
-        fontSize: 10, color: '#5a6a7a',
-        fontFamily: "'IBM Plex Mono', monospace",
-      }}>
-        Empty
-      </span>
-    )}
-  </div>
-);
 
 /** Expanded inventory panel — shown when inventory is toggled open. */
 export const InventoryPanel: React.FC<InventoryPanelProps> = ({ playerInventory, nearbyBuildings }) => {

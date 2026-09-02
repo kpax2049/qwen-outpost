@@ -1,6 +1,32 @@
 import React from 'react';
-import type { BuildingTypeValue, DirectionValue, PowerSummary } from '../types';
-import { BUILDING_NAMES } from '../types';
+import type { BuildingTypeValue, DirectionValue, PowerSummary, Item } from '../types';
+import { BUILDING_NAMES, ITEM_DISPLAY_NAMES } from '../types';
+import type { ItemType } from '../types';
+
+const SPRITE_BASE = '/assets/relay-seven';
+
+const MATERIALS: ItemType[] = [
+  'wood', 'stone', 'iron', 'copper', 'coal',
+  'iron_ingot', 'copper_wire', 'steel_plate',
+];
+
+function itemSpritePath(type: string): string | null {
+  const map: Record<string, string> = {
+    stone: 'R-item-stone',
+    iron: 'R-item-iron',
+    copper: 'R-item-copper',
+    coal: 'R-item-coal',
+    gold: 'R-item-gold',
+    iron_ingot: 'R-item-ingot',
+    copper_wire: 'R-item-wire',
+    steel_plate: 'R-item-plate',
+    circuit: 'R-item-circuit',
+    gear: 'R-item-gear',
+    engine: 'R-item-engine',
+    wood: 'R-item-wood',
+  };
+  return map[type] ?? null;
+}
 
 interface HUDProps {
   tickRate: number;
@@ -13,6 +39,7 @@ interface HUDProps {
   onToggleInventory: () => void;
   onToggleHelp: () => void;
   onToggleObjectives: () => void;
+  onTogglePower: () => void;
   onSave: () => void;
   onLoad: () => void;
   onNewGame: () => void;
@@ -21,6 +48,8 @@ interface HUDProps {
   onDeselectBuild: () => void;
   saveStatus: { message: string; type: 'success' | 'error' | 'info' } | null;
   power?: PowerSummary;
+  showPowerPanel: boolean;
+  playerInventory: Item[];
 }
 
 const DIR_HINT: Record<number, string> = { 0: 'Up \u25B2', 1: 'Right \u25B6', 2: 'Down \u25BC', 3: 'Left \u25C0' };
@@ -28,10 +57,10 @@ const DIR_HINT: Record<number, string> = { 0: 'Up \u25B2', 1: 'Right \u25B6', 2:
 export const HUD: React.FC<HUDProps> = ({
   tickRate,
   onIncreaseSpeed, onDecreaseSpeed, onResetSpeed,
-  onToggleBuildMenu, onToggleInventory, onToggleHelp, onToggleObjectives,
+  onToggleBuildMenu, onToggleInventory, onToggleHelp, onToggleObjectives, onTogglePower,
   onSave, onLoad, onNewGame,
   buildType, buildDirection, onDeselectBuild,
-  saveStatus, power,
+  saveStatus, power, showPowerPanel, playerInventory,
 }) => {
   const speedRates = [1, 5, 10, 20];
   const isSpeedActive = (rate: number) => {
@@ -117,11 +146,15 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
 
         {power && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 9,
-            height: 30, padding: '0 12px',
-            background: '#0d1318', border: '1px solid #2a333c', borderRadius: 4,
-          }}>
+          <div
+            onClick={onTogglePower}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 9,
+              height: 30, padding: '0 12px',
+              background: '#0d1318', border: '1px solid #2a333c', borderRadius: 4,
+              cursor: 'pointer',
+            }}
+          >
             <div style={{
               width: 8, height: 8, borderRadius: '50%',
               background: power.enough ? '#7ddc8a' : '#ec6058',
@@ -155,6 +188,52 @@ export const HUD: React.FC<HUDProps> = ({
             </span>
           </div>
         )}
+
+        <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,.1)', margin: '0 4px' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          {MATERIALS.map(type => {
+            const invItem = playerInventory.find(i => i.type === type);
+            if (!invItem || invItem.amount <= 0) return null;
+            const spritePath = itemSpritePath(type);
+            return (
+              <div
+                key={type}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 2,
+                  padding: '2px 5px',
+                  background: '#0d1318', border: '1px solid #2a333c', borderRadius: 2,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {spritePath && (
+                  <img
+                    src={`${SPRITE_BASE}/${spritePath}.png`}
+                    width={14}
+                    height={14}
+                    alt=""
+                    style={{ imageRendering: 'pixelated', flexShrink: 0 }}
+                  />
+                )}
+                <span style={{
+                  fontSize: 9, color: '#94a3af',
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  maxWidth: 48,
+                }}>
+                  {ITEM_DISPLAY_NAMES[type] || type}
+                </span>
+                <span style={{
+                  fontSize: 9, color: '#e6ebef', fontWeight: 600,
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  flexShrink: 0,
+                }}>
+                  x{invItem.amount}
+                </span>
+              </div>
+            );
+          })}
+        </div>
 
         <div style={{ flex: 1 }} />
 
@@ -369,6 +448,144 @@ export const HUD: React.FC<HUDProps> = ({
           zIndex: 30,
         }}>
           {saveStatus.message}
+        </div>
+      )}
+
+      {showPowerPanel && power && (
+        <div style={{
+          position: 'absolute', top: 56, left: '50%', transform: 'translateX(-50%)',
+          width: 340,
+          background: '#141a20',
+          border: '1px solid #2a333c',
+          borderRadius: 4,
+          zIndex: 25,
+          boxShadow: '0 12px 32px rgba(0,0,0,.5)',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '8px 12px',
+            background: '#1b232c',
+            borderBottom: '1px solid #2a333c',
+          }}>
+            <span style={{
+              fontFamily: "'Chakra Petch', sans-serif",
+              fontSize: 11, fontWeight: 700, letterSpacing: '.14em',
+              color: '#cbd6e0',
+            }}>
+              POWER GRID
+            </span>
+            <button
+              onClick={onTogglePower}
+              style={{
+                width: 22, height: 22,
+                display: 'grid', placeItems: 'center',
+                background: 'transparent', border: '1px solid #2a333c',
+                borderRadius: 3, cursor: 'pointer',
+                color: '#6f7d89', fontSize: 12,
+                fontFamily: "'IBM Plex Mono', monospace",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 11, color: '#6f7d89', fontFamily: "'IBM Plex Mono', monospace" }}>
+                Production
+              </span>
+              <span style={{ fontSize: 14, color: '#7ddc8a', fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600 }}>
+                +{power.produced}
+              </span>
+            </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 11, color: '#6f7d89', fontFamily: "'IBM Plex Mono', monospace" }}>
+                Consumption
+              </span>
+              <span style={{ fontSize: 14, color: '#ec6058', fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600 }}>
+                -{power.consumed}
+              </span>
+            </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '6px 8px',
+              background: power.enough ? 'rgba(125,220,138,.08)' : 'rgba(236,96,88,.08)',
+              border: `1px solid ${power.enough ? 'rgba(125,220,138,.2)' : 'rgba(236,96,88,.2)'}`,
+              borderRadius: 3,
+            }}>
+              <span style={{ fontSize: 11, color: '#94a3af', fontFamily: "'IBM Plex Mono', monospace" }}>
+                Surplus
+              </span>
+              <span style={{
+                fontSize: 14, fontWeight: 600,
+                color: power.surplus >= 0 ? '#7ddc8a' : '#ec6058',
+                fontFamily: "'IBM Plex Mono', monospace",
+              }}>
+                {power.surplus >= 0 ? '+' : ''}{power.surplus}
+              </span>
+            </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 11, color: '#6f7d89', fontFamily: "'IBM Plex Mono', monospace" }}>
+                Generators
+              </span>
+              <span style={{ fontSize: 11, color: '#cbd6e0', fontFamily: "'IBM Plex Mono', monospace" }}>
+                {power.fueledGenerators}/{power.generatorCount} active
+              </span>
+            </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 11, color: '#6f7d89', fontFamily: "'IBM Plex Mono', monospace" }}>
+                Consumers
+              </span>
+              <span style={{ fontSize: 11, color: '#cbd6e0', fontFamily: "'IBM Plex Mono', monospace" }}>
+                {power.consumerCount} machines
+              </span>
+            </div>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 11, color: '#6f7d89', fontFamily: "'IBM Plex Mono', monospace" }}>
+                Status
+              </span>
+              <span style={{
+                fontSize: 10, fontWeight: 600, letterSpacing: '.1em',
+                color: power.enough ? '#7ddc8a' : '#ec6058',
+                fontFamily: "'Chakra Petch', sans-serif",
+              }}>
+                {power.enough ? 'FULLY POWERED' : 'POWER DEFICIT'}
+              </span>
+            </div>
+          </div>
+          <div style={{
+            padding: '6px 12px',
+            borderTop: '1px solid #2a333c',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{
+              fontSize: 9, color: '#4a5a6a', fontFamily: "'IBM Plex Mono', monospace",
+            }}>
+              Press Esc or click ✕ to close
+            </span>
+            <button
+              onClick={onTogglePower}
+              style={{
+                fontSize: 9, color: '#6f7d89', fontFamily: "'IBM Plex Mono', monospace",
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                padding: '2px 6px',
+              }}
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </>

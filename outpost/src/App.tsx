@@ -7,7 +7,7 @@ import { BUILDING_COLORS, BuildingTypeMap } from './types';
 import type { BuildingTypeValue, PowerSummary, DirectionValue } from './types';
 import { HUD } from './ui/HUD';
 import { BuildMenu } from './ui/BuildMenu';
-import { InventoryPanel, MinimizedInventoryBar } from './ui/InventoryPanel';
+import { InventoryPanel } from './ui/InventoryPanel';
 import { HelpPanel } from './ui/HelpPanel';
 import { ObjectivesPanel } from './ui/ObjectivesPanel';
 import { Tutorial } from './ui/Tutorial';
@@ -95,11 +95,13 @@ const App: React.FC = () => {
   const buildMenuOpenRef = useRef(false);
   const inventoryOpenRef = useRef(false);
   const helpOpenRef = useRef(false);
+  const powerPanelOpenRef = useRef(false);
 
   const [showBuildMenu, setShowBuildMenu] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showObjectives, setShowObjectives] = useState(true);
+  const [showPowerPanel, setShowPowerPanel] = useState(false);
   const [buildType, setBuildType] = useState<BuildingTypeValue | null>(null);
   const [showWinMessage, setShowWinMessage] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -321,6 +323,8 @@ const App: React.FC = () => {
           setShowBuildMenu(false); buildMenuOpenRef.current = false;
           setShowInventory(false); inventoryOpenRef.current = false;
           setShowHelp(false); helpOpenRef.current = false;
+        } else if (powerPanelOpenRef.current) {
+          setShowPowerPanel(false); powerPanelOpenRef.current = false;
         }
       }
 
@@ -796,6 +800,7 @@ const App: React.FC = () => {
         onToggleInventory={() => { const n = !showInventory; setShowInventory(n); inventoryOpenRef.current = n; setShowBuildMenu(false); buildMenuOpenRef.current = false; setShowHelp(false); helpOpenRef.current = false; }}
         onToggleHelp={() => { const n = !showHelp; setShowHelp(n); helpOpenRef.current = n; setShowBuildMenu(false); buildMenuOpenRef.current = false; setShowInventory(false); inventoryOpenRef.current = false; }}
         onToggleObjectives={() => setShowObjectives(!showObjectives)}
+        onTogglePower={() => { const n = !showPowerPanel; setShowPowerPanel(n); powerPanelOpenRef.current = n; }}
         onSave={handleSave}
         onLoad={handleLoad}
         onNewGame={handleNewGame}
@@ -804,6 +809,8 @@ const App: React.FC = () => {
         onDeselectBuild={() => { setBuildType(null); buildTypeRef.current = null; }}
         saveStatus={saveStatus}
         power={powerState ?? undefined}
+        showPowerPanel={showPowerPanel}
+        playerInventory={engineRef.current.player.inventory}
       />
 
       {showBuildMenu && (
@@ -821,8 +828,6 @@ const App: React.FC = () => {
           playerStats={engineRef.current.player.stats}
         />
       )}
-
-      <MinimizedInventoryBar playerInventory={engineRef.current.player.inventory} />
 
       {showHelp && <HelpPanel />}
       {showObjectives && <ObjectivesPanel enginesCrafted={engineRef.current.player.stats.enginesCrafted} stonesMined={engineRef.current.player.stats.stonesMined} />}
