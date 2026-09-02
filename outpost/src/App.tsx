@@ -395,7 +395,6 @@ const App: React.FC = () => {
         if (ip) {
           setInspectedData({
             building: engine.inspectBuilding(ip.x, ip.y),
-            power: engine.getPowerSummary(),
             playerItems: engine.player.inventory
               .filter(i => i.amount > 0)
               .map(i => ({ type: i.type as string, amount: i.amount })),
@@ -562,7 +561,6 @@ const App: React.FC = () => {
       const building = engine.inspectBuilding(tx, ty);
       setInspectedData({
         building,
-        power: engine.getPowerSummary(),
         playerItems: engine.player.inventory
           .filter(i => i.amount > 0)
           .map(i => ({ type: i.type as string, amount: i.amount })),
@@ -639,7 +637,6 @@ const App: React.FC = () => {
     setRenderTick(t => t + 1);
     setInspectedData({
       building: engine.inspectBuilding(ip.x, ip.y),
-      power: engine.getPowerSummary(),
       playerItems: engine.player.inventory
         .filter(i => i.amount > 0)
         .map(i => ({ type: i.type as string, amount: i.amount })),
@@ -660,7 +657,6 @@ const App: React.FC = () => {
     setRenderTick(t => t + 1);
     setInspectedData({
       building: engine.inspectBuilding(ip.x, ip.y),
-      power: engine.getPowerSummary(),
       playerItems: engine.player.inventory
         .filter(i => i.amount > 0)
         .map(i => ({ type: i.type as string, amount: i.amount })),

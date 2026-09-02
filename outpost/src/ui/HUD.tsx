@@ -6,7 +6,7 @@ import type { ItemType } from '../types';
 const SPRITE_BASE = '/assets/relay-seven';
 
 const MATERIALS: ItemType[] = [
-  'wood', 'stone', 'iron', 'copper', 'coal',
+  'wood', 'stone', 'iron', 'copper', 'coal', 'gold',
   'iron_ingot', 'copper_wire', 'steel_plate',
 ];
 

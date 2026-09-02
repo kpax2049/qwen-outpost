@@ -443,6 +443,7 @@ function Showcase() {
     { type: 'coal', amount: 4 },
     { type: 'iron', amount: 2 },
     { type: 'copper', amount: 3 },
+    { type: 'gold', amount: 1 },
   ];
 
   // Inspection data for the real InspectionPanel (inspects the smelter in the base)
@@ -450,7 +451,6 @@ function Showcase() {
     const engine = gameplay.engine;
     return {
       building: engine.inspectBuilding(59, 56),
-      power: engine.getPowerSummary(),
       playerItems: playerItems.filter((i) => i.amount > 0).map((i) => ({ type: i.type as string, amount: i.amount })),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

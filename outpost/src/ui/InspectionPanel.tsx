@@ -1,10 +1,9 @@
 import React from 'react';
 import { BUILDING_DEFS, BUILDING_COLORS } from '../types';
-import type { BuildingInspection, PowerSummary, BuildingTypeValue } from '../types';
+import type { BuildingInspection, BuildingTypeValue } from '../types';
 
 export interface InspectionData {
   building: BuildingInspection | null;
-  power: PowerSummary;
   playerItems: { type: string; amount: number }[];
 }
 
@@ -48,7 +47,7 @@ const DEPOSIT_DISPLAY: Record<string, string> = {
 };
 
 export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose, onDeposit, canDeposit, onRotate }) => {
-  const { building, power, playerItems } = data;
+  const { building, playerItems } = data;
 
   return (
     <div style={{
@@ -59,119 +58,14 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
       maxHeight: 'calc(100vh - 60px)', overflowY: 'auto',
     }}>
       {!building ? (
-        <>
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 14px', background: '#1d242e',
-            borderBottom: '1px solid rgba(255,255,255,.08)',
-          }}>
-            <span style={{
-              fontFamily: "'Chakra Petch', sans-serif",
-              fontSize: 12, fontWeight: 700, letterSpacing: '.16em',
-              color: '#e8edf2',
-            }}>
-              POWER GRID
-            </span>
-          </div>
-          <div style={{ padding: 14 }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12,
-            }}>
-              <span style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: power.enough ? '#5fcb93' : '#ec6058',
-                animation: power.enough ? undefined : 'emberpulse 1.2s ease-in-out infinite',
-              }} />
-              <span style={{
-                fontFamily: "'Chakra Petch', sans-serif",
-                fontSize: 11, fontWeight: 700, letterSpacing: '.12em',
-                color: power.enough ? '#5fcb93' : '#ec6058',
-              }}>
-                {power.enough ? 'OK' : 'NOT ENOUGH'}
-              </span>
-            </div>
-
-            <div style={{
-              display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12,
-            }}>
-              <span style={{
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontSize: 30, fontWeight: 600,
-                color: power.surplus >= 0 ? '#5fcb93' : '#ec6058',
-              }}>
-                {power.surplus >= 0 ? '+' : ''}{power.surplus}
-              </span>
-              <span style={{
-                fontFamily: "'IBM Plex Sans', sans-serif",
-                fontSize: 12, color: '#94a2b0',
-              }}>
-                {power.produced} produced · {power.consumed} demanded
-              </span>
-            </div>
-
-            <div style={{
-              height: 10, background: '#0e131a', border: '1px solid rgba(255,255,255,.08)',
-              borderRadius: 2, display: 'flex', overflow: 'hidden', marginBottom: 12,
-            }}>
-              {(() => {
-                const pct = power.consumed > 0 ? Math.min(100, (power.produced / power.consumed) * 100) : 100;
-                return (
-                  <>
-                    <div style={{ width: `${pct}%`, background: '#5fcb93' }} />
-                    <div style={{
-                      width: `${100 - pct}%`,
-                      background: power.enough ? '#101720' : 'repeating-linear-gradient(45deg,#ec6058 0 4px,#b8433c 4px 8px)',
-                    }} />
-                  </>
-                );
-              })()}
-            </div>
-
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
-            }}>
-              <div style={{
-                padding: '8px 10px', background: '#101720', borderRadius: 3,
-              }}>
-                <div style={{
-                  fontFamily: "'IBM Plex Mono', monospace",
-                  fontSize: 15, color: '#e8edf2',
-                }}>
-                  {power.fueledGenerators} / {power.generatorCount}
-                </div>
-                <div style={{
-                  fontFamily: "'IBM Plex Sans', sans-serif",
-                  fontSize: 11, color: '#94a2b0', marginTop: 2,
-                }}>
-                  generators fuelled · 50 {'\u26A1'} each
-                </div>
-              </div>
-              <div style={{
-                padding: '8px 10px', background: '#101720', borderRadius: 3,
-              }}>
-              <div style={{
-                fontFamily: "'IBM Plex Mono', monospace",
-                fontSize: 15, color: power.enough ? '#e8edf2' : '#ec6058',
-              }}>
-                {power.consumerCount}
-              </div>
-              <div style={{
-                fontFamily: "'IBM Plex Sans', sans-serif",
-                fontSize: 11, color: '#94a2b0', marginTop: 2,
-              }}>
-                machine{power.consumerCount !== 1 ? 's' : ''} powered
-              </div>
-              </div>
-            </div>
-
-            <div style={{
-              marginTop: 12, fontFamily: "'IBM Plex Sans', sans-serif",
-              fontSize: 11, lineHeight: 1.5, color: '#7e8c9a',
-            }}>
-              The whole outpost shares one power grid. Fuel a Generator (add Coal) to power every machine on the map.
-            </div>
-          </div>
-        </>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24,
+          fontFamily: "'IBM Plex Sans', sans-serif",
+          fontSize: 12, color: '#5e6873',
+        }}>
+          Select a building to inspect
+        </div>
       ) : (
         <>
           <div style={{
