@@ -742,6 +742,39 @@ export class Renderer {
     const isBlocked = !!building.blocked;
     const isWorking = hasPower && building.maxProgress > 1 && building.progress > 0 && building.progress < building.maxProgress;
     const isIdle = hasPower && (building.maxProgress <= 1 || building.progress === 0 || building.progress >= building.maxProgress);
+    const isNoPower = !hasPower && building.powerConsumed > 0;
+    const isNoFuel = !hasPower && building.type === 'generator';
+
+    // Machine state configuration (Relay Seven design spec).
+    //   c   — progress bar color (0 = no bar)
+    //   bar — 1 = show progress bar, 0 = hide
+    //   dim — 1 = dim the machine body
+    //   hatch — 1 = draw cross-hatch overlay (no-power)
+    const STATE_CONFIG: Record<string, { c: string; bar: number; dim: number; hatch: number; aura: number }> = {
+      working:   { c: '#5FCB93', bar: 1, dim: 0, hatch: 0, aura: 1 },
+      waiting:   { c: '#5FAEE0', bar: 0, dim: 0, hatch: 0, aura: 0 },
+      blocked:   { c: '#F6BB45', bar: 1, dim: 0, hatch: 0, aura: 0 },
+      nopower:   { c: '#98A0A9', bar: 0, dim: 1, hatch: 1, aura: 0 },
+      nofuel:    { c: '#EC6058', bar: 0, dim: 1, hatch: 0, aura: 0 },
+      idle:      { c: '#767C85', bar: 0, dim: 1, hatch: 0, aura: 0 },
+      plain:     { c: '',       bar: 0, dim: 0, hatch: 0, aura: 0 },
+    };
+
+    let stateKey: string;
+    if (isNoPower && isNoFuel) {
+      stateKey = 'nofuel';
+    } else if (isNoPower) {
+      stateKey = 'nopower';
+    } else if (isBlocked) {
+      stateKey = 'blocked';
+    } else if (isWorking) {
+      stateKey = 'working';
+    } else if (isIdle) {
+      stateKey = 'idle';
+    } else {
+      stateKey = 'plain';
+    }
+    const st = STATE_CONFIG[stateKey] ?? STATE_CONFIG.plain;
 
     if (isBlocked) {
       // Blocked: dark overlay with red pulse + gate
@@ -789,8 +822,40 @@ export class Renderer {
       ctx.fillRect(bx, by, TILE_SIZE, TILE_SIZE);
     }
 
+    // Working-state glow/aura (Relay Seven design: visible only for working)
+    if (st.aura) {
+      ctx.save();
+      ctx.shadowColor = '#5FCB93';
+      ctx.shadowBlur = Math.round(TILE_SIZE * 0.22);
+      ctx.strokeStyle = 'rgba(95, 203, 147, 0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(bx + 2, by + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
+    // No-power hatch overlay: 45° cross-hatching (Relay Seven design)
+    if (st.hatch) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(bx, by, TILE_SIZE, TILE_SIZE);
+      ctx.clip();
+      const hatchSpacing = Math.round(TILE_SIZE * 0.11);
+      for (let offset = -(TILE_SIZE * 2); offset < TILE_SIZE * 3; offset += hatchSpacing) {
+        ctx.fillStyle = 'rgba(16, 20, 24, 0.62)';
+        ctx.beginPath();
+        ctx.moveTo(bx + offset, by);
+        ctx.lineTo(bx + offset + TILE_SIZE * 0.6, by);
+        ctx.lineTo(bx + offset - 2, by + TILE_SIZE);
+        ctx.lineTo(bx + offset + TILE_SIZE * 0.6 - 2, by + TILE_SIZE);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // Progress bar (industrial treatment)
-    this.drawIndustrialProgress(gx, gy, building, isWorking);
+    this.drawIndustrialProgress(gx, gy, building, st);
 
     // Inventory count bubble
     const totalItems = building.inventory.reduce((sum, i) => sum + i.amount, 0);
@@ -1334,68 +1399,44 @@ export class Renderer {
 
   // ======================== Industrial Progress Bar ========================
 
-  private drawIndustrialProgress(gx: number, gy: number, building: Building, isWorking: boolean): void {
+  private drawIndustrialProgress(gx: number, gy: number, building: Building, st: { c: string; bar: number; dim: number; hatch: number; aura: number }): void {
     const { ctx } = this;
 
     if (building.maxProgress <= 1) return;
+
+    // No progress bar for states that don't show one (Relay Seven design)
+    if (!st.bar) return;
 
     const barWidth = TILE_SIZE - 12;
     const barHeight = 5;
     const barX = gx * TILE_SIZE + 6;
     const barY = gy * TILE_SIZE + TILE_SIZE - 9;
 
-    // Dark recessed housing
-    ctx.fillStyle = 'rgba(15, 15, 25, 0.85)';
+    // Dark recessed housing (track background)
+    ctx.fillStyle = 'rgba(16, 20, 24, 0.9)';
     ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
 
     // Inner recess (darker)
-    ctx.fillStyle = 'rgba(25, 25, 40, 0.9)';
+    ctx.fillStyle = 'rgba(30, 37, 44, 0.95)';
     ctx.fillRect(barX, barY, barWidth, barHeight);
 
-    // Tick marks (industrial scale)
-    const tickCount = 8;
-    for (let i = 0; i <= tickCount; i++) {
-      const tx = barX + (i / tickCount) * barWidth;
-      const tickH = i % 2 === 0 ? 3 : 2;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.fillRect(tx, barY + barHeight - tickH, 0.5, tickH);
-    }
-
-    // Progress fill with amber/sodium color for working machines
-    const progress = building.progress / building.maxProgress;
-
-    if (progress > 0) {
-      if (isWorking) {
-        // Amber glow fill with subtle gradient
-        const grad = ctx.createLinearGradient(barX, barY, barX, barY + barHeight);
-        grad.addColorStop(0, 'rgba(255, 180, 80, 0.9)');
-        grad.addColorStop(0.5, 'rgba(255, 150, 50, 0.85)');
-        grad.addColorStop(1, 'rgba(220, 120, 30, 0.8)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(barX + 1, barY + 1, (barWidth - 2) * progress, barHeight - 2);
-
-        // Glow effect
-        ctx.shadowColor = '#ffaa33';
-        ctx.shadowBlur = 3;
-        ctx.strokeStyle = 'rgba(255, 180, 80, 0.5)';
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(barX + 1, barY + 1, (barWidth - 2) * progress, barHeight - 2);
-        ctx.shadowBlur = 0;
-      } else {
-        // Idle: muted blue-gray
-        ctx.fillStyle = 'rgba(80, 90, 120, 0.5)';
-        ctx.fillRect(barX + 1, barY + 1, (barWidth - 2) * progress, barHeight - 2);
-      }
-    }
-
-    // Top highlight line
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.fillRect(barX, barY, barWidth, 1);
-
-    // Housing border
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    // Border inset (recessed look)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
     ctx.lineWidth = 0.5;
-    ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+    ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+    const progress = building.progress / building.maxProgress;
+    const clampedProgress = Math.max(0.04, Math.min(1, progress));
+
+    // Progress fill — color from state config (Relay Seven design)
+    if (st.c) {
+      ctx.fillStyle = st.c;
+      ctx.fillRect(barX + 1, barY + 1, (barWidth - 2) * clampedProgress, barHeight - 2);
+
+      // Top highlight on fill
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.fillRect(barX + 1, barY + 1, (barWidth - 2) * clampedProgress, 1);
+    }
   }
 
   // ======================== Player Rendering ========================
