@@ -217,6 +217,13 @@ export interface PlayerState {
     woodChopped: number;
     ingotsCrafted: number;
     enginesCrafted: number;
+    ironIngotsCrafted: number;
+    copperWiresCrafted: number;
+    minersBuilt: number;
+    generatorsBuilt: number;
+    smeltersBuilt: number;
+    assemblersBuilt: number;
+    conveyorsBuilt: number;
     timePlayed: number;
   };
   _buildDirection?: DirectionValue;

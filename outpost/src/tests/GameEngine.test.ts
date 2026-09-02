@@ -546,6 +546,63 @@ describe('GameEngine - Win Condition', () => {
   });
 });
 
+describe('GameEngine - Objective Tracking', () => {
+  it('tracks miners built', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    expect(engine.player.stats.minersBuilt).toBe(0);
+    engine.placeBuilding('miner');
+    expect(engine.player.stats.minersBuilt).toBe(1);
+  });
+
+  it('tracks generators built', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    expect(engine.player.stats.generatorsBuilt).toBe(0);
+    engine.placeBuilding('generator');
+    expect(engine.player.stats.generatorsBuilt).toBe(1);
+  });
+
+  it('tracks smelters built', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    expect(engine.player.stats.smeltersBuilt).toBe(0);
+    engine.placeBuilding('smelter');
+    expect(engine.player.stats.smeltersBuilt).toBe(1);
+  });
+
+  it('tracks assemblers built', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    expect(engine.player.stats.assemblersBuilt).toBe(0);
+    engine.placeBuilding('assembler');
+    expect(engine.player.stats.assemblersBuilt).toBe(1);
+  });
+
+  it('tracks conveyors built', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    expect(engine.player.stats.conveyorsBuilt).toBe(0);
+    engine.movePlayer(1, 0);
+    engine.placeBuilding('conveyor');
+    expect(engine.player.stats.conveyorsBuilt).toBe(1);
+  });
+
+  it('tracks iron ingots crafted via smelter production stat', () => {
+    const engine = new GameEngine(42);
+    expect(engine.player.stats.ironIngotsCrafted).toBe(0);
+    engine.player.stats.ironIngotsCrafted = 5;
+    expect(engine.player.stats.ironIngotsCrafted).toBe(5);
+  });
+
+  it('tracks copper wires crafted via production stat', () => {
+    const engine = new GameEngine(42);
+    expect(engine.player.stats.copperWiresCrafted).toBe(0);
+    engine.player.stats.copperWiresCrafted = 3;
+    expect(engine.player.stats.copperWiresCrafted).toBe(3);
+  });
+});
+
 describe('GameEngine - Inventory Management', () => {
   it('player starts with initial resources', () => {
     const engine = new GameEngine(42);

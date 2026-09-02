@@ -982,7 +982,7 @@ function Showcase() {
             showPowerPanel={false}
             playerInventory={playerItems}
           />
-          <ObjectivesPanel enginesCrafted={1} stonesMined={12} />
+          <ObjectivesPanel stats={{ stonesMined: 12, woodChopped: 0, ingotsCrafted: 0, enginesCrafted: 1, ironIngotsCrafted: 0, copperWiresCrafted: 0, minersBuilt: 0, generatorsBuilt: 0, smeltersBuilt: 0, assemblersBuilt: 0, conveyorsBuilt: 0, timePlayed: 0 }} />
         </Stage>
         <div style={{ color: '#7f8aa6', fontSize: 11, marginTop: 8 }}>
           A populated base: two fueled generators, production machines (smelter / steel / assembler), a miner→belt→storage coal chain, and passive storage/chest. HUD + objectives overlay as in normal play.
@@ -1128,7 +1128,7 @@ function Showcase() {
               onManualNext={() => {}}
             />
           </div>
-          <ObjectivesPanel enginesCrafted={1} stonesMined={12} />
+          <ObjectivesPanel stats={{ stonesMined: 12, woodChopped: 0, ingotsCrafted: 0, enginesCrafted: 1, ironIngotsCrafted: 0, copperWiresCrafted: 0, minersBuilt: 0, generatorsBuilt: 0, smeltersBuilt: 0, assemblersBuilt: 0, conveyorsBuilt: 0, timePlayed: 0 }} />
         </div>
         <div style={{ color: '#7f8aa6', fontSize: 11, marginTop: 8 }}>
           The real Help panel (controls reference), the active first-run Tutorial card (with step progress dots), and the Objectives tracker — as they appear in normal play.

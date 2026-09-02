@@ -107,6 +107,7 @@ const App: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [nearbyBuildings, setNearbyBuildings] = useState<import('./types').Tile[]>([]);
   const [, setRenderTick] = useState(0);
+  const [, setTickVersion] = useState(0);
   const [powerState, setPowerState] = useState<PowerSummary | null>(null);
   const [inspectedData, setInspectedData] = useState<InspectionData | null>(null);
 
@@ -372,6 +373,7 @@ const App: React.FC = () => {
 
       while (tickAccumulatorRef.current >= tickInterval) {
         engine.tick();
+        setTickVersion(v => v + 1);
         tickAccumulatorRef.current -= tickInterval;
       }
 
@@ -830,7 +832,7 @@ const App: React.FC = () => {
       )}
 
       {showHelp && <HelpPanel />}
-      {showObjectives && <ObjectivesPanel enginesCrafted={engineRef.current.player.stats.enginesCrafted} stonesMined={engineRef.current.player.stats.stonesMined} />}
+      {showObjectives && <ObjectivesPanel stats={engineRef.current.player.stats} />}
 
       {inspectedData && (buildType === null) && (
         <InspectionPanel

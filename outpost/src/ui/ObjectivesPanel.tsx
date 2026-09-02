@@ -1,22 +1,36 @@
 import React from 'react';
 
-interface ObjectivesPanelProps {
-  enginesCrafted: number;
+interface Stats {
   stonesMined: number;
+  woodChopped: number;
+  ingotsCrafted: number;
+  enginesCrafted: number;
+  ironIngotsCrafted: number;
+  copperWiresCrafted: number;
+  minersBuilt: number;
+  generatorsBuilt: number;
+  smeltersBuilt: number;
+  assemblersBuilt: number;
+  conveyorsBuilt: number;
+  timePlayed: number;
 }
 
-export const ObjectivesPanel: React.FC<ObjectivesPanelProps> = ({ enginesCrafted, stonesMined }) => {
+interface ObjectivesPanelProps {
+  stats: Stats;
+}
+
+export const ObjectivesPanel: React.FC<ObjectivesPanelProps> = ({ stats }) => {
   const objectives = [
-    { id: 1, title: 'First Steps', desc: 'Mine your first resource', check: stonesMined >= 1 },
-    { id: 2, title: 'Gathering', desc: 'Mine 10 resources', check: stonesMined >= 10 },
-    { id: 3, title: 'Automation', desc: 'Place a Miner', check: false },
-    { id: 4, title: 'Power Up', desc: 'Build a Coal Generator', check: false },
-    { id: 5, title: 'Processing', desc: 'Build a Smelter', check: false },
-    { id: 6, title: 'Production', desc: 'Craft 5 Iron Ingots', check: false },
-    { id: 7, title: 'Logistics', desc: 'Build 3 Conveyors', check: false },
-    { id: 8, title: 'Advanced', desc: 'Build an Assembler', check: false },
-    { id: 9, title: 'Engineering', desc: 'Craft 3 Copper Wires', check: false },
-    { id: 10, title: 'Outpost Established!', desc: 'Craft 5 Engines', check: enginesCrafted >= 5 },
+    { id: 1, title: 'First Steps', desc: 'Mine your first resource', check: stats.stonesMined >= 1 },
+    { id: 2, title: 'Gathering', desc: 'Mine 10 resources', check: stats.stonesMined >= 10 },
+    { id: 3, title: 'Automation', desc: 'Place a Miner', check: stats.minersBuilt >= 1 },
+    { id: 4, title: 'Power Up', desc: 'Build a Coal Generator', check: stats.generatorsBuilt >= 1 },
+    { id: 5, title: 'Processing', desc: 'Build a Smelter', check: stats.smeltersBuilt >= 1 },
+    { id: 6, title: 'Production', desc: 'Produce 5 Iron Ingots', check: stats.ironIngotsCrafted >= 5 },
+    { id: 7, title: 'Logistics', desc: 'Build 3 Conveyors', check: stats.conveyorsBuilt >= 3 },
+    { id: 8, title: 'Advanced', desc: 'Build an Assembler', check: stats.assemblersBuilt >= 1 },
+    { id: 9, title: 'Engineering', desc: 'Produce 3 Copper Wires', check: stats.copperWiresCrafted >= 3 },
+    { id: 10, title: 'Outpost Established!', desc: 'Produce 5 Engines', check: stats.enginesCrafted >= 5 },
   ];
 
   return (

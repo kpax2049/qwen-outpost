@@ -244,7 +244,7 @@ export class GameEngine {
           facing: Dir.Down,
           inventory: [{ type: 'wood', amount: 5 }, { type: 'stone', amount: 5 }],
           maxInventorySlots: 20,
-          stats: { stonesMined: 0, woodChopped: 0, ingotsCrafted: 0, enginesCrafted: 0, timePlayed: 0 },
+          stats: { stonesMined: 0, woodChopped: 0, ingotsCrafted: 0, enginesCrafted: 0, ironIngotsCrafted: 0, copperWiresCrafted: 0, minersBuilt: 0, generatorsBuilt: 0, smeltersBuilt: 0, assemblersBuilt: 0, conveyorsBuilt: 0, timePlayed: 0 },
         },
         tick: 0,
         gameTime: 0,
@@ -430,6 +430,9 @@ export class GameEngine {
       }
       if (b.producesItem) {
         this.addToInventory(b, { type: b.producesItem, amount: 1 });
+        const p = this._state.save.player;
+        if (b.producesItem === 'iron_ingot') { p.stats.ironIngotsCrafted++; p.stats.ingotsCrafted++; }
+        else if (b.producesItem === 'steel_plate') { p.stats.ingotsCrafted++; }
       }
       this.tryOutputToAdjacent(x, y, tile);
     }
@@ -454,7 +457,12 @@ export class GameEngine {
       }
     }
 
-    if (produced) this.tryOutputToAdjacent(x, y, tile);
+    if (produced) {
+      const p = this._state.save.player;
+      if (recipe.output === 'copper_wire') { p.stats.copperWiresCrafted++; }
+      else if (recipe.output === 'engine') { p.stats.enginesCrafted++; }
+      this.tryOutputToAdjacent(x, y, tile);
+    }
   }
 
   private getAssemblerRecipe(b: Building): { inputs: { type: string; amount: number }[]; output: ItemType; threshold: number } | null {
@@ -808,6 +816,7 @@ export class GameEngine {
         }
       }
     }
+    this._state.save.player.stats[`${building.type}sBuilt`] = (this._state.save.player.stats[`${building.type}sBuilt`] as number) + 1;
     return true;
   }
 
@@ -829,6 +838,7 @@ export class GameEngine {
       building.direction = buildDir;
     }
     tile.building = building;
+    this._state.save.player.stats[`${building.type}sBuilt`] = (this._state.save.player.stats[`${building.type}sBuilt`] as number) + 1;
     return true;
   }
 
