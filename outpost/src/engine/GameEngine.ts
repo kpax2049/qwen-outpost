@@ -392,6 +392,8 @@ export class GameEngine {
           case BuildingTypeMap.smelter:
           case BuildingTypeMap.steel_smelter: this.updateSmelter(x, y, tile); break;
           case BuildingTypeMap.assembler: this.updateAssembler(x, y, tile); break;
+          case BuildingTypeMap.storage:
+          case BuildingTypeMap.chest: this.updateStorage(x, y); break;
         }
       }
     }
@@ -585,6 +587,39 @@ export class GameEngine {
     if (this.canBuildingAccept(nextTile.building, invItem.type)) {
       this.addToInventory(nextTile.building, { type: invItem.type, amount: 1 });
       this.consumeOne(b, invItem);
+    }
+  }
+
+  /**
+   * Output items from a storage/chest to an adjacent conveyor.
+   * Pushes one item from the storage's inventory onto the first adjacent empty belt.
+   */
+  private updateStorage(x: number, y: number): void {
+    const tile = this._state.save.map[y][x];
+    if (!tile.building) return;
+    const b = tile.building;
+    if (b.type !== BuildingTypeMap.storage && b.type !== BuildingTypeMap.chest) return;
+
+    const item = this.getFirstItem(b);
+    if (!item || item.amount <= 0) return;
+
+    // Find the first adjacent empty belt and push one item onto it.
+    for (let dir = 0; dir < 4; dir++) {
+      const nx = x + DELTA[dir].x;
+      const ny = y + DELTA[dir].y;
+      if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
+
+      const nextTile = this._state.save.map[ny][nx];
+      if (!nextTile.building) continue;
+      if (nextTile.building.type !== BuildingTypeMap.conveyor) continue;
+
+      // Don't push into a conveyor facing back at us.
+      if (nextTile.building.direction === oppositeDirection(dir)) continue;
+      if (this.canAddToInventory(nextTile.building, item.type)) {
+        this.removeItemFromInventory(b, item.type, 1);
+        this.addToInventory(nextTile.building, { type: item.type, amount: 1 });
+        return;
+      }
     }
   }
 

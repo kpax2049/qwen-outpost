@@ -335,6 +335,134 @@ describe('GameEngine - Conveyor Belts', () => {
     expect(engine.getTile(60, 61)!.building!.active).toBe(false);
   });
 
+  it('storage pushes items to an adjacent conveyor facing it', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    setG(60, 61); setG(60, 62);
+
+    // Belt at (60,61) pointing Down toward storage at (60,62).
+    engine.map[61][60] = { terrain: 'grass', building: makeBelt(Dir.Down) };
+    // Storage at (60,62) — start with no stone so belt has room to push coal.
+    const storageBuilding = createStorage();
+    engine.map[62][60] = { terrain: 'grass', building: storageBuilding };
+    // Put coal on the belt (belt capacity is 1, so we put 1 item).
+    engine.map[61][60]!.building!.inventory = [{ type: 'coal', amount: 1 }];
+
+    const belt = engine.getTile(60, 61)!.building!;
+    const storage = engine.getTile(60, 62)!.building!;
+
+    // After enough ticks, belt pushes coal to storage (storage has room).
+    for (let i = 0; i < 25; i++) engine.tick();
+
+    // Belt should have pushed its coal — now empty.
+    const beltCoal = belt.inventory.find(i => i.type === 'coal');
+    expect(beltCoal).toBeUndefined();
+
+    // Storage should have received coal.
+    const storageCoal = storage.inventory.find(i => i.type === 'coal');
+    expect(storageCoal).toBeDefined();
+    if (storageCoal) expect(storageCoal.amount).toBe(1);
+  });
+
+  it('storage feeds items through a multi-belt chain', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    // Belt chain: (60,61) → (60,62) → (60,63) → (60,64) grass (end of line).
+    // Storage at (60,60) feeds belt0 at (60,61).
+    setG(60, 60); setG(60, 61); setG(60, 62); setG(60, 63); setG(60, 64);
+    engine.map[61][60] = { terrain: 'grass', building: makeBelt(Dir.Down) };
+    engine.map[62][60] = { terrain: 'grass', building: makeBelt(Dir.Down) };
+    engine.map[63][60] = { terrain: 'grass', building: makeBelt(Dir.Down) };
+
+    // Storage at (60, 60) above the belt chain.
+    engine.player.x = 60; engine.player.y = 60;
+    engine.placeBuilding('storage');
+
+    const belt0 = engine.getTile(60, 61)!.building!;
+    belt0.active = true;
+    belt0.inventory = [{ type: 'stone', amount: 1 }];
+
+    const storage = engine.getTile(60, 60)!.building!;
+    // Storage starts with 5 stones.
+    storage.inventory.push({ type: 'stone', amount: 5 });
+
+    for (let i = 0; i < 100; i++) engine.tick();
+
+    // Belt 0 still carries an item (transporting through chain).
+    const belt0Stone = belt0.inventory.find(i => i.type === 'stone');
+    expect(belt0Stone).toBeDefined();
+    // Storage lost items — fed the belt chain.
+    const storageStone = storage.inventory.find(i => i.type === 'stone');
+    expect(storageStone).toBeDefined();
+    if (storageStone) expect(storageStone.amount).toBeLessThan(6);
+  });
+
+  it('blocked downstream conveyor chain prevents storage output', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    setG(60, 61); setG(60, 62); setG(60, 63);
+    engine.map[61][60] = { terrain: 'grass', building: makeBelt(Dir.Down) };
+    engine.map[62][60] = { terrain: 'grass', building: makeBelt(Dir.Down) };
+    engine.map[63][60] = { terrain: 'grass', building: makeBelt(Dir.Down) };
+
+    // Chest at the end, filled to capacity so nothing can push to it.
+    engine.map[63][60]!.building!.inventory = [{ type: 'stone', amount: 1 }];
+    engine.map[64][60] = { terrain: 'grass', building: fillChest() };
+
+    // Storage at (60, 60) — above the belt chain.
+    engine.player.x = 60; engine.player.y = 60;
+    engine.placeBuilding('storage');
+
+    const belt0 = engine.getTile(60, 61)!.building!;
+    const belt1 = engine.getTile(60, 62)!.building!;
+    const belt2 = engine.getTile(60, 63)!.building!;
+    const storage = engine.getTile(60, 60)!.building!;
+
+    // Fill all belts so the chain is fully blocked from the start.
+    belt0.inventory = [{ type: 'stone', amount: 1 }];
+    belt1.inventory = [{ type: 'stone', amount: 1 }];
+
+    // Give storage iron to track.
+    storage.inventory.push({ type: 'iron' as const, amount: 5 });
+
+    for (let i = 0; i < 40; i++) engine.tick();
+
+    // Storage should NOT have lost iron (belt chain is blocked by full chest).
+    const storageIron = storage.inventory.find(i => i.type === 'iron');
+    expect(storageIron).toBeDefined();
+    if (storageIron) expect(storageIron.amount).toBe(5);
+    // Belt0 should be blocked (can't push to belt1 which is full).
+    expect(belt0.blocked).toBe(true);
+  });
+
+  it('empty storage does not output anything onto a belt', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('conveyor');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('storage');
+
+    const belt = engine.getTile(60, 61)!.building!;
+    const storage = engine.getTile(60, 62)!.building!;
+
+    // Remove all items from storage (completely empty).
+    storage.inventory = [];
+
+    // Start the belt empty too.
+    belt.inventory = [];
+
+    for (let i = 0; i < 25; i++) engine.tick();
+
+    // Belt should still be empty — nothing pulled from empty storage.
+    expect(belt.inventory.length).toBe(0);
+  });
+
   it('adding many belts does NOT increase grid power demand', () => {
     const engine = new GameEngine(42);
     fundPlayer(engine);
@@ -1193,6 +1321,22 @@ describe('Acceptance - Adjacent non-feeding belt', () => {
 });
 
 // ==================== HELPER ====================
+
+function createStorage(): Building {
+  return {
+    type: 'storage', direction: Dir.Down, active: true, powerConsumed: 0,
+    powerProduced: undefined, inventory: [], maxInventory: 100,
+    progress: 0, maxProgress: 0, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
+  };
+}
+
+function fillChest(): Building {
+  return {
+    type: 'chest', direction: Dir.Down, active: true, powerConsumed: 0,
+    powerProduced: undefined, inventory: [{ type: 'stone', amount: 100 }], maxInventory: 100,
+    progress: 0, maxProgress: 0, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
+  };
+}
 
 function makeBelt(direction: DirectionValue): Building {
   return {
