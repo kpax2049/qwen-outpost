@@ -75,7 +75,7 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
     <div style={{
       position: 'absolute', top: 50, left: 8,
       background: '#141922', border: '1px solid rgba(255,255,255,.1)',
-      borderRadius: 5, zIndex: 20, minWidth: 380,
+      borderRadius: 5, width: 380,
       maxHeight: 'calc(100vh - 100px)', overflowY: 'auto',
       boxShadow: '0 18px 44px rgba(0,0,0,.55)',
     }}>
@@ -276,6 +276,8 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
             fontSize: 11, lineHeight: 1.5,
             color: '#9aa8b4',
             marginBottom: 10,
+            overflowWrap: 'break-word',
+            wordWrap: 'break-word',
           }}>
             {selDef.description}
           </div>
@@ -291,7 +293,7 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
               }}>
                 COST
               </div>
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', overflowWrap: 'break-word' }}>
                 {selDef.cost.map((c, i) => {
                   const spritePath = itemSpritePath(c.resource);
                   const displayName = ITEM_DISPLAY_NAMES[c.resource] || c.resource;
@@ -334,7 +336,7 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
               }}>
                 POWER
               </div>
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', overflowWrap: 'break-word' }}>
                 {selDef.powerProduced && (
                   <span style={{
                     padding: '3px 8px', borderRadius: 3,
@@ -399,6 +401,8 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
                 fontFamily: "'IBM Plex Mono', monospace",
                 fontSize: 10,
                 color: '#e8ae4a',
+                overflowWrap: 'break-word',
+                wordWrap: 'break-word',
               }}>
                 Requires Coal in inventory. Holds up to 20 units. Burns 1 per {selDef.maxProgress} ticks.
               </div>
@@ -419,6 +423,8 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
                 fontFamily: "'IBM Plex Mono', monospace",
                 fontSize: 10,
                 color: '#e8ae4a',
+                overflowWrap: 'break-word',
+                wordWrap: 'break-word',
               }}>
                 Place directly on a resource deposit (coal, iron, copper, stone, etc). Mines automatically.
               </div>
@@ -439,6 +445,8 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
                 fontFamily: "'IBM Plex Mono', monospace",
                 fontSize: 10,
                 color: '#8a9aa4',
+                overflowWrap: 'break-word',
+                wordWrap: 'break-word',
               }}>
                 Consumes:{' '}
                 {selDef.consumesItems?.map(c =>
@@ -463,6 +471,8 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
                 fontFamily: "'IBM Plex Mono', monospace",
                 fontSize: 10,
                 color: '#8a9aa4',
+                overflowWrap: 'break-word',
+                wordWrap: 'break-word',
               }}>
                 Crafts copper wire, gears, and engines from raw materials and components.
               </div>
@@ -483,6 +493,8 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
                 fontFamily: "'IBM Plex Mono', monospace",
                 fontSize: 10,
                 color: '#5fcb93',
+                overflowWrap: 'break-word',
+                wordWrap: 'break-word',
               }}>
                 Passive logistics — no power required. Click-drag to place a multi-tile route. Press R to rotate direction.
               </div>
