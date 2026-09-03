@@ -38,6 +38,7 @@ interface HUDProps {
   onToggleBuildMenu: () => void;
   onToggleInventory: () => void;
   onToggleHelp: () => void;
+  onToggleTutorial: () => void;
   onToggleObjectives: () => void;
   onTogglePower: () => void;
   onSave: () => void;
@@ -57,7 +58,7 @@ const DIR_HINT: Record<number, string> = { 0: 'Up \u25B2', 1: 'Right \u25B6', 2:
 export const HUD: React.FC<HUDProps> = ({
   tickRate,
   onIncreaseSpeed, onDecreaseSpeed, onResetSpeed,
-  onToggleBuildMenu, onToggleInventory, onToggleHelp, onToggleObjectives, onTogglePower,
+  onToggleBuildMenu, onToggleInventory, onToggleHelp, onToggleTutorial, onToggleObjectives, onTogglePower,
   onSave, onLoad, onNewGame,
   buildType, buildDirection, onDeselectBuild,
   saveStatus, power, showPowerPanel, playerInventory,
@@ -294,6 +295,18 @@ export const HUD: React.FC<HUDProps> = ({
             cursor: 'pointer',
           }}>
             ?
+          </button>
+          <button onClick={onToggleTutorial} style={{
+            width: 30, height: 30,
+            display: 'grid', placeItems: 'center',
+            background: '#1f2831',
+            color: '#e8ae4a',
+            fontFamily: "'Chakra Petch', sans-serif",
+            fontSize: 9, fontWeight: 700, letterSpacing: '.05em',
+            border: '1px solid #2f3a45', borderRadius: 4,
+            cursor: 'pointer',
+          }}>
+            TUT
           </button>
 
           <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,.1)', margin: '0 4px' }} />

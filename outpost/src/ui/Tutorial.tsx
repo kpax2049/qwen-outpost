@@ -13,6 +13,7 @@ interface TutorialProps {
   dismissed: boolean;
   onDismiss: () => void;
   onManualNext: (id: string) => void;
+  show?: boolean;
 }
 
 const STEP_COLORS: Record<string, string> = {
@@ -27,8 +28,8 @@ const STEP_COLORS: Record<string, string> = {
   next: '#5fcb93',
 };
 
-export const Tutorial: React.FC<TutorialProps> = ({ steps, dismissed, onDismiss, onManualNext }) => {
-  if (dismissed) return null;
+export const Tutorial: React.FC<TutorialProps> = ({ steps, dismissed, onDismiss, onManualNext, show }) => {
+  if (dismissed && !show) return null;
 
   const visible = steps.filter(s => !s.done);
   const allDone = visible.length === 0;

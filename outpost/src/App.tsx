@@ -96,6 +96,7 @@ const App: React.FC = () => {
   const inventoryOpenRef = useRef(false);
   const helpOpenRef = useRef(false);
   const powerPanelOpenRef = useRef(false);
+  const tutorialOpenRef = useRef(false);
 
   const [showBuildMenu, setShowBuildMenu] = useState(false);
   const [showInventory, setShowInventory] = useState(false);
@@ -115,12 +116,23 @@ const App: React.FC = () => {
   const [tutorialDismissed, setTutorialDismissed] = useState<boolean>(() => {
     try { return localStorage.getItem('outpost-tutorial-done') === '1'; } catch { return false; }
   });
+  const [showTutorial, setShowTutorial] = useState(false);
   const [manualDone, setManualDone] = useState<Record<string, boolean>>({});
   const [tutorialDoneMap, setTutorialDoneMap] = useState<Record<string, boolean>>({});
 
   const handleDismissTutorial = useCallback(() => {
     setTutorialDismissed(true);
+    setShowTutorial(false);
     try { localStorage.setItem('outpost-tutorial-done', '1'); } catch { /* ignore */ }
+  }, []);
+
+  const handleToggleTutorial = useCallback(() => {
+    setShowTutorial(prev => {
+      const n = !prev;
+      tutorialOpenRef.current = n;
+      if (n) setTutorialDismissed(false);
+      return n;
+    });
   }, []);
 
   const handleManualNext = useCallback((id: string) => {
@@ -322,6 +334,9 @@ const App: React.FC = () => {
           setSelectedBuild(null);
         } else if (inspectedRef.current) {
           closeInspection();
+        } else if (tutorialOpenRef.current) {
+          setShowTutorial(false);
+          tutorialOpenRef.current = false;
         } else if (buildMenuOpenRef.current || inventoryOpenRef.current || helpOpenRef.current) {
           setShowBuildMenu(false); buildMenuOpenRef.current = false;
           setShowInventory(false); inventoryOpenRef.current = false;
@@ -804,6 +819,7 @@ const App: React.FC = () => {
         onToggleBuildMenu={() => { const n = !showBuildMenu; setShowBuildMenu(n); buildMenuOpenRef.current = n; setShowInventory(false); inventoryOpenRef.current = false; setShowHelp(false); helpOpenRef.current = false; }}
         onToggleInventory={() => { const n = !showInventory; setShowInventory(n); inventoryOpenRef.current = n; setShowBuildMenu(false); buildMenuOpenRef.current = false; setShowHelp(false); helpOpenRef.current = false; }}
         onToggleHelp={() => { const n = !showHelp; setShowHelp(n); helpOpenRef.current = n; setShowBuildMenu(false); buildMenuOpenRef.current = false; setShowInventory(false); inventoryOpenRef.current = false; }}
+        onToggleTutorial={() => { const n = !showTutorial; setShowTutorial(n); tutorialOpenRef.current = n; }}
         onToggleObjectives={() => setShowObjectives(!showObjectives)}
         onTogglePower={() => { const n = !showPowerPanel; setShowPowerPanel(n); powerPanelOpenRef.current = n; }}
         onSave={handleSave}
@@ -836,7 +852,7 @@ const App: React.FC = () => {
         />
       )}
 
-      {showHelp && <HelpPanel />}
+      {showHelp && <HelpPanel onReviewTutorial={handleToggleTutorial} />}
       {showObjectives && <ObjectivesPanel stats={engineRef.current.player.stats} />}
 
       {inspectedData && (buildType === null) && (
@@ -854,6 +870,7 @@ const App: React.FC = () => {
         dismissed={tutorialDismissed}
         onDismiss={handleDismissTutorial}
         onManualNext={handleManualNext}
+        show={showTutorial}
       />
     </div>
   );

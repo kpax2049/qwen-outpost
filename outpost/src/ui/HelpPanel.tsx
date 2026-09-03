@@ -1,6 +1,10 @@
 import React from 'react';
 
-export const HelpPanel: React.FC = () => (
+export interface HelpPanelProps {
+  onReviewTutorial?: () => void;
+}
+
+export const HelpPanel: React.FC<HelpPanelProps> = ({ onReviewTutorial }) => (
   <div style={{
     position: 'absolute', top: 50, right: 8,
     background: '#141922', border: '1px solid rgba(255,255,255,.1)',
@@ -145,6 +149,23 @@ export const HelpPanel: React.FC = () => (
         <div>5. Watch the <strong style={{ color: '#e8edf2' }}>OUTPOST POWER GRID</strong> panel: surplus should stay positive</div>
         <div>6. If a belt glows red it's blocked — check its direction and the building it leads into</div>
       </div>
+
+      {onReviewTutorial && (
+        <button onClick={onReviewTutorial} style={{
+          width: '100%',
+          marginTop: 12,
+          padding: '8px 12px',
+          display: 'grid', placeItems: 'center',
+          background: '#e8ae4a',
+          color: '#0b0e12',
+          fontFamily: "'Chakra Petch', sans-serif",
+          fontSize: 11, fontWeight: 700, letterSpacing: '.12em',
+          border: 'none', borderRadius: 4,
+          cursor: 'pointer',
+        }}>
+          REVIEW TUTORIAL
+        </button>
+      )}
     </div>
   </div>
 );

@@ -970,6 +970,7 @@ function Showcase() {
             onToggleBuildMenu={() => {}}
             onToggleInventory={() => {}}
             onToggleHelp={() => {}}
+            onToggleTutorial={() => {}}
             onToggleObjectives={() => {}}
             onTogglePower={() => {}}
             onSave={() => {}}
@@ -1003,19 +1004,20 @@ function Showcase() {
               onResetSpeed={() => {}}
               onToggleBuildMenu={() => {}}
               onToggleInventory={() => {}}
-              onToggleHelp={() => {}}
-              onToggleObjectives={() => {}}
-              onTogglePower={() => {}}
-              onSave={() => {}}
-              onLoad={() => {}}
-              onNewGame={() => {}}
-              buildType={'miner'}
-              buildDirection={Dir.Down}
-              onDeselectBuild={() => {}}
-              saveStatus={null}
-              showPowerPanel={false}
-              playerInventory={playerItems}
-            />
+            onToggleHelp={() => {}}
+            onToggleTutorial={() => {}}
+            onToggleObjectives={() => {}}
+            onTogglePower={() => {}}
+            onSave={() => {}}
+            onLoad={() => {}}
+            onNewGame={() => {}}
+            buildType={'miner'}
+            buildDirection={Dir.Down}
+            onDeselectBuild={() => {}}
+            saveStatus={null}
+            showPowerPanel={false}
+            playerInventory={playerItems}
+          />
             <div style={{ position: 'absolute', top: 50, left: 8, zIndex: 20 }}>
               <BuildMenu onSelectBuild={() => {}} activeBuild={'miner'} selectedBuild={null} onDetailSelect={() => {}} playerInventory={playerItems} />
             </div>
@@ -1044,6 +1046,7 @@ function Showcase() {
             onToggleBuildMenu={() => {}}
             onToggleInventory={() => {}}
             onToggleHelp={() => {}}
+            onToggleTutorial={() => {}}
             onToggleObjectives={() => {}}
             onTogglePower={() => {}}
             onSave={() => {}}
@@ -1087,6 +1090,7 @@ function Showcase() {
               onToggleBuildMenu={() => {}}
               onToggleInventory={() => {}}
               onToggleHelp={() => {}}
+              onToggleTutorial={() => {}}
               onToggleObjectives={() => {}}
               onTogglePower={() => {}}
               onSave={() => {}}
