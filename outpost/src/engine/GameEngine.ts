@@ -401,17 +401,17 @@ export class GameEngine {
 
   private updateMiner(x: number, y: number, tile: Tile): void {
     const b = tile.building!;
-    if (!tile.resource || tile.resource.amount <= 0) return;
-
-    b.progress++;
-    if (b.progress >= b.maxProgress) {
-      b.progress = 0;
-      tile.resource.amount--;
-      if (tile.resource.amount < 0) tile.resource.amount = 0;
-      this.addToInventory(b, { type: tile.resource.type, amount: 1 });
-      b.producesItem = tile.resource.type;
-      this.tryOutputToAdjacent(x, y, tile);
+    if (tile.resource && tile.resource.amount > 0) {
+      b.progress++;
+      if (b.progress >= b.maxProgress) {
+        b.progress = 0;
+        tile.resource.amount--;
+        if (tile.resource.amount < 0) tile.resource.amount = 0;
+        this.addToInventory(b, { type: tile.resource.type, amount: 1 });
+        b.producesItem = tile.resource.type;
+      }
     }
+    this.tryOutputToAdjacent(x, y, tile);
   }
 
   private updateSmelter(x: number, y: number, tile: Tile): void {

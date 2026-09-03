@@ -1346,6 +1346,33 @@ function makeBelt(direction: DirectionValue): Building {
   };
 }
 
+function makeMiner(direction: DirectionValue): Building {
+  return {
+    type: 'miner', direction, active: true, powerConsumed: 5,
+    powerProduced: undefined, inventory: [], maxInventory: 10,
+    progress: 0, maxProgress: 30, producesItem: undefined, consumesItems: undefined, outputDirection: direction,
+  };
+}
+
+function makeGenerator(): Building {
+  return {
+    type: 'generator', direction: Dir.Down, active: true, powerConsumed: 0,
+    powerProduced: 50, inventory: [], maxInventory: 20,
+    progress: 0, maxProgress: 50, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
+  };
+}
+
+function makeAssembler(): Building {
+  return {
+    type: 'assembler', direction: Dir.Down, active: true, powerConsumed: 15,
+    powerProduced: undefined, inventory: [], maxInventory: 30,
+    progress: 0, maxProgress: 80, producesItem: 'gear', consumesItems: [
+      { type: 'iron_ingot', amount: 2 },
+      { type: 'copper_wire', amount: 2 },
+    ], outputDirection: undefined,
+  };
+}
+
 // ==================== ENGINE PHASE B: CONVEYOR DATA MODEL TESTS ====================
 
 describe('Engine - computeIncomingSide', () => {
@@ -2171,5 +2198,165 @@ describe('Engine - zero-power passive operation', () => {
     engine.map[60][60].terrain = 'grass';
     engine.map[60][60].building = makeBelt(Dir.Down);
     expect(engine.map[60][60]!.building!.powerConsumed).toBe(0);
+  });
+});
+
+describe('Miner logistics - output drains on depleted deposit', () => {
+  it('miner with active deposit mines and outputs to adjacent belt', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    // Layout: Miner(60,59) → Belt(61,59) → Storage(62,59)
+    // Generator at (60,60) for power
+    setG(60, 59); setG(61, 59); setG(62, 59);
+    setG(60, 60);
+
+    // Coal deposit under the miner
+    engine.map[59][60].resource = { type: 'coal', amount: 50 };
+
+    engine.map[59][60].building = makeMiner(Dir.Right);
+    engine.map[59][61].building = makeBelt(Dir.Right);
+    engine.map[59][62].building = createStorage();
+    engine.map[60][60].building = makeGenerator();
+    engine.map[60][60]!.building!.inventory = [{ type: 'coal', amount: 5 }];
+
+    for (let i = 0; i < 100; i++) engine.tick();
+
+    // Storage should have received coal from the belt chain
+    const storageInv = engine.map[59][62]!.building!.inventory;
+    expect(storageInv.some(i => i.type === 'coal')).toBe(true);
+    // Deposit should have decreased
+    expect(engine.map[59][60].resource!.amount).toBeLessThan(50);
+  });
+
+  it('depleted deposit + stored output continues draining onto belt', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+    setG(60, 59); setG(61, 59); setG(62, 59);
+    setG(60, 60);
+
+    // Small coal deposit (2 units)
+    engine.map[59][60].resource = { type: 'coal', amount: 2 };
+
+    engine.map[59][60].building = makeMiner(Dir.Right);
+    engine.map[59][61].building = makeBelt(Dir.Right);
+    engine.map[59][62].building = createStorage();
+    engine.map[60][60].building = makeGenerator();
+    engine.map[60][60]!.building!.inventory = [{ type: 'coal', amount: 5 }];
+
+    // Mine the deposit to depletion
+    for (let i = 0; i < 100; i++) engine.tick();
+
+    // Deposit should be empty
+    expect(engine.map[59][60].resource!.amount).toBe(0);
+
+    // Preload the miner with stored items
+    const miner = engine.map[59][60]!.building!;
+    miner.inventory = [{ type: 'coal', amount: 5 }];
+
+    // Run more ticks - items should drain from miner → belt → storage
+    for (let i = 0; i < 100; i++) engine.tick();
+
+    // Miner's stored coal should be depleted
+    const minerCoal = miner.inventory.find(i => i.type === 'coal');
+    if (minerCoal) { expect(minerCoal.amount).toBe(0); }
+    // Storage should have received the items
+    const storageInv = engine.map[59][62]!.building!.inventory;
+    const storedCoal = storageInv.find(i => i.type === 'coal');
+    expect(storedCoal).toBeDefined();
+    expect(storedCoal!.amount).toBeGreaterThan(0);
+  });
+
+  it('depleted deposit + empty miner remains idle (no new mining)', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    // Small coal deposit (1 unit)
+    engine.map[59][60].resource = { type: 'coal', amount: 1 };
+
+    engine.map[59][60].building = makeMiner(Dir.Right);
+
+    // Power the grid
+    setG(60, 60);
+    engine.map[60][60].building = makeGenerator();
+    engine.map[61][60] = { terrain: 'grass', building: makeGenerator() };
+    engine.map[61][60]!.building!.inventory = [{ type: 'coal', amount: 5 }];
+
+    // Mine the single deposit to depletion
+    for (let i = 0; i < 100; i++) engine.tick();
+
+    // Deposit should be empty
+    expect(engine.map[59][60].resource!.amount).toBe(0);
+
+    const miner = engine.map[59][60]!.building!;
+
+    // Miner may have the 1 coal it mined — that's OK, it was produced
+    // The key is: no MORE coal should appear after depletion
+    const coalAfterFirstPhase = miner.inventory.find(i => i.type === 'coal');
+    const maxCoalAfterMine = coalAfterFirstPhase ? coalAfterFirstPhase.amount : 0;
+    expect(maxCoalAfterMine).toBeLessThanOrEqual(1);
+
+    // Keep ticking - miner should NOT produce any more items
+    for (let i = 0; i < 100; i++) engine.tick();
+
+    // Miner should not have gained any more coal
+    const coalAfterIdle = miner.inventory.find(i => i.type === 'coal');
+    const maxCoalAfterIdle = coalAfterIdle ? coalAfterIdle.amount : 0;
+    expect(maxCoalAfterIdle).toBe(maxCoalAfterMine);
+    // Status should be "No Resource Below"
+    const inspection = engine.inspectBuilding(60, 59);
+    expect(inspection!.status).toBe('No Resource Below');
+  });
+
+  it('blocked downstream belt preserves stored items until output becomes available', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    const setG = (x: number, y: number) => { engine.map[y][x].terrain = 'grass'; };
+
+    // Depleted deposit
+    engine.map[59][60].resource = { type: 'coal', amount: 0 };
+
+    // Layout: Miner(60,59) → Belt(61,59) → Assembler(62,59) that rejects coal
+    engine.map[59][60].building = makeMiner(Dir.Right);
+    engine.map[59][61].building = makeBelt(Dir.Right);
+    engine.map[59][62].building = makeAssembler();
+
+    // Power the grid
+    setG(60, 60);
+    engine.map[60][60].building = makeGenerator();
+    engine.map[60][60]!.building!.inventory = [{ type: 'coal', amount: 5 }];
+
+    // Preload the miner with items
+    const miner = engine.map[59][60]!.building!;
+    miner.inventory = [{ type: 'coal', amount: 3 }];
+
+    // Fill the belt to capacity (belt maxInventory = 1)
+    engine.map[59][61]!.building!.inventory = [{ type: 'coal', amount: 1 }];
+
+    // Run ticks - miner should try to output but belt is full, and assembler rejects coal
+    for (let i = 0; i < 50; i++) engine.tick();
+
+    // Miner's stored coal should still be there (blocked by full belt)
+    const minerCoal = miner.inventory.find(i => i.type === 'coal');
+    expect(minerCoal).toBeDefined();
+    expect(minerCoal!.amount).toBe(3);
+
+    // Now clear the belt to unblock
+    engine.map[59][61]!.building!.inventory = [];
+
+    // Run more ticks - items should flow from miner to belt
+    for (let i = 0; i < 50; i++) engine.tick();
+
+    // Miner's coal should have started draining
+    const minerCoalAfter = miner.inventory.find(i => i.type === 'coal');
+    if (minerCoalAfter) { expect(minerCoalAfter.amount).toBeLessThan(3); }
+    // Belt should have received at least some items
+    const beltInv = engine.map[59][61]!.building!.inventory;
+    const beltCoal = beltInv.find(i => i.type === 'coal');
+    expect(beltCoal).toBeDefined();
+    expect(beltCoal!.amount).toBeGreaterThan(0);
   });
 });
