@@ -285,6 +285,13 @@ const App: React.FC = () => {
         engine.removeBuilding();
         setRenderTick(t => t + 1);
       }
+      if (e.key.toLowerCase() === 't' && !bt) {
+        const insp = inspectedRef.current;
+        if (insp) {
+          engine.takeInspectedItem(insp.x, insp.y);
+          setRenderTick(t => t + 1);
+        }
+      }
       if (e.key.toLowerCase() === ' ') {
         e.preventDefault();
         engine.setPaused(!engine.getConfig().paused);
@@ -685,6 +692,26 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const handleWithdraw = useCallback((type: string) => {
+    const ip = inspectedRef.current;
+    const engine = engineRef.current;
+    if (!ip) return;
+    engine.withdrawItemFromBuilding(ip.x, ip.y, type);
+    setRenderTick(t => t + 1);
+    setInspectedData({
+      building: engine.inspectBuilding(ip.x, ip.y),
+      playerItems: engine.player.inventory
+        .filter(i => i.amount > 0)
+        .map(i => ({ type: i.type as string, amount: i.amount })),
+    });
+  }, []);
+
+  const canWithdraw = useCallback((type: string): boolean => {
+    const ip = inspectedRef.current;
+    if (!ip) return false;
+    return engineRef.current.buildingCanWithdrawItem(ip.x, ip.y, type);
+  }, []);
+
   const eng = engineRef.current;
   const playerInv = eng.player.inventory;
   const cMove = eng.player.x !== 60 || eng.player.y !== 60;
@@ -861,6 +888,8 @@ const App: React.FC = () => {
           onClose={closeInspection}
           onDeposit={handleDeposit}
           canDeposit={canDeposit}
+          onWithdraw={handleWithdraw}
+          canWithdraw={canWithdraw}
           onRotate={handleRotateInspected}
         />
       )}

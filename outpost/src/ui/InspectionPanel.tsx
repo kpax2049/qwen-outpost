@@ -1,5 +1,5 @@
 import React from 'react';
-import { BUILDING_DEFS, BUILDING_COLORS } from '../types';
+import { BUILDING_DEFS, BUILDING_COLORS, ITEM_COLORS } from '../types';
 import type { BuildingInspection, BuildingTypeValue } from '../types';
 
 export interface InspectionData {
@@ -12,6 +12,8 @@ interface InspectionPanelProps {
   onClose: () => void;
   onDeposit: (type: string) => void;
   canDeposit: (type: string) => boolean;
+  onWithdraw: (type: string) => void;
+  canWithdraw: (type: string) => boolean;
   onRotate: () => void;
 }
 
@@ -46,7 +48,7 @@ const DEPOSIT_DISPLAY: Record<string, string> = {
   engine: 'Engine',
 };
 
-export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose, onDeposit, canDeposit, onRotate }) => {
+export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose, onDeposit, canDeposit, onWithdraw, canWithdraw, onRotate }) => {
   const { building, playerItems } = data;
 
   return (
@@ -305,6 +307,72 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
               }}>
                 REMOVE Q
               </button>
+            )}
+
+            {/* Take from building */}
+            {building.inventory.length > 0 && building.type !== 'conveyor' && (
+              <>
+                <div style={{
+                  fontFamily: "'Chakra Petch', sans-serif",
+                  fontSize: 10, letterSpacing: '.16em',
+                  color: '#6e7b88', marginTop: 14, marginBottom: 8,
+                  paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.08)',
+                }}>
+                  TAKE FROM RELAY
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {building.inventory.map((item, idx) => {
+                    const color = ITEM_COLORS[item.type as keyof typeof ITEM_COLORS] ?? '#94a2b0';
+                    const ok = canWithdraw(item.type);
+                    return (
+                      <button
+                        key={idx}
+                        disabled={!ok || item.amount <= 0}
+                        onClick={() => onWithdraw(item.type)}
+                        style={{
+                          height: 30, padding: '0 6px 0 8px',
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          background: ok ? '#1f2732' : '#101418',
+                          border: ok ? '1px solid rgba(246,187,69,.3)' : '1px solid rgba(255,255,255,.07)',
+                          borderRadius: 3,
+                          fontFamily: "'IBM Plex Mono', monospace",
+                          fontSize: 11,
+                          color: ok ? '#f6bb45' : '#5e6873',
+                          cursor: ok ? 'pointer' : 'not-allowed',
+                          opacity: ok ? 1 : 0.5,
+                        }}
+                      >
+                        <span style={{
+                          width: 11, height: 11, background: color,
+                          border: '1px solid #101418',
+                          flexShrink: 0,
+                        }} />
+                        <span style={{
+                          fontFamily: "'Chakra Petch', sans-serif",
+                          fontSize: 10, fontWeight: 600, letterSpacing: '.05em',
+                          color: '#c6d2de',
+                        }}>
+                          {DEPOSIT_DISPLAY[item.type] ?? item.type}
+                        </span>
+                        <span style={{
+                          color: ok ? '#e8edf2' : '#5e6873',
+                          minWidth: 18, textAlign: 'right',
+                        }}>
+                          {item.amount}
+                        </span>
+                        <span style={{
+                          width: 18, height: 18, display: 'grid', placeItems: 'center',
+                          background: '#0e131a', borderRadius: 2,
+                          fontFamily: "'IBM Plex Mono', monospace",
+                          fontSize: 12, fontWeight: 700,
+                        }}>
+                          −
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
 
             {/* Deposit buttons */}

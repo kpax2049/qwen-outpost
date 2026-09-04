@@ -1266,6 +1266,52 @@ export class GameEngine {
     return data;
   }
 
+  withdrawItemFromBuilding(x: number, y: number, type: string): boolean {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
+    const tile = this._state.save.map[y][x];
+    if (!tile.building) return false;
+    if (tile.building.type === BuildingTypeMap.conveyor) return false;
+    const p = this._state.save.player;
+    const nearby = Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1;
+    if (!nearby) return false;
+
+    const buildingItem = this.getItemInInventory(tile.building, type);
+    if (!buildingItem || buildingItem.amount <= 0) return false;
+
+    this.removeItemFromInventory(tile.building, type, 1);
+    this.addToPlayerInventory({ type: type as ItemType, amount: 1 });
+    return true;
+  }
+
+  buildingCanWithdrawItem(x: number, y: number, type: string): boolean {
+    const tile = x >= 0 && x < MAP_SIZE && y >= 0 && y < MAP_SIZE ? this._state.save.map[y][x] : undefined;
+    if (!tile?.building || tile.building.type === BuildingTypeMap.conveyor) return false;
+    const p = this._state.save.player;
+    const nearby = Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1;
+    if (!nearby) return false;
+    const buildingItem = this.getItemInInventory(tile.building, type);
+    if (!buildingItem || buildingItem.amount <= 0) return false;
+    return true;
+  }
+
+  /**
+   * Take the first item stack from the building at (x,y).
+   * Convenience for keyboard-driven inspection take.
+   */
+  takeInspectedItem(x: number, y: number): boolean {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
+    const tile = this._state.save.map[y][x];
+    if (!tile.building || tile.building.type === BuildingTypeMap.conveyor) return false;
+    const p = this._state.save.player;
+    const nearby = Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1;
+    if (!nearby) return false;
+    const first = this.getFirstItem(tile.building);
+    if (!first || first.amount <= 0) return false;
+    this.removeItemFromInventory(tile.building, first.type, 1);
+    this.addToPlayerInventory({ type: first.type as ItemType, amount: 1 });
+    return true;
+  }
+
   /**
    * Deposit one item of `type` from the player's inventory into a building they can reach (inspected).
    */
