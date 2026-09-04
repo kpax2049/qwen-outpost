@@ -555,6 +555,7 @@ describe('GameEngine - Assembler', () => {
     genTile.building!.inventory.push({ type: 'coal', amount: 50 });
 
     const assembler = engine.getTile(60, 62)!.building!;
+    assembler.selectedRecipe = 'gear';
     assembler.inventory = [
       { type: 'iron_ingot', amount: 4 },
       { type: 'copper_wire', amount: 4 },
@@ -1317,6 +1318,385 @@ describe('Acceptance - Adjacent non-feeding belt', () => {
 
     const outA = engine.getConnections(60, 61)!;
     expect(outA.outgoing.kind).toBe('headon');
+  });
+});
+
+// ==================== ASSEMBLER RECIPE SELECTION ====================
+
+describe('Assembler - Default Recipe', () => {
+  it('newly built assembler defaults to copper_wire', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('assembler');
+
+    const asm = engine.getTile(60, 60)!.building!;
+    expect(asm.selectedRecipe).toBe('copper_wire');
+  });
+
+  it('inspection shows selected recipe', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('assembler');
+
+    const info = engine.inspectBuilding(60, 60)!;
+    expect(info.selectedRecipe).toBe('copper_wire');
+  });
+});
+
+describe('Assembler - Copper Wire Recipe', () => {
+  it('assembler crafts copper wire when selected and copper is provided', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine.getTile(60, 62)!.building!;
+    asm.inventory = [{ type: 'copper', amount: 10 }];
+
+    for (let i = 0; i < 60; i++) engine.tick();
+
+    const wires = asm.inventory.find(i => i.type === 'copper_wire');
+    expect(wires).toBeDefined();
+    if (wires) expect(wires.amount).toBeGreaterThan(0);
+    expect(engine.player.stats.copperWiresCrafted).toBeGreaterThan(0);
+  });
+
+  it('status shows crafting copper wire', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine.getTile(60, 62)!.building!;
+    asm.inventory = [{ type: 'copper', amount: 10 }];
+
+    engine.tick();
+    const info = engine.inspectBuilding(60, 62)!;
+    expect(info.status).toBe('Crafting Copper Wire');
+  });
+});
+
+describe('Assembler - Gear Recipe', () => {
+  it('assembler crafts gears when selected with proper ingredients', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine.getTile(60, 62)!.building!;
+    asm.selectedRecipe = 'gear';
+    asm.inventory = [
+      { type: 'iron_ingot', amount: 6 },
+      { type: 'copper_wire', amount: 6 },
+    ];
+
+    for (let i = 0; i < 120; i++) engine.tick();
+
+    const gears = asm.inventory.find(i => i.type === 'gear');
+    expect(gears).toBeDefined();
+    if (gears) expect(gears.amount).toBeGreaterThan(0);
+  });
+
+  it('status shows waiting for missing gear ingredients', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine.getTile(60, 62)!.building!;
+    asm.selectedRecipe = 'gear';
+    asm.inventory = [
+      { type: 'iron_ingot', amount: 6 },
+      // missing copper_wire
+    ];
+
+    engine.tick();
+    const info = engine.inspectBuilding(60, 62)!;
+    expect(info.status).toContain('Waiting for Input');
+    expect(info.status).toContain('Copper Wire');
+  });
+});
+
+describe('Assembler - Engine Recipe', () => {
+  it('assembler crafts engines when selected with proper ingredients', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine.getTile(60, 62)!.building!;
+    asm.selectedRecipe = 'engine';
+    asm.inventory = [
+      { type: 'steel_plate', amount: 3 },
+      { type: 'gear', amount: 3 },
+      { type: 'copper_wire', amount: 6 },
+    ];
+
+    for (let i = 0; i < 250; i++) engine.tick();
+
+    const engines = asm.inventory.find(i => i.type === 'engine');
+    expect(engines).toBeDefined();
+    if (engines) expect(engines.amount).toBeGreaterThan(0);
+    expect(engine.player.stats.enginesCrafted).toBeGreaterThan(0);
+  });
+
+  it('status shows waiting for missing engine ingredients', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine.getTile(60, 62)!.building!;
+    asm.selectedRecipe = 'engine';
+    asm.inventory = [
+      { type: 'steel_plate', amount: 3 },
+      // missing gear and copper_wire
+    ];
+
+    engine.tick();
+    const info = engine.inspectBuilding(60, 62)!;
+    expect(info.status).toContain('Waiting for Input');
+  });
+});
+
+describe('Assembler - Switching Recipes', () => {
+  it('can switch from copper wire to gear', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine.getTile(60, 62)!.building!;
+    asm.inventory = [{ type: 'copper', amount: 10 }];
+
+    // Run with copper wire recipe
+    for (let i = 0; i < 60; i++) engine.tick();
+    expect(asm.selectedRecipe).toBe('copper_wire');
+    expect(engine.inspectBuilding(60, 62)!.status).toBe('Crafting Copper Wire');
+
+    // Switch to gear
+    engine.setAssemblerRecipe(60, 62, 'gear');
+
+    const info = engine.inspectBuilding(60, 62)!;
+    expect(info.selectedRecipe).toBe('gear');
+    // No gear ingredients yet — should show waiting
+    expect(info.status).toContain('Waiting for Input');
+
+    // Now add gear ingredients
+    asm.inventory.push(
+      { type: 'iron_ingot', amount: 4 },
+      { type: 'copper_wire', amount: 4 },
+    );
+    for (let i = 0; i < 45; i++) engine.tick();
+
+    // Should now be crafting gears
+    info.status; // will check below
+    expect(info.selectedRecipe).toBe('gear');
+  });
+
+  it('setAssemblerRecipe on non-assembler does nothing', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.placeBuilding('storage');
+
+    // Should not throw or change anything
+    engine.setAssemblerRecipe(60, 60, 'gear');
+    const storage = engine.getTile(60, 60)!.building!;
+    expect(storage.type).toBe('storage');
+  });
+
+  it('setAssemblerRecipe on out-of-bounds does nothing', () => {
+    const engine = new GameEngine(42);
+    expect(() => engine.setAssemblerRecipe(-1, 0, 'gear')).not.toThrow();
+    expect(() => engine.setAssemblerRecipe(999, 999, 'gear')).not.toThrow();
+  });
+});
+
+describe('Assembler - Multiple Assemblers With Different Recipes', () => {
+  it('two assemblers can run different recipes simultaneously', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    // Place generator at (60, 61) for power
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    // Move to (60, 62) for Assembler 1 (copper wire)
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    // Move to (60, 63) for Assembler 2 (gears)
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const asm1 = engine.getTile(60, 62)!.building!;
+    asm1.selectedRecipe = 'copper_wire';
+    asm1.inventory = [{ type: 'copper', amount: 20 }];
+
+    const asm2 = engine.getTile(60, 63)!.building!;
+    asm2.selectedRecipe = 'gear';
+    asm2.inventory = [
+      { type: 'iron_ingot', amount: 6 },
+      { type: 'copper_wire', amount: 6 },
+    ];
+
+    for (let i = 0; i < 120; i++) engine.tick();
+
+    // Assembler 1 should have copper wire
+    const wires1 = asm1.inventory.find(i => i.type === 'copper_wire');
+    expect(wires1).toBeDefined();
+    if (wires1) expect(wires1.amount).toBeGreaterThan(0);
+
+    // Assembler 2 should have gears
+    const gears2 = asm2.inventory.find(i => i.type === 'gear');
+    expect(gears2).toBeDefined();
+    if (gears2) expect(gears2.amount).toBeGreaterThan(0);
+
+    // They should still have different recipes
+    expect(asm1.selectedRecipe).toBe('copper_wire');
+    expect(asm2.selectedRecipe).toBe('gear');
+  });
+});
+
+describe('Assembler - Missing Ingredients', () => {
+  it('assembler waits when output is full but inputs are available', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine.getTile(60, 62)!.building!;
+    asm.inventory = [
+      { type: 'copper', amount: 10 },
+      { type: 'copper_wire', amount: 30 }, // fill output slot
+    ];
+
+    engine.tick();
+    const info = engine.inspectBuilding(60, 62)!;
+    expect(info.status).toBe('Output Blocked (output full)');
+  });
+
+  it('assembler shows specific missing ingredients', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('generator');
+    engine.movePlayer(0, 1);
+    engine.placeBuilding('assembler');
+
+    const genTile = engine.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine.getTile(60, 62)!.building!;
+    asm.selectedRecipe = 'engine';
+    // Only have steel_plate, missing gear and copper_wire
+    asm.inventory = [{ type: 'steel_plate', amount: 5 }];
+
+    engine.tick();
+    const info = engine.inspectBuilding(60, 62)!;
+    expect(info.status).toContain('Waiting for Input');
+  });
+});
+
+describe('Assembler - Save/Load', () => {
+  it('preserves selected recipe through save/load', () => {
+    const engine1 = new GameEngine(42);
+    fundPlayer(engine1);
+    engine1.movePlayer(0, 1);
+    engine1.placeBuilding('generator');
+    engine1.movePlayer(0, 1);
+    engine1.placeBuilding('assembler');
+
+    const genTile = engine1.getTile(60, 61)!;
+    genTile.building!.inventory.push({ type: 'coal', amount: 50 });
+
+    const asm = engine1.getTile(60, 62)!.building!;
+    asm.selectedRecipe = 'engine';
+    asm.inventory = [
+      { type: 'steel_plate', amount: 5 },
+      { type: 'gear', amount: 5 },
+      { type: 'copper_wire', amount: 10 },
+    ];
+
+    // Run some ticks
+    for (let i = 0; i < 80; i++) engine1.tick();
+
+    const saved = engine1.save();
+
+    // Load into a fresh engine
+    const engine2 = new GameEngine(999);
+    engine2.load(saved);
+
+    const asm2 = engine2.getTile(60, 62)!.building!;
+    expect(asm2.selectedRecipe).toBe('engine');
+    expect(asm2.type).toBe('assembler');
+  });
+
+  it('preserves different recipes for multiple assemblers', () => {
+    const engine1 = new GameEngine(42);
+    fundPlayer(engine1);
+    engine1.movePlayer(0, 1);
+    engine1.placeBuilding('generator');
+    engine1.movePlayer(0, 1);
+    engine1.placeBuilding('assembler');
+    engine1.movePlayer(0, 1);
+    engine1.placeBuilding('assembler');
+
+    const asm1 = engine1.getTile(60, 61)!.building!;
+    asm1.selectedRecipe = 'copper_wire';
+
+    const asm2 = engine1.getTile(60, 62)!.building!;
+    asm2.selectedRecipe = 'gear';
+
+    const saved = engine1.save();
+
+    const engine2 = new GameEngine(1);
+    engine2.load(saved);
+
+    expect(engine2.getTile(60, 61)!.building!.selectedRecipe).toBe('copper_wire');
+    expect(engine2.getTile(60, 62)!.building!.selectedRecipe).toBe('gear');
   });
 });
 

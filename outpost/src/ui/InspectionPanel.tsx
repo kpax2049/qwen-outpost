@@ -1,6 +1,7 @@
 import React from 'react';
-import { BUILDING_DEFS, BUILDING_COLORS, ITEM_COLORS } from '../types';
-import type { BuildingInspection, BuildingTypeValue } from '../types';
+import { BUILDING_DEFS, BUILDING_COLORS, ITEM_COLORS, ITEM_DISPLAY_NAMES } from '../types';
+import type { BuildingInspection, BuildingTypeValue, AsmRecipe } from '../types';
+import { ASM_RECIPES, ASM_RECIPE_ORDER } from '../types';
 
 export interface InspectionData {
   building: BuildingInspection | null;
@@ -15,6 +16,7 @@ interface InspectionPanelProps {
   onWithdraw: (type: string) => void;
   canWithdraw: (type: string) => boolean;
   onRotate: () => void;
+  onRecipeSelect?: (recipe: AsmRecipe) => void;
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string }> = {
@@ -48,7 +50,7 @@ const DEPOSIT_DISPLAY: Record<string, string> = {
   engine: 'Engine',
 };
 
-export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose, onDeposit, canDeposit, onWithdraw, canWithdraw, onRotate }) => {
+export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose, onDeposit, canDeposit, onWithdraw, canWithdraw, onRotate, onRecipeSelect }) => {
   const { building, playerItems } = data;
 
   return (
@@ -235,6 +237,69 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
               }}>
                 <span>CARRYING</span>
                 <span style={{ color: '#e8edf2' }}>{building.beltItem ?? '—'}</span>
+              </div>
+            )}
+
+            {/* Assembler recipe selector */}
+            {building.type === 'assembler' && onRecipeSelect && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  fontFamily: "'Chakra Petch', sans-serif",
+                  fontSize: 10, letterSpacing: '.16em',
+                  color: '#6e7b88', marginBottom: 8,
+                }}>
+                  RECIPE
+                </div>
+                {ASM_RECIPE_ORDER.map(recipe => {
+                  const def = ASM_RECIPES[recipe];
+                  const isSelected = building.selectedRecipe === recipe;
+                  return (
+                    <button
+                      key={recipe}
+                      onClick={() => onRecipeSelect(recipe)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        width: '100%', height: 36, marginBottom: 4,
+                        padding: '0 10px',
+                        background: isSelected ? '#1a2a1a' : '#101720',
+                        border: isSelected ? '1px solid rgba(95,203,147,.45)' : '1px solid rgba(255,255,255,.07)',
+                        borderRadius: 3,
+                        cursor: 'pointer',
+                        fontFamily: "'IBM Plex Mono', monospace",
+                        fontSize: 11,
+                        color: isSelected ? '#5fcb93' : '#94a2b0',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span style={{
+                        width: 16, height: 16, background: ITEM_COLORS[def.output] ?? '#666',
+                        border: '1px solid rgba(255,255,255,.12)',
+                        borderRadius: 2, flexShrink: 0,
+                      }} />
+                      <span style={{
+                        fontFamily: "'Chakra Petch', sans-serif",
+                        fontSize: 11, fontWeight: 600, letterSpacing: '.06em',
+                        color: isSelected ? '#e8edf2' : '#c6d2de',
+                        flex: 1,
+                      }}>
+                        {def.label}
+                      </span>
+                      <span style={{
+                        fontFamily: "'IBM Plex Mono', monospace",
+                        fontSize: 10, color: '#6e7b88',
+                      }}>
+                        {def.inputs.map(c => `${c.amount}x ${ITEM_DISPLAY_NAMES[c.type] ?? c.type}`).join(' + ')}
+                      </span>
+                      <span style={{
+                        color: '#5fcb93', fontWeight: 700,
+                        fontFamily: "'IBM Plex Mono', monospace",
+                        fontSize: 10,
+                      }}>
+                        → {def.threshold}t
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
 

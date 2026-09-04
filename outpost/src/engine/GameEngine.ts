@@ -12,6 +12,7 @@ import {
   type PowerSummary,
   type BuildingInspection,
   type ConveyorConnection,
+  type AsmRecipe,
   BuildingTypeMap,
   Dir,
   BUILDING_DEFS,
@@ -22,6 +23,7 @@ import {
   DELTA,
   oppositeDirection,
   DIR_NAMES,
+  ASM_RECIPES,
 } from '../types';
 
 // ==================== SEEDED PRNG ====================
@@ -220,6 +222,7 @@ function createBuilding(type: BuildingTypeValue): Building {
     producesItem: def.producesItem,
     consumesItems: def.consumesItems,
     outputDirection: def.outputDirection,
+    ...(type === 'assembler' ? { selectedRecipe: 'copper_wire' as AsmRecipe } : {}),
   };
 }
 
@@ -442,57 +445,35 @@ export class GameEngine {
 
   private updateAssembler(x: number, y: number, tile: Tile): void {
     const b = tile.building!;
-    let produced = false;
+    const recipeDef = ASM_RECIPES[b.selectedRecipe ?? 'copper_wire'];
 
-    // Determine which recipe to run based on available ingredients (priority order)
-    const recipe = this.getAssemblerRecipe(b);
+    const hasAll = recipeDef.inputs.every(c => {
+      const inv = this.getItemInInventory(b, c.type);
+      return inv && inv.amount >= c.amount;
+    });
 
-    if (recipe) {
+    if (hasAll && this.canAddToInventory(b, recipeDef.output)) {
       b.progress++;
-      if (b.progress >= recipe.threshold) {
+      if (b.progress >= recipeDef.threshold) {
         b.progress = 0;
-        for (const c of recipe.inputs) {
+        for (const c of recipeDef.inputs) {
           this.removeItemFromInventory(b, c.type, c.amount);
         }
-        this.addToInventory(b, { type: recipe.output, amount: 1 });
-        produced = true;
+        this.addToInventory(b, { type: recipeDef.output, amount: 1 });
+        const p = this._state.save.player;
+        if (recipeDef.output === 'copper_wire') { p.stats.copperWiresCrafted++; }
+        else if (recipeDef.output === 'engine') { p.stats.enginesCrafted++; }
+        this.tryOutputToAdjacent(x, y, tile);
       }
-    }
-
-    if (produced) {
-      const p = this._state.save.player;
-      if (recipe.output === 'copper_wire') { p.stats.copperWiresCrafted++; }
-      else if (recipe.output === 'engine') { p.stats.enginesCrafted++; }
-      this.tryOutputToAdjacent(x, y, tile);
     }
   }
 
-  private getAssemblerRecipe(b: Building): { inputs: { type: string; amount: number }[]; output: ItemType; threshold: number } | null {
-    // Copper wire: 1 copper -> 1 copper_wire (30 ticks)
-    {
-      const copper = this.getItemInInventory(b, 'copper');
-      if (copper && copper.amount >= 1 && this.canAddToInventory(b, 'copper_wire')) {
-        return { inputs: [{ type: 'copper', amount: 1 }], output: 'copper_wire' as ItemType, threshold: 30 };
-      }
-    }
-    // Gears: 2 iron_ingot + 2 copper_wire -> 1 gear (40 ticks)
-    {
-      const ingot = this.getItemInInventory(b, 'iron_ingot');
-      const wire = this.getItemInInventory(b, 'copper_wire');
-      if (ingot && ingot.amount >= 2 && wire && wire.amount >= 2 && this.canAddToInventory(b, 'gear')) {
-        return { inputs: [{ type: 'iron_ingot', amount: 2 }, { type: 'copper_wire', amount: 2 }], output: 'gear' as ItemType, threshold: 40 };
-      }
-    }
-    // Engine: 1 steel_plate + 1 gear + 2 copper_wire -> 1 engine (80 ticks)
-    {
-      const steel = this.getItemInInventory(b, 'steel_plate');
-      const gear = this.getItemInInventory(b, 'gear');
-      const wire = this.getItemInInventory(b, 'copper_wire');
-      if (steel && steel.amount >= 1 && gear && gear.amount >= 1 && wire && wire.amount >= 2 && this.canAddToInventory(b, 'engine')) {
-        return { inputs: [{ type: 'steel_plate', amount: 1 }, { type: 'gear', amount: 1 }, { type: 'copper_wire', amount: 2 }], output: 'engine' as ItemType, threshold: 80 };
-      }
-    }
-    return null;
+  /** Set the selected recipe for an Assembler at (x, y). */
+  setAssemblerRecipe(x: number, y: number, recipe: AsmRecipe): void {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return;
+    const tile = this._state.save.map[y][x];
+    if (!tile.building || tile.building.type !== BuildingTypeMap.assembler) return;
+    tile.building.selectedRecipe = recipe;
   }
 
   private updateConveyors(): void {
@@ -1125,31 +1106,23 @@ export class GameEngine {
       }
       case BuildingTypeMap.assembler: {
         if (!b.active) return { status: 'No Power', statusColor: 'bad' };
-        // Determine what the next craftable recipe needs.
-        const recipes: { inputs: { type: string; amount: number }[]; output: string }[] = [
-          { inputs: [{ type: 'copper', amount: 1 }], output: 'copper_wire' },
-          { inputs: [{ type: 'iron_ingot', amount: 2 }, { type: 'copper_wire', amount: 2 }], output: 'gear' },
-          { inputs: [{ type: 'steel_plate', amount: 1 }, { type: 'gear', amount: 1 }, { type: 'copper_wire', amount: 2 }], output: 'engine' },
-        ];
-        const ready = recipes.find(r => {
-          const has = r.inputs.every(c => {
-            const inv = this.getItemInInventory(b, c.type);
-            return inv && inv.amount >= c.amount;
-          });
-          return has && this.canAddToInventory(b, r.output);
+        const recipe = ASM_RECIPES[b.selectedRecipe ?? 'copper_wire'];
+        const hasAll = recipe.inputs.every(c => {
+          const inv = this.getItemInInventory(b, c.type);
+          return inv && inv.amount >= c.amount;
         });
-        if (!ready) {
-          const needed = recipes.filter(r => r.inputs.every(c => {
-            const inv = this.getItemInInventory(b, c.type);
-            return inv && inv.amount >= c.amount;
-          }));
-          if (needed.length > 0) {
-            return { status: 'Output Blocked (output full)', statusColor: 'bad' };
-          }
-          const want = recipes[0].inputs.map(c => `${c.amount}x ${ITEM_DISPLAY_NAMES[c.type as ItemType] ?? c.type}`).join(', ');
-          return { status: `Waiting for Input (e.g. ${want})`, statusColor: 'warn' };
+        if (hasAll && this.canAddToInventory(b, recipe.output)) {
+          return { status: `Crafting ${recipe.label}`, statusColor: 'ok' };
         }
-        return { status: 'Crafting', statusColor: 'ok' };
+        const missing = recipe.inputs.filter(c => {
+          const inv = this.getItemInInventory(b, c.type);
+          return !inv || inv.amount < c.amount;
+        });
+        if (missing.length > 0) {
+          const names = missing.map(c => `${c.amount}x ${ITEM_DISPLAY_NAMES[c.type] ?? c.type}`);
+          return { status: `Waiting for Input (${names.join(', ')})`, statusColor: 'warn' };
+        }
+        return { status: 'Output Blocked (output full)', statusColor: 'bad' };
       }
       case BuildingTypeMap.storage:
       case BuildingTypeMap.chest:
@@ -1261,6 +1234,10 @@ export class GameEngine {
         outgoing: this.getOutConnection(x, y, b),
       };
       data.beltItem = b.inventory[0]?.amount > 0 ? (ITEM_DISPLAY_NAMES[b.inventory[0].type as ItemType] ?? b.inventory[0].type) : null;
+    }
+
+    if (b.type === BuildingTypeMap.assembler) {
+      data.selectedRecipe = b.selectedRecipe ?? 'copper_wire';
     }
 
     return data;

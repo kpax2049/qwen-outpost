@@ -4,7 +4,7 @@ import { Renderer } from './rendering/Renderer';
 import type { Camera } from './rendering/Renderer';
 import { AssetLoader } from './rendering/AssetLoader';
 import { BUILDING_COLORS, BuildingTypeMap } from './types';
-import type { BuildingTypeValue, PowerSummary, DirectionValue } from './types';
+import type { BuildingTypeValue, PowerSummary, DirectionValue, AsmRecipe } from './types';
 import { HUD } from './ui/HUD';
 import { BuildMenu } from './ui/BuildMenu';
 import { InventoryPanel } from './ui/InventoryPanel';
@@ -712,6 +712,20 @@ const App: React.FC = () => {
     return engineRef.current.buildingCanWithdrawItem(ip.x, ip.y, type);
   }, []);
 
+  const handleRecipeSelect = useCallback((recipe: AsmRecipe) => {
+    const ip = inspectedRef.current;
+    const engine = engineRef.current;
+    if (!ip) return;
+    engine.setAssemblerRecipe(ip.x, ip.y, recipe);
+    setRenderTick(t => t + 1);
+    setInspectedData({
+      building: engine.inspectBuilding(ip.x, ip.y),
+      playerItems: engine.player.inventory
+        .filter(i => i.amount > 0)
+        .map(i => ({ type: i.type as string, amount: i.amount })),
+    });
+  }, []);
+
   const eng = engineRef.current;
   const playerInv = eng.player.inventory;
   const cMove = eng.player.x !== 60 || eng.player.y !== 60;
@@ -891,6 +905,7 @@ const App: React.FC = () => {
           onWithdraw={handleWithdraw}
           canWithdraw={canWithdraw}
           onRotate={handleRotateInspected}
+          onRecipeSelect={handleRecipeSelect}
         />
       )}
 

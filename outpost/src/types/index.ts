@@ -185,6 +185,40 @@ export const BuildingTypeMap = {
 
 export type BuildingTypeValue = typeof BuildingTypeMap[keyof typeof BuildingTypeMap];
 
+// ==================== ASSEMBLER RECIPES ====================
+
+export type AsmRecipe = 'copper_wire' | 'gear' | 'engine';
+
+export interface AsmRecipeDef {
+  output: ItemType;
+  inputs: { type: ItemType; amount: number }[];
+  threshold: number;
+  label: string;
+}
+
+export const ASM_RECIPES: Record<AsmRecipe, AsmRecipeDef> = {
+  copper_wire: {
+    output: 'copper_wire',
+    inputs: [{ type: 'copper', amount: 1 }],
+    threshold: 30,
+    label: 'Copper Wire',
+  },
+  gear: {
+    output: 'gear',
+    inputs: [{ type: 'iron_ingot', amount: 2 }, { type: 'copper_wire', amount: 2 }],
+    threshold: 40,
+    label: 'Gear',
+  },
+  engine: {
+    output: 'engine',
+    inputs: [{ type: 'steel_plate', amount: 1 }, { type: 'gear', amount: 1 }, { type: 'copper_wire', amount: 2 }],
+    threshold: 80,
+    label: 'Engine',
+  },
+};
+
+export const ASM_RECIPE_ORDER: AsmRecipe[] = ['copper_wire', 'gear', 'engine'];
+
 export interface Building {
   type: BuildingTypeValue;
   direction: DirectionValue;
@@ -204,6 +238,8 @@ export interface Building {
   blocked?: boolean;
   /** Human-readable reason a machine is not progressing. */
   statusReason?: string;
+  /** For assemblers: which recipe this building is crafting. */
+  selectedRecipe?: AsmRecipe;
 }
 
 export interface PlayerState {
@@ -488,4 +524,6 @@ export interface BuildingInspection {
   };
   beltItem?: string | null;
   isPlayerStanding: boolean;
+  /** Assembler only: the currently selected recipe. */
+  selectedRecipe?: AsmRecipe;
 }
