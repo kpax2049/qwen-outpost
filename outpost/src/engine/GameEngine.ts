@@ -216,7 +216,7 @@ function createBuilding(type: BuildingTypeValue): Building {
     active: false,
     powerConsumed: def.powerConsumed,
     powerProduced: def.powerProduced,
-    inventory: type === 'storage' || type === 'chest' ? [{ type: 'stone', amount: 1 }] : [],
+    inventory: [],
     maxInventory: def.maxInventory,
     progress: 0,
     maxProgress: def.maxProgress,

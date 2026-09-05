@@ -260,7 +260,7 @@ describe('GameEngine - Conveyor Belts', () => {
     const storage = engine.getTile(60, 62)!.building!;
     const stored = storage.inventory.find(i => i.type === 'stone');
     expect(stored).toBeDefined();
-    if (stored) expect(stored.amount).toBeGreaterThan(1); // starter stone + delivered stone
+    if (stored) expect(stored.amount).toBe(2); // belt delivered 2 stones from the 3 it started with
   });
 
   it('conveyor holds an item when the belt ahead points back (head-on block)', () => {
@@ -386,7 +386,6 @@ describe('GameEngine - Conveyor Belts', () => {
     belt0.inventory = [{ type: 'stone', amount: 1 }];
 
     const storage = engine.getTile(60, 60)!.building!;
-    // Storage starts with 5 stones.
     storage.inventory.push({ type: 'stone', amount: 5 });
 
     for (let i = 0; i < 100; i++) engine.tick();
@@ -397,7 +396,7 @@ describe('GameEngine - Conveyor Belts', () => {
     // Storage lost items — fed the belt chain.
     const storageStone = storage.inventory.find(i => i.type === 'stone');
     expect(storageStone).toBeDefined();
-    if (storageStone) expect(storageStone.amount).toBeLessThan(6);
+    if (storageStone) expect(storageStone.amount).toBeLessThan(5);
   });
 
   it('blocked downstream conveyor chain prevents storage output', () => {

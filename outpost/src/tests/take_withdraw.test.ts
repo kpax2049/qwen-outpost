@@ -189,10 +189,10 @@ describe('GameEngine - Take/Withdraw from Buildings', () => {
     const result = engine.withdrawItemFromBuilding(61, 60, 'iron');
     expect(result).toBe(false);
 
-    // No change - stone should still be there (storage starts with 1 stone, we added 5 more = 6)
+    // No change - stone should still be there (we added 5 stones, no starter stone)
     const inStorage = storage.inventory.find(i => i.type === 'stone');
     expect(inStorage).toBeDefined();
-    if (inStorage) expect(inStorage.amount).toBe(6);
+    if (inStorage) expect(inStorage.amount).toBe(5);
 
     const inPlayer = engine.player.inventory.find(i => i.type === 'iron');
     expect(inPlayer).toBeUndefined();
