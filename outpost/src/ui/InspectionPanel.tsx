@@ -240,6 +240,32 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
               </div>
             )}
 
+            {/* Miner — mining field info */}
+            {building.type === 'miner' && (
+              <div style={{ marginBottom: 12 }}>
+                {building.minerResourceType && (
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between',
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: 11, color: '#94a2b0', marginBottom: 5,
+                  }}>
+                    <span>RESOURCE</span>
+                    <span style={{ color: '#e8edf2' }}>{building.minerResourceType}</span>
+                  </div>
+                )}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: 11, color: '#94a2b0', marginBottom: 5,
+                }}>
+                  <span>FIELD RESERVE</span>
+                  <span style={{ color: building.exhausted ? '#ec6058' : '#e8edf2' }}>
+                    {building.exhausted ? 'Depleted' : `${building.fieldReserve ?? 0} units`}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Assembler recipe selector */}
             {building.type === 'assembler' && onRecipeSelect && (
               <div style={{ marginBottom: 12 }}>

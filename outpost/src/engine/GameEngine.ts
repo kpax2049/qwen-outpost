@@ -17,6 +17,7 @@ import {
   Dir,
   BUILDING_DEFS,
   MAP_SIZE,
+  MINING_FIELD_RADIUS,
   RESOURCE_NAMES,
   BUILDING_NAMES,
   ITEM_DISPLAY_NAMES,
@@ -404,17 +405,121 @@ export class GameEngine {
 
   private updateMiner(x: number, y: number, tile: Tile): void {
     const b = tile.building!;
-    if (tile.resource && tile.resource.amount > 0) {
+
+    // Determine resource type from the tile the miner sits on (if not already set).
+    if (!b.minerResourceType) {
+      if (tile.resource) {
+        b.minerResourceType = tile.resource.type;
+        b.miningFieldTargetX = x;
+        b.miningFieldTargetY = y;
+      }
+    }
+
+    // If we have no resource type, nothing to do.
+    if (!b.minerResourceType) {
+      this.tryOutputToAdjacent(x, y, tile);
+      return;
+    }
+
+    // Check if exhausted.
+    if (b.exhausted) {
+      this.tryOutputToAdjacent(x, y, tile);
+      return;
+    }
+
+    // Ensure the current target is within bounds.
+    const tx = b.miningFieldTargetX ?? x;
+    const ty = b.miningFieldTargetY ?? y;
+    const inBounds = tx >= 0 && tx < MAP_SIZE && ty >= 0 && ty < MAP_SIZE;
+
+    // If the current target is depleted, scan for a new target.
+    if (!inBounds || this.isTargetDepleted(x, y, b)) {
+      const newTarget = this.findNextTarget(x, y, b);
+      if (newTarget) {
+        b.miningFieldTargetX = newTarget.x;
+        b.miningFieldTargetY = newTarget.y;
+      } else {
+        b.exhausted = true;
+        this.tryOutputToAdjacent(x, y, tile);
+        return;
+      }
+    }
+
+    // Re-read the (possibly updated) target.
+    const targetX = b.miningFieldTargetX ?? x;
+    const targetY = b.miningFieldTargetY ?? y;
+    const targetTile = this._state.save.map[targetY]?.[targetX];
+
+    if (targetTile && targetTile.resource && targetTile.resource.amount > 0) {
       b.progress++;
       if (b.progress >= b.maxProgress) {
         b.progress = 0;
-        tile.resource.amount--;
-        if (tile.resource.amount < 0) tile.resource.amount = 0;
-        this.addToInventory(b, { type: tile.resource.type, amount: 1 });
-        b.producesItem = tile.resource.type;
+        targetTile.resource.amount--;
+        if (targetTile.resource.amount < 0) targetTile.resource.amount = 0;
+        this.addToInventory(b, { type: targetTile.resource.type, amount: 1 });
+        b.producesItem = targetTile.resource.type;
       }
     }
     this.tryOutputToAdjacent(x, y, tile);
+  }
+
+  /** Scan the 5×5 field and return the next viable target tile offset. */
+  private findNextTarget(x: number, y: number, b: Building): { x: number; y: number } | null {
+    const r = MINING_FIELD_RADIUS;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx === 0 && dy === 0) {
+          // Always check the under-tile first (deterministic priority).
+          continue;
+        }
+        const tx = x + dx;
+        const ty = y + dy;
+        if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) continue;
+        const targetTile = this._state.save.map[ty][tx];
+        if (targetTile?.resource?.amount && targetTile.resource.type === b.minerResourceType) {
+          return { x: tx, y: ty };
+        }
+      }
+    }
+    // Fall back to under-tile (in case it wasn't checked above).
+    if (x >= 0 && x < MAP_SIZE && y >= 0 && y < MAP_SIZE) {
+      const underTile = this._state.save.map[y][x];
+      if (underTile?.resource?.amount && underTile.resource.type === b.minerResourceType) {
+        return { x, y };
+      }
+    }
+    return null;
+  }
+
+  /** Check if the current target is depleted or out of bounds. */
+  private isTargetDepleted(x: number, y: number, b: Building): boolean {
+    const tx = b.miningFieldTargetX ?? x;
+    const ty = b.miningFieldTargetY ?? y;
+    if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) return true;
+    const targetTile = this._state.save.map[ty]?.[tx];
+    if (!targetTile?.resource) return true;
+    if (targetTile.resource.type !== b.minerResourceType) return true;
+    if (targetTile.resource.amount <= 0) return true;
+    return false;
+  }
+
+  /** Count remaining resource units of the correct type within the mining field. */
+  private countFieldReserve(x: number, y: number, b: Building): number {
+    if (!b.minerResourceType) return 0;
+    const r = MINING_FIELD_RADIUS;
+    let total = 0;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const tx = x + dx;
+        const ty = y + dy;
+        if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) continue;
+        const t = this._state.save.map[ty][tx];
+        if (t?.resource?.amount && t.resource.type === b.minerResourceType) {
+          total += t.resource.amount;
+        }
+      }
+    }
+    return total;
   }
 
   private updateSmelter(x: number, y: number, tile: Tile): void {
@@ -1077,9 +1182,11 @@ export class GameEngine {
       case BuildingTypeMap.miner: {
         const tile = this._state.save.map[y][x];
         if (!b.active) return { status: 'No Power', statusColor: 'bad' };
-        if (!tile.resource || tile.resource.amount <= 0) return { status: 'No Resource Below', statusColor: 'warn' };
+        if (b.exhausted) return { status: `Exhausted — no ${b.minerResourceType ? RESOURCE_NAMES[b.minerResourceType] ?? b.minerResourceType : 'matching'} deposits in field`, statusColor: 'warn' };
+        const reserve = this.countFieldReserve(x, y, b);
+        if (reserve <= 0) return { status: 'No Resource Below', statusColor: 'warn' };
         if (total >= b.maxInventory) return { status: 'Output Blocked (inventory full)', statusColor: 'bad' };
-        return { status: 'Mining', statusColor: 'ok' };
+        return { status: `Mining ${b.minerResourceType ? RESOURCE_NAMES[b.minerResourceType] ?? b.minerResourceType : '...'} · ${reserve} in field`, statusColor: 'ok' };
       }
       case BuildingTypeMap.conveyor: {
         const invItem = b.inventory[0];
@@ -1219,6 +1326,9 @@ export class GameEngine {
       if (tile.resource) {
         data.resourceOnTile = { type: RESOURCE_NAMES[tile.resource.type] ?? tile.resource.type, amount: tile.resource.amount };
       }
+      data.minerResourceType = b.minerResourceType ? RESOURCE_NAMES[b.minerResourceType] ?? b.minerResourceType : undefined;
+      data.fieldReserve = this.countFieldReserve(x, y, b);
+      data.exhausted = !!b.exhausted;
     }
 
     if (b.type === BuildingTypeMap.generator) {

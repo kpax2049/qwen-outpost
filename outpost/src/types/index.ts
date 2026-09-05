@@ -3,6 +3,9 @@
 export const TILE_SIZE = 48;
 export const MAP_SIZE = 120;
 
+/** Radius (in tiles) for a Miner's extraction field. A radius of 2 gives a 5×5 mining field. */
+export const MINING_FIELD_RADIUS = 2;
+
 // Terrain types
 export type Terrain = 'grass' | 'forest' | 'water' | 'rock' | 'sand' | 'dirt';
 
@@ -240,6 +243,13 @@ export interface Building {
   statusReason?: string;
   /** For assemblers: which recipe this building is crafting. */
   selectedRecipe?: AsmRecipe;
+  /** Miner only: the resource type this miner extracts (set on placement from under-tile). */
+  minerResourceType?: ResourceTypeValue;
+  /** Miner only: current target tile offset within the 5x5 mining field. */
+  miningFieldTargetX?: number;
+  miningFieldTargetY?: number;
+  /** Miner only: true when all matching deposits in its field are depleted. */
+  exhausted?: boolean;
 }
 
 export interface PlayerState {
@@ -513,6 +523,12 @@ export interface BuildingInspection {
   consumesItems?: { type: ItemType; amount: number }[];
   /** Miner only: resource deposit on the tile. */
   resourceOnTile?: { type: string; amount: number };
+  /** Miner only: the resource type this miner is extracting. */
+  minerResourceType?: string;
+  /** Miner only: remaining units of the correct type across the mining field. */
+  fieldReserve?: number;
+  /** Miner only: true when all matching deposits in the mining field are depleted. */
+  exhausted?: boolean;
   /** Generator only: coal left + fuel bar percentage (ticks until current coal runs out). */
   fuelCoal?: number;
   fuelPct?: number;

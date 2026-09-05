@@ -2686,9 +2686,9 @@ describe('Miner logistics - output drains on depleted deposit', () => {
     const coalAfterIdle = miner.inventory.find(i => i.type === 'coal');
     const maxCoalAfterIdle = coalAfterIdle ? coalAfterIdle.amount : 0;
     expect(maxCoalAfterIdle).toBe(maxCoalAfterMine);
-    // Status should be "No Resource Below"
+    // Status should indicate exhausted state
     const inspection = engine.inspectBuilding(60, 59);
-    expect(inspection!.status).toBe('No Resource Below');
+    expect(inspection!.exhausted).toBe(true);
   });
 
   it('blocked downstream belt preserves stored items until output becomes available', () => {
