@@ -284,6 +284,8 @@ export interface SaveData {
   tick: number;
   gameTime: number;
   won: boolean;
+  /** True when the player has dismissed the victory overlay (persisted across save/load). */
+  victoryAcknowledged?: boolean;
 }
 
 export interface GameConfig {

@@ -664,14 +664,91 @@ describe('GameEngine - Win Condition', () => {
     expect(engine.getWinState()).toBe(true);
   });
 
-  it('resetWinState clears the won state', () => {
+  it('victory screen appears when final objective is first completed', () => {
+    const engine = new GameEngine(42);
+    expect(engine.getWinState()).toBe(false);
+    expect(engine.isVictoryAcknowledged()).toBe(false);
+
+    engine.player.stats.enginesCrafted = 5;
+    engine.tick();
+
+    expect(engine.getWinState()).toBe(true);
+    expect(engine.isVictoryAcknowledged()).toBe(false);
+  });
+
+  it('dismissVictory prevents victory screen from reopening on subsequent ticks', () => {
     const engine = new GameEngine(42);
     engine.player.stats.enginesCrafted = 5;
-    for (let i = 0; i < 10; i++) engine.tick();
+    engine.tick();
+    expect(engine.getWinState()).toBe(true);
+    expect(engine.isVictoryAcknowledged()).toBe(false);
+
+    engine.dismissVictory();
+    expect(engine.isVictoryAcknowledged()).toBe(true);
+
+    // Subsequent ticks must not re-trigger the victory screen.
+    for (let i = 0; i < 100; i++) engine.tick();
+    expect(engine.getWinState()).toBe(true);
+    expect(engine.isVictoryAcknowledged()).toBe(true);
+  });
+
+  it('completion status (won) remains true after dismissing', () => {
+    const engine = new GameEngine(42);
+    engine.player.stats.enginesCrafted = 5;
+    engine.tick();
     expect(engine.getWinState()).toBe(true);
 
-    engine.resetWinState();
-    expect(engine.getWinState()).toBe(false);
+    engine.dismissVictory();
+    expect(engine.getWinState()).toBe(true);
+  });
+
+  it('save/load preserves the dismissed/acknowledged state', () => {
+    const engine = new GameEngine(42);
+    engine.player.stats.enginesCrafted = 5;
+    engine.tick();
+    engine.dismissVictory();
+    expect(engine.isVictoryAcknowledged()).toBe(true);
+
+    const saved = engine.save();
+    const engine2 = new GameEngine(999);
+    engine2.load(saved);
+    expect(engine2.getWinState()).toBe(true);
+    expect(engine2.isVictoryAcknowledged()).toBe(true);
+
+    // Loading an acknowledged save must not re-trigger the victory.
+    for (let i = 0; i < 10; i++) engine2.tick();
+    expect(engine2.getWinState()).toBe(true);
+    expect(engine2.isVictoryAcknowledged()).toBe(true);
+  });
+
+  it('a new game resets the victory acknowledgement', () => {
+    const engine1 = new GameEngine(42);
+    engine1.player.stats.enginesCrafted = 5;
+    engine1.tick();
+    engine1.dismissVictory();
+    expect(engine1.isVictoryAcknowledged()).toBe(true);
+
+    const engine2 = new GameEngine(42);
+    expect(engine2.getWinState()).toBe(false);
+    expect(engine2.isVictoryAcknowledged()).toBe(false);
+  });
+
+  it('load old save without victoryAcknowledged field defaults to false', () => {
+    // Simulate an old save that lacks the victoryAcknowledged field.
+    const engine = new GameEngine(42);
+    engine.player.stats.enginesCrafted = 5;
+    engine.tick();
+    expect(engine.isVictoryAcknowledged()).toBe(false);
+
+    const saved = engine.save();
+    // Manually remove the field to simulate an old save.
+    const data = JSON.parse(saved);
+    delete data.victoryAcknowledged;
+    const serialized = JSON.stringify(data);
+
+    const engine2 = new GameEngine(999);
+    engine2.load(serialized);
+    expect(engine2.isVictoryAcknowledged()).toBe(false);
   });
 });
 

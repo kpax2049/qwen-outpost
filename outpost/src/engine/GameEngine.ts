@@ -253,6 +253,7 @@ export class GameEngine {
         tick: 0,
         gameTime: 0,
         won: false,
+        victoryAcknowledged: false,
       },
     };
   }
@@ -1529,11 +1530,13 @@ export class GameEngine {
     const p = this._state.save.player;
     if (p.stats.enginesCrafted >= 5 && !this._state.save.won) {
       this._state.save.won = true;
+      this._state.save.victoryAcknowledged = false;
     }
   }
 
   getWinState(): boolean { return this._state.save.won; }
-  resetWinState(): void { this._state.save.won = false; }
+  isVictoryAcknowledged(): boolean { return !!this._state.save.victoryAcknowledged; }
+  dismissVictory(): void { this._state.save.victoryAcknowledged = true; }
 
   getTile(x: number, y: number): Tile | undefined {
     if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return undefined;

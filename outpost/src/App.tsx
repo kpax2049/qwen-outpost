@@ -401,7 +401,7 @@ const App: React.FC = () => {
         tickAccumulatorRef.current -= tickInterval;
       }
 
-      if (engine.getWinState() && !showWinRef.current) {
+      if (engine.getWinState() && !showWinRef.current && !engine.getSaveData().victoryAcknowledged) {
         showWinRef.current = true;
         setShowWinMessage(true);
       }
@@ -838,7 +838,7 @@ const App: React.FC = () => {
             onClick={() => {
               setShowWinMessage(false);
               showWinRef.current = false;
-              engineRef.current.resetWinState();
+              engineRef.current.dismissVictory();
             }}
             style={{
               marginTop: 24, padding: '12px 32px', background: '#4488ff', color: '#fff',
