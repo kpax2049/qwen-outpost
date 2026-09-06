@@ -3193,21 +3193,21 @@ describe('Harvesting Regression Tests', () => {
     expect(engine.map[60][60].resource?.amount).toBe(0);
   });
 
-  // 6. Inventory full blocks collection
-  it('Inventory full: prevents adding more of same resource type when slot full', () => {
+  // 6. Automated RMB harvesting matches manual E acceptance semantics
+  it('RMB harvesting: can add more coal even when slot has 20+ (matches manual E behavior)', () => {
     const engine = new GameEngine(42);
-    // Fill coal slot (maxInventorySlots is 20)
+    // Start with coal slot at 20 (previously this blocked automated harvesting)
     engine.player.inventory = [{ type: 'coal', amount: 20 }];
     engine.map[60][60].terrain = 'grass';
-    engine.map[60][60].resource = { type: 'coal', amount: 5 };
+    engine.map[60][60].resource = { type: 'coal', amount: 10 };
     engine.player.x = 60; engine.player.y = 60;
     engine.startHarvestAt(60, 60);
 
-    for (let i = 0; i < 10; i++) engine.tick();
+    for (let i = 0; i < 22; i++) engine.tick();
 
-    // No additional coal should be collected due to full slot
+    // RMB must collect additional coal, matching manual E acceptance semantics
     const coal = engine.player.inventory.find(i => i.type === 'coal');
-    expect(coal?.amount).toBe(20);
+    expect(coal?.amount).toBe(30);
   });
 
   // 7. Auto-collection on step-over (single-unit wood)
@@ -3277,18 +3277,20 @@ describe('Harvesting Regression Tests', () => {
     expect(engine.map[64][60].terrain).toBe('grass');
   });
 
-  // 11. Full inventory prevents auto-collection
-  it('Full inventory: auto-collection blocked when wood slot is full', () => {
+  // 11. Stepping on forest with existing wood (no slot-cap limit on amount)
+  it('Stepping on forest: auto-collection works even when wood slot has 20+ (matches manual E)', () => {
     const engine = new GameEngine(42);
-    // Fill wood slot (maxInventorySlots is 20)
-    engine.player.inventory = [{ type: 'wood', amount: 20 }];
+    // Fill wood slot beyond 20
+    engine.player.inventory = [{ type: 'wood', amount: 25 }];
     engine.map[59][60].terrain = 'forest';
     engine.map[59][60].resource = undefined;
     engine.movePlayer(0, -1);
 
     expect(engine.player.y).toBe(59);
-    // Tile should remain forest since we couldn't collect wood (slot full)
-    expect(engine.map[59][60].terrain).toBe('forest');
+    // Tile is converted to grass since we collected wood (matching manual E behavior)
+    expect(engine.map[59][60].terrain).toBe('grass');
+    const wood = engine.player.inventory.find(i => i.type === 'wood');
+    expect(wood?.amount).toBe(26);
   });
 
   // 12. Harvesting continues across multiple game ticks
@@ -3326,6 +3328,133 @@ describe('Harvesting Regression Tests', () => {
     const result = engine.interact();
     expect(result).toBeTruthy();
     if (result) expect(result.type).toBe('coal');
+  });
+
+  // ==================== AUTOMATED = MANUAL SEMANTICS REGRESSION TESTS ====================
+  // These tests reproduce the human observations that were reported as bugs:
+  // - Manual E harvesting can accumulate MORE than 20 of an item
+  // - RMB auto-harvesting starting from 0 stops exactly at 20 (bug)
+  // - After manual E accumulates >20, RMB harvesting another deposit adds ZERO (bug)
+  // - Walk-over Wood/Stone auto-collection stops once item reaches 20 (bug)
+  //
+  // The fix: automated harvesting must have the same player-inventory acceptance
+  // semantics as manual E harvesting. If manual E can increase Coal from 25 to 26,
+  // RMB harvesting must also be able to increase Coal from 25 to 26.
+
+  describe('Automated = Manual semantics regression', () => {
+    it('RMB: RMB harvesting starting from 0 Coal must pass 20 and reach at least 25', () => {
+      const engine = new GameEngine(42);
+      engine.map[60][60].terrain = 'grass';
+      engine.map[60][60].resource = { type: 'coal', amount: 30 };
+      engine.player.x = 60; engine.player.y = 60;
+      engine.player.inventory = [];
+      engine.startHarvestAt(60, 60);
+
+      // Run enough ticks to harvest all 30 (harvest every 2 ticks, so ~60 ticks)
+      for (let i = 0; i < 60; i++) engine.tick();
+
+      const coal = engine.player.inventory.find(i => i.type === 'coal');
+      expect(coal?.amount).toBeGreaterThanOrEqual(25);
+      expect(coal?.amount).toBe(30);
+    });
+
+    it('RMB: starting with 19 Coal, RMB harvesting must pass 20', () => {
+      const engine = new GameEngine(42);
+      engine.map[60][60].terrain = 'grass';
+      engine.map[60][60].resource = { type: 'coal', amount: 5 };
+      engine.player.x = 60; engine.player.y = 60;
+      engine.player.inventory = [{ type: 'coal', amount: 19 }];
+      engine.startHarvestAt(60, 60);
+
+      for (let i = 0; i < 12; i++) engine.tick();
+
+      const coal = engine.player.inventory.find(i => i.type === 'coal');
+      expect(coal?.amount).toBe(24);
+    });
+
+    it('RMB: starting with exactly 20 Coal, RMB harvesting must still add Coal', () => {
+      const engine = new GameEngine(42);
+      engine.map[60][60].terrain = 'grass';
+      engine.map[60][60].resource = { type: 'coal', amount: 10 };
+      engine.player.x = 60; engine.player.y = 60;
+      engine.player.inventory = [{ type: 'coal', amount: 20 }];
+      engine.startHarvestAt(60, 60);
+
+      for (let i = 0; i < 22; i++) engine.tick();
+
+      const coal = engine.player.inventory.find(i => i.type === 'coal');
+      expect(coal?.amount).toBe(30);
+    });
+
+    it('RMB: starting with 25 Coal (same state as after manual E), RMB harvesting must increase it further', () => {
+      // Reproduce the exact human observation: manual E created 25 coal,
+      // then RMB harvesting another Coal deposit should still add coal.
+      const engine = new GameEngine(42);
+      // Simulate the inventory state after manual E has accumulated 25 coal
+      engine.player.inventory = [{ type: 'coal', amount: 25 }];
+      engine.map[60][60].terrain = 'grass';
+      engine.map[60][60].resource = { type: 'coal', amount: 10 };
+      engine.player.x = 60; engine.player.y = 60;
+      engine.startHarvestAt(60, 60);
+
+      for (let i = 0; i < 22; i++) engine.tick();
+
+      const coal = engine.player.inventory.find(i => i.type === 'coal');
+      expect(coal?.amount).toBe(35);
+    });
+
+    it('RMB: manual E first then RMB on different deposit (human bug reproduction)', () => {
+      const engine = new GameEngine(42);
+      // First: manual E accumulates >20 coal
+      engine.map[60][60].terrain = 'grass';
+      engine.map[60][60].resource = { type: 'coal', amount: 30 };
+      engine.player.x = 60; engine.player.y = 60;
+      engine.player.inventory = [];
+
+      // Use interact() (manual E) to collect 25 coal
+      for (let i = 0; i < 25; i++) {
+        engine.interact();
+      }
+      let coal = engine.player.inventory.find(i => i.type === 'coal');
+      expect(coal?.amount).toBe(25);
+
+      // Second: RMB harvest on the SAME deposit for remaining coal
+      engine.startHarvestAt(60, 60);
+      for (let i = 0; i < 22; i++) engine.tick();
+
+      coal = engine.player.inventory.find(i => i.type === 'coal');
+      expect(coal?.amount).toBe(30);
+    });
+
+    it('Wood step-over: collecting onto forest tile must work when wood amount > 20', () => {
+      const engine = new GameEngine(42);
+      engine.map[59][60].terrain = 'forest';
+      engine.map[59][60].resource = undefined;
+      engine.player.x = 60; engine.player.y = 60;
+      engine.player.inventory = [{ type: 'wood', amount: 25 }];
+
+      // Step onto forest tile - should collect 1 wood even though > 20
+      engine.movePlayer(0, -1);
+
+      expect(engine.player.y).toBe(59);
+      expect(engine.map[59][60].terrain).toBe('grass');
+      const wood = engine.player.inventory.find(i => i.type === 'wood');
+      expect(wood?.amount).toBe(26);
+    });
+
+    it('Manual E: interact() must remain able to harvest beyond 20 (no regression)', () => {
+      const engine = new GameEngine(42);
+      engine.map[60][60].terrain = 'grass';
+      engine.map[60][60].resource = { type: 'coal', amount: 30 };
+      engine.player.x = 60; engine.player.y = 60;
+      engine.player.inventory = [{ type: 'coal', amount: 25 }];
+
+      // Manual E should still be able to add more coal beyond 20+25
+      engine.interact();
+
+      const coal = engine.player.inventory.find(i => i.type === 'coal');
+      expect(coal?.amount).toBe(26);
+    });
   });
 });
 

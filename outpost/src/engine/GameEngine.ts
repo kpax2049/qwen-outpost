@@ -932,7 +932,7 @@ export class GameEngine {
   private canAddToPlayerInventory(type: string): boolean {
     const p = this._state.save.player;
     const item = p.inventory.find(i => i.type === type);
-    if (item) return item.amount < p.maxInventorySlots;
+    if (item) return true;
     return p.inventory.length < p.maxInventorySlots;
   }
 
