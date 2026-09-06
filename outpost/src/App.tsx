@@ -706,8 +706,8 @@ const App: React.FC = () => {
       return;
     }
 
-    // Walkable terrain: move there via pathfinding
-    if (tile.terrain === 'grass' || tile.terrain === 'sand') {
+    // Walkable terrain (including single-unit Wood/Stone): move there via pathfinding
+    if (tile.terrain === 'grass' || tile.terrain === 'sand' || tile.terrain === 'forest' || tile.terrain === 'rock') {
       engine.startMoveTo(tx, ty);
       setRenderTick(t => t + 1);
     }
