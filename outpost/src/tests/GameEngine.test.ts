@@ -933,33 +933,30 @@ describe('GameEngine - Harvesting Model', () => {
 
   it('chops wood from a facing tree', () => {
     const engine = new GameEngine(42);
-    // Put a tree directly above the player
+    // Clear player inventory
+    engine.player.inventory = [];
+    // Place a tree directly above the player
     engine.map[59][60].terrain = 'forest';
     engine.map[59][60].resource = undefined;
-    engine.movePlayer(0, -1); // face up (but blocked -> facing still Up)
-    const before = engine.player.inventory.find(i => i.type === 'wood')?.amount ?? 0;
-    const result = engine.interact();
-    expect(result).toBeTruthy();
-    if (result) expect(result.type).toBe('wood');
-    const after = engine.player.inventory.find(i => i.type === 'wood')?.amount ?? 0;
-    expect(after).toBe(before + 1);
+    engine.movePlayer(0, -1); // walk onto forest -> auto-collects wood, tile becomes grass
     expect(engine.map[59][60].terrain).toBe('grass');
+    expect(engine.player.y).toBe(59); // player moved onto the tile
+    expect(engine.player.inventory.find(i => i.type === 'wood')?.amount).toBe(1);
     expect(engine.player.stats.woodChopped).toBe(1);
   });
 
   it('mines stone from a facing rock', () => {
     const engine = new GameEngine(42);
-    // Put rock to the right of the player
-    engine.map[60][61].terrain = 'rock';
-    engine.map[60][61].resource = undefined;
-    engine.movePlayer(1, 0); // face right (blocked -> facing Right)
-    const before = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
-    const result = engine.interact();
-    expect(result).toBeTruthy();
-    if (result) expect(result.type).toBe('stone');
-    const after = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
-    expect(after).toBe(before + 1);
-    expect(engine.map[60][61].terrain).toBe('grass');
+    // Clear player inventory
+    engine.player.inventory = [];
+    // Place a rock directly above the player
+    engine.map[59][60].terrain = 'rock';
+    engine.map[59][60].resource = undefined;
+    engine.movePlayer(0, -1); // walk onto rock -> auto-collects stone, tile becomes grass
+    expect(engine.map[59][60].terrain).toBe('grass');
+    expect(engine.player.y).toBe(59); // player moved onto the tile
+    expect(engine.player.inventory.find(i => i.type === 'stone')?.amount).toBe(1);
+    expect(engine.player.stats.stonesMined).toBe(1);
   });
 
   it('mines a facing resource deposit', () => {
@@ -998,19 +995,24 @@ describe('GameEngine - Harvesting Model', () => {
 
   it('tracks the tile E will interact with', () => {
     const engine = new GameEngine(42);
-    // Facing tree
+    // Player starts at [60][60]. Place a forest tile above at [59][60].
     engine.map[59][60].terrain = 'forest';
-    engine.movePlayer(0, -1);
+    engine.player.x = 60;
+    engine.player.y = 60;
+    engine.player.facing = Dir.Up;
     const target = engine.getInteractiveTile();
     expect(target).toEqual({ x: 60, y: 59 });
     expect(engine.getInteractiveLabel()).toBe('Wood');
   });
 
-  it('prevents walking onto trees', () => {
+  it('walks onto trees and auto-collects them', () => {
     const engine = new GameEngine(42);
+    engine.player.inventory = []; // clear initial inventory
     engine.map[59][60].terrain = 'forest';
-    expect(engine.movePlayer(0, -1)).toBe(false);
-    expect(engine.player.y).toBe(60);
+    expect(engine.movePlayer(0, -1)).toBe(true);
+    expect(engine.player.y).toBe(59);
+    expect(engine.map[59][60].terrain).toBe('grass');
+    expect(engine.player.inventory.find(i => i.type === 'wood')?.amount).toBe(1);
   });
 
   it('counts buildings of a specific type', () => {
@@ -3097,3 +3099,233 @@ describe('BFS Pathfinding & Auto-Movement', () => {
     expect(result).toBe(true);
   });
 });
+
+// ==================== HARVESTING REGRESSION TESTS ====================
+
+describe('Harvesting Regression Tests', () => {
+  // 1. RMB continuous harvest
+  it('RMB: harvests multiple items from a single deposit over multiple ticks', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal', amount: 5 };
+    engine.player.x = 60; engine.player.y = 60;
+    engine.player.inventory = [];
+    engine.startHarvestAt(60, 60);
+
+    for (let i = 0; i < 12; i++) engine.tick();
+
+    const coal = engine.player.inventory.find(i => i.type === 'coal');
+    expect(coal?.amount).toBe(5);
+  });
+
+  // 2. Same-type lockout prevention
+  it('RMB: switching to different resource type works immediately', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal', amount: 2 };
+    engine.player.x = 60; engine.player.y = 60;
+    engine.player.inventory = [];
+    engine.startHarvestAt(60, 60);
+
+    // Harvest the coal
+    for (let i = 0; i < 6; i++) engine.tick();
+
+    // Switch to a different resource at adjacent tile (same tile to avoid pathfinding issues)
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'iron', amount: 3 };
+
+    engine.startHarvestAt(60, 60);
+
+    for (let i = 0; i < 6; i++) engine.tick();
+
+    // Should have iron from the new deposit
+    const iron = engine.player.inventory.find(i => i.type === 'iron');
+    expect(iron?.amount).toBeGreaterThan(0);
+  });
+
+  // 3. WASD cancellation
+  it('RMB: WASD movement cancels harvesting', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal', amount: 10 };
+    engine.player.x = 60; engine.player.y = 60;
+    engine.player.inventory = [];
+    engine.startHarvestAt(60, 60);
+
+    for (let i = 0; i < 3; i++) engine.tick();
+    engine.movePlayer(0, 1); // move down, should cancel harvest
+
+    expect(engine.isHarvesting()).toBe(false);
+    expect(engine.getHarvestTarget()).toBeNull();
+  });
+
+  // 4. Manual E harvest
+  it('Manual E: interact() harvests from facing tile', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal', amount: 10 };
+    engine.player.x = 60; engine.player.y = 60;
+    engine.player.inventory = [];
+    engine.player.facing = Dir.Up;
+    engine.map[59][60].terrain = 'forest';
+    engine.map[59][60].resource = undefined;
+
+    const result = engine.interact();
+    expect(result).toBeTruthy();
+    if (result) expect(result.type).toBe('wood');
+  });
+
+  // 5. Multi-unit deposit (Coal/Iron/Copper/Gold)
+  it('Multi-unit deposit: collects all coal from deposit', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal', amount: 4 };
+    engine.player.x = 60; engine.player.y = 60;
+    engine.player.inventory = [];
+    engine.startHarvestAt(60, 60);
+
+    // Run enough ticks to harvest all 4
+    for (let i = 0; i < 10; i++) engine.tick();
+
+    const coal = engine.player.inventory.find(i => i.type === 'coal');
+    expect(coal?.amount).toBe(4);
+    // Resource object persists with amount 0 when fully harvested
+    expect(engine.map[60][60].resource?.amount).toBe(0);
+  });
+
+  // 6. Inventory full blocks collection
+  it('Inventory full: prevents adding more of same resource type when slot full', () => {
+    const engine = new GameEngine(42);
+    // Fill coal slot (maxInventorySlots is 20)
+    engine.player.inventory = [{ type: 'coal', amount: 20 }];
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal', amount: 5 };
+    engine.player.x = 60; engine.player.y = 60;
+    engine.startHarvestAt(60, 60);
+
+    for (let i = 0; i < 10; i++) engine.tick();
+
+    // No additional coal should be collected due to full slot
+    const coal = engine.player.inventory.find(i => i.type === 'coal');
+    expect(coal?.amount).toBe(20);
+  });
+
+  // 7. Auto-collection on step-over (single-unit wood)
+  it('Auto-collection: steps on forest and collects wood', () => {
+    const engine = new GameEngine(42);
+    engine.map[59][60].terrain = 'forest';
+    engine.map[59][60].resource = undefined;
+    engine.player.inventory = [];
+    engine.movePlayer(0, -1);
+
+    expect(engine.player.y).toBe(59);
+    expect(engine.map[59][60].terrain).toBe('grass');
+    expect(engine.player.inventory.find(i => i.type === 'wood')?.amount).toBe(1);
+  });
+
+  // 8. Auto-collection on step-over (single-unit stone)
+  it('Auto-collection: steps on rock and collects stone', () => {
+    const engine = new GameEngine(42);
+    engine.map[59][60].terrain = 'rock';
+    engine.map[59][60].resource = undefined;
+    engine.player.inventory = [];
+    engine.movePlayer(0, -1);
+
+    expect(engine.player.y).toBe(59);
+    expect(engine.map[59][60].terrain).toBe('grass');
+    expect(engine.player.inventory.find(i => i.type === 'stone')?.amount).toBe(1);
+  });
+
+  // 9. No auto-collection for multi-unit ores on step-over
+  it('Auto-collection: does NOT collect multi-unit ores on step-over', () => {
+    const engine = new GameEngine(42);
+    // Multi-unit coal deposit (not forest/rock)
+    engine.map[60][61].terrain = 'grass';
+    engine.map[60][61].resource = { type: 'coal', amount: 5 };
+    engine.player.inventory = [];
+    engine.movePlayer(0, 1); // move onto grass with coal
+
+    // Player should be on the tile but coal should still be there
+    expect(engine.player.y).toBe(61);
+    expect(engine.map[60][61].resource?.amount).toBe(5);
+  });
+
+  // 10. Pathfinding through forest (should auto-harvest at destination)
+  it('Pathfinding: moves through forest tiles and auto-harvests destination', () => {
+    const engine = new GameEngine(42);
+    // Clear path tiles (map[y][x] convention: y=60,x=61 means map[60][61])
+    engine.map[60][61].terrain = 'grass';
+    engine.map[60][62].terrain = 'grass';
+    engine.map[60][63].terrain = 'grass';
+    // Place forest at destination (y=64, x=60 -> map[64][60])
+    engine.map[64][60].terrain = 'forest';
+    engine.map[64][60].resource = undefined;
+
+    engine.startMoveTo(60, 64);
+
+    // Run until path is cleared (player reaches destination)
+    let steps = 0;
+    while (engine.hasAutoPath() && steps < 20) {
+      engine.tick();
+      steps++;
+    }
+
+    // Player should be at destination
+    expect(engine.player.x).toBe(60);
+    expect(engine.player.y).toBe(64);
+    // Tile should have been converted to grass (auto-collected)
+    expect(engine.map[64][60].terrain).toBe('grass');
+  });
+
+  // 11. Full inventory prevents auto-collection
+  it('Full inventory: auto-collection blocked when wood slot is full', () => {
+    const engine = new GameEngine(42);
+    // Fill wood slot (maxInventorySlots is 20)
+    engine.player.inventory = [{ type: 'wood', amount: 20 }];
+    engine.map[59][60].terrain = 'forest';
+    engine.map[59][60].resource = undefined;
+    engine.movePlayer(0, -1);
+
+    expect(engine.player.y).toBe(59);
+    // Tile should remain forest since we couldn't collect wood (slot full)
+    expect(engine.map[59][60].terrain).toBe('forest');
+  });
+
+  // 12. Harvesting continues across multiple game ticks
+  it('Multi-tick harvest: continues correctly over many ticks', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal', amount: 10 };
+    engine.player.x = 60; engine.player.y = 60;
+    engine.player.inventory = [];
+    engine.startHarvestAt(60, 60);
+
+    // Run 50 ticks
+    for (let i = 0; i < 50; i++) engine.tick();
+
+    // Should have harvested all 10
+    const coal = engine.player.inventory.find(i => i.type === 'coal');
+    expect(coal?.amount).toBe(10);
+    // Should have stopped harvesting
+    expect(engine.isHarvesting()).toBe(false);
+  });
+
+  // 13. Manual harvest from adjacent tile
+  it('Manual harvest: interact() harvests from facing tile', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal', amount: 5 };
+    engine.player.x = 60; engine.player.y = 60;
+    engine.player.inventory = [];
+    engine.player.facing = Dir.Up;
+    // Place coal at tile above player
+    engine.map[59][60].terrain = 'grass';
+    engine.map[59][60].resource = { type: 'coal', amount: 3 };
+
+    // Player at [60][60], facing up, coal at [59][60] (above)
+    const result = engine.interact();
+    expect(result).toBeTruthy();
+    if (result) expect(result.type).toBe('coal');
+  });
+});
+

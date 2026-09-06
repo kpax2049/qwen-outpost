@@ -250,6 +250,7 @@ export class GameEngine {
   private _harvestTarget: HarvestTargetState | null = null;
   private _isHarvesting = false;
   private _moveCooldown = 0;
+  private _harvestCooldown = 0;
 
   constructor(seed: number = 42) {
     const map = generateMap(seed);
@@ -846,47 +847,41 @@ export class GameEngine {
   isWalkable(x: number, y: number): boolean {
     if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
     const tile = this._state.save.map[y][x];
-    if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'forest') return false;
+    if (tile.terrain === 'water') return false;
     // Buildings block movement (stand adjacent to them)
     if (tile.building) return false;
     return true;
   }
 
   /**
-   * Process one step of auto-movement.
-   * Called every tick during the simulation.
-   */
+    * Process one step of auto-movement.
+    * Called every tick during the simulation.
+    */
   private updatePlayer(): void {
     const p = this._state.save.player;
 
-    // Handle movement cooldown
+    // Auto-movement: follow the path (uses _moveCooldown)
     if (this._moveCooldown > 0) {
       this._moveCooldown--;
-      return;
     }
 
-    // Auto-movement: follow the path
-    if (this._autoPath.length > 0) {
+    if (this._autoPath.length > 0 && this._moveCooldown === 0) {
       const next = this._autoPath[0];
       this._movePlayer(next.x, next.y);
       this._autoPath.shift();
-
-      // Check if we've arrived adjacent to the harvest target (resource tile)
-      if (this._isHarvesting && this._harvestTarget) {
-        const adjDist = Math.max(Math.abs(p.x - this._harvestTarget.x), Math.abs(p.y - this._harvestTarget.y));
-        if (adjDist <= 1) {
-          this.doHarvest();
-        }
-      }
-      // Set cooldown so next step doesn't happen this tick
       this._moveCooldown = 3;
       return;
     }
 
-    // Already at destination but still harvesting (no path needed)
+    // Harvesting phase (uses _harvestCooldown, independent of move cooldown)
     if (this._isHarvesting && this._harvestTarget) {
-      // Harvest resources at current position
-      this.doHarvest();
+      if (this._harvestCooldown > 0) {
+        this._harvestCooldown--;
+      }
+      const adjDist = Math.max(Math.abs(p.x - this._harvestTarget.x), Math.abs(p.y - this._harvestTarget.y));
+      if (adjDist <= 1 && this._harvestCooldown === 0) {
+        this.doHarvest();
+      }
     }
   }
 
@@ -930,7 +925,7 @@ export class GameEngine {
     }
 
     // Cooldown for harvest speed (harvest every 2 ticks)
-    this._moveCooldown = 2;
+    this._harvestCooldown = 1;
   }
 
   /** Check if the player can accept one more item of the given type. */
@@ -1041,13 +1036,14 @@ export class GameEngine {
   }
 
   /**
-   * Cancel any auto-movement and harvesting.
-   */
+    * Cancel any auto-movement and harvesting.
+    */
   cancelAutoPath(): void {
     this._autoPath = [];
     this._harvestTarget = null;
     this._isHarvesting = false;
     this._moveCooldown = 0;
+    this._harvestCooldown = 0;
   }
 
   // Getters for UI
@@ -1069,7 +1065,23 @@ export class GameEngine {
     const ny = ty;
     if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) return false;
     const tile = this._state.save.map[ny][nx];
-    if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'forest') return false;
+    if (tile.terrain === 'water') return false;
+
+    // Auto-collect single-unit Wood and Stone when stepping onto the tile.
+    if (tile.terrain === 'forest') {
+      if (this.canAddToPlayerInventory('wood')) {
+        this.addToPlayerInventory({ type: 'wood', amount: 1 });
+        tile.terrain = 'grass';
+        p.stats.woodChopped++;
+      }
+    } else if (tile.terrain === 'rock') {
+      if (this.canAddToPlayerInventory('stone')) {
+        this.addToPlayerInventory({ type: 'stone', amount: 1 });
+        tile.terrain = 'grass';
+        p.stats.stonesMined++;
+      }
+    }
+
     p.x = nx;
     p.y = ny;
     return true;
@@ -1085,8 +1097,23 @@ export class GameEngine {
     const ny = p.y + dy;
     if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) return false;
     const tile = this._state.save.map[ny][nx];
-    if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'forest') return false;
-    // Allow movement onto building tiles to interact with them (rotate/remove)
+    if (tile.terrain === 'water') return false;
+
+    // Auto-collect single-unit Wood and Stone when stepping onto the tile.
+    if (tile.terrain === 'forest') {
+      if (this.canAddToPlayerInventory('wood')) {
+        this.addToPlayerInventory({ type: 'wood', amount: 1 });
+        tile.terrain = 'grass';
+        p.stats.woodChopped++;
+      }
+    } else if (tile.terrain === 'rock') {
+      if (this.canAddToPlayerInventory('stone')) {
+        this.addToPlayerInventory({ type: 'stone', amount: 1 });
+        tile.terrain = 'grass';
+        p.stats.stonesMined++;
+      }
+    }
+
     p.x = nx;
     p.y = ny;
     return true;
