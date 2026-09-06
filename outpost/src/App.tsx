@@ -12,6 +12,7 @@ import { HelpPanel } from './ui/HelpPanel';
 import { ObjectivesPanel } from './ui/ObjectivesPanel';
 import { Tutorial } from './ui/Tutorial';
 import { InspectionPanel, type InspectionData } from './ui/InspectionPanel';
+import { HarvestingIndicator } from './ui/HarvestingIndicator';
 import type { TutorialStep } from './ui/Tutorial';
 
 const SAVE_KEY = 'outpost-save';
@@ -91,6 +92,10 @@ const App: React.FC = () => {
   const buildDragPathRef = useRef<{ x: number; y: number }[]>([]);
   const inspectedRef = useRef<{ x: number; y: number } | null>(null);
   const showWinRef = useRef(false);
+  // Auto-movement state refs (mirrored from engine)
+  const autoPathRef = useRef<{ x: number; y: number }[]>([]);
+  const harvestingRef = useRef(false);
+  const harvestTargetRef = useRef<{ x: number; y: number; type: string } | null>(null);
   // Mirrors of menu-open state for the (stale-closure-free) keydown handler.
   const buildMenuOpenRef = useRef(false);
   const inventoryOpenRef = useRef(false);
@@ -408,6 +413,11 @@ const App: React.FC = () => {
 
       const pos = engine.getPlayerPosition();
 
+      // Sync auto-movement state from engine
+      autoPathRef.current = engine.getAutoPath();
+      harvestingRef.current = engine.isHarvesting();
+      harvestTargetRef.current = engine.getHarvestTarget();
+
       if (frameCount % 30 === 0) {
         const buildings = engine.getNearbyBuildings(pos.x, pos.y, 3);
         setNearbyBuildings(buildings);
@@ -447,6 +457,12 @@ const App: React.FC = () => {
         buildPath = buildDragPathRef.current;
       }
 
+      // Auto-movement path: show the planned route
+      let autoPath: { x: number; y: number }[] | undefined;
+      if (autoPathRef.current.length > 0) {
+        autoPath = autoPathRef.current;
+      }
+
       let previewTile: { x: number; y: number } | null = null;
       let previewColor: string | undefined;
       let buildValid: boolean | undefined;
@@ -483,6 +499,8 @@ const App: React.FC = () => {
           interactiveTile,
           interactiveLabel,
           facing: engine.getFacing(),
+          autoPath,
+          autoPathValid: autoPath ? true : undefined,
         }
       );
 
@@ -654,6 +672,43 @@ const App: React.FC = () => {
     }
   };
 
+  /** Handle right-click context menu: suppress browser menu + contextual action. */
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    // Don't issue movement commands when UI is open or in build mode.
+    if (showBuildMenu || showInventory || showHelp || showTutorial || inspectedRef.current) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const worldX = (e.clientX - rect.left - cameraRef.current.x) / cameraRef.current.zoom;
+    const worldY = (e.clientY - rect.top - cameraRef.current.y) / cameraRef.current.zoom;
+    const tx = Math.floor(worldX / TILE_SIZE);
+    const ty = Math.floor(worldY / TILE_SIZE);
+    if (tx < 0 || tx >= 120 || ty < 0 || ty >= 120) return;
+
+    const engine = engineRef.current;
+    const tile = engine.getTile(tx, ty);
+    if (!tile) return;
+
+    // Building: no action for this version (ignore)
+    if (tile.building) return;
+
+    // Resource deposit: contextual harvest
+    if (tile.resource && tile.resource.amount > 0) {
+      engine.startHarvestAt(tx, ty);
+      setRenderTick(t => t + 1);
+      return;
+    }
+
+    // Walkable terrain: move there via pathfinding
+    if (tile.terrain === 'grass' || tile.terrain === 'sand') {
+      engine.startMoveTo(tx, ty);
+      setRenderTick(t => t + 1);
+    }
+  }, [showBuildMenu, showInventory, showHelp, showTutorial]);
+
   const handleBuildDetailSelect = useCallback((type: BuildingTypeValue | null) => {
     setSelectedBuild(type);
   }, []);
@@ -818,7 +873,7 @@ const App: React.FC = () => {
         onMouseMove={handleMouseMove}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
-        onContextMenu={e => e.preventDefault()}
+        onContextMenu={handleContextMenu}
         style={{ width: '100%', height: '100%', display: 'block' }}
       />
 
@@ -873,6 +928,12 @@ const App: React.FC = () => {
         power={powerState ?? undefined}
         showPowerPanel={showPowerPanel}
         playerInventory={engineRef.current.player.inventory}
+      />
+
+      <HarvestingIndicator
+        isHarvesting={harvestingRef.current}
+        harvestTarget={harvestTargetRef.current}
+        autoPathLength={autoPathRef.current.length}
       />
 
       {showBuildMenu && (

@@ -2816,3 +2816,185 @@ describe('Miner logistics - output drains on depleted deposit', () => {
     expect(beltCoal!.amount).toBeGreaterThan(0);
   });
 });
+
+// ==================== BFS PATHFINDING & AUTO-MOVEMENT ====================
+
+describe('BFS Pathfinding & Auto-Movement', () => {
+  it('finds path to adjacent grass tile', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][61].terrain = 'grass';
+    const result = engine.startMoveTo(60, 61);
+    expect(result).toBe(true);
+  });
+
+  it('moves player along auto-path after cooldown', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][62].terrain = 'grass';
+    engine.startMoveTo(60, 62);
+    // Cooldown is 3 ticks, so player moves on tick 4
+    for (let i = 0; i < 4; i++) engine.tick();
+    expect(engine.player.x).toBe(60);
+    expect(engine.player.y).toBe(61);
+  });
+
+  it('returns false when already at destination', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][61].terrain = 'grass';
+    const result = engine.startMoveTo(60, 60);
+    expect(result).toBe(false);
+    expect(engine.hasAutoPath()).toBe(false);
+  });
+
+  it('refuses to move onto blocked terrain', () => {
+    const engine = new GameEngine(42);
+    engine.map[65][60].terrain = 'water';
+    const result = engine.startMoveTo(60, 65);
+    expect(result).toBe(false);
+  });
+
+  it('finds path around a single obstacle', () => {
+    const engine = new GameEngine(42);
+    // Block direct path with water
+    engine.map[62][60].terrain = 'water';
+    // Clear alternative route
+    engine.map[61][61].terrain = 'grass';
+    engine.map[62][61].terrain = 'grass';
+    engine.map[63][60].terrain = 'grass';
+    engine.map[63][60].terrain = 'grass';
+
+    const result = engine.startMoveTo(60, 63);
+    expect(result).toBe(true);
+
+    const path = engine.getAutoPath();
+    // Path should NOT go through (62,60) which is water
+    const onWater = path.some(p => p.x === 62 && p.y === 60);
+    expect(onWater).toBe(false);
+  });
+
+  it('cancels auto-path on WASD move', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][65].terrain = 'grass';
+    engine.startMoveTo(60, 65);
+    expect(engine.hasAutoPath()).toBe(true);
+
+    // WASD move
+    engine.movePlayer(0, -1);
+
+    expect(engine.hasAutoPath()).toBe(false);
+    expect(engine.player.x).toBe(60);
+    expect(engine.player.y).toBe(59);
+  });
+});
+
+describe('Right-Click Resource Harvesting', () => {
+  it('starts harvesting when standing on resource', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal' as any, amount: 10 };
+    engine.player.x = 60; engine.player.y = 60;
+
+    const result = engine.startHarvestAt(60, 60);
+    expect(result).toBe(true);
+    expect(engine.isHarvesting()).toBe(true);
+    expect(engine.getHarvestTarget()?.type).toBe('coal');
+  });
+
+  it('harvests resources until depleted', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal' as any, amount: 3 };
+    engine.player.x = 60; engine.player.y = 60;
+
+    engine.startHarvestAt(60, 60);
+    expect(engine.isHarvesting()).toBe(true);
+
+    // Harvest all 3 items (cooldown 2, so 1 harvest every 2 ticks)
+    for (let i = 0; i < 15; i++) {
+      engine.tick();
+    }
+
+    // Should have harvested some items
+    const coal = engine.player.inventory.find(i => i.type === 'coal');
+    expect(coal).toBeDefined();
+    expect(coal!.amount).toBe(3);
+  });
+
+  it('stops harvesting when deposit depleted', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].resource = { type: 'coal' as any, amount: 2 };
+    engine.player.x = 60; engine.player.y = 60;
+
+    engine.startHarvestAt(60, 60);
+    expect(engine.isHarvesting()).toBe(true);
+
+    // Harvest all
+    for (let i = 0; i < 20; i++) {
+      engine.tick();
+    }
+
+    // Should have stopped
+    expect(engine.isHarvesting()).toBe(false);
+  });
+});
+
+describe('Pathfinding Edge Cases', () => {
+  it('handles out-of-bounds destination', () => {
+    const engine = new GameEngine(42);
+    const result = engine.startMoveTo(200, 200);
+    expect(result).toBe(false);
+  });
+
+  it('refuses path through forest tiles', () => {
+    const engine = new GameEngine(42);
+    // Block direct path
+    engine.map[62][60].terrain = 'forest';
+    // Clear detour
+    engine.map[61][61].terrain = 'grass';
+    engine.map[62][61].terrain = 'grass';
+    engine.map[63][60].terrain = 'grass';
+
+    const result = engine.startMoveTo(60, 63);
+    expect(result).toBe(true);
+
+    const path = engine.getAutoPath();
+    const onForest = path.some(p => p.x === 62 && p.y === 60);
+    expect(onForest).toBe(false);
+  });
+
+  it('cancels previous command when setting new destination', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][65].terrain = 'grass';
+    engine.map[60][70].terrain = 'grass';
+
+    engine.startMoveTo(60, 65);
+    expect(engine.getAutoPath().length).toBeGreaterThan(0);
+
+    // New destination
+    engine.startMoveTo(60, 70);
+    const path = engine.getAutoPath();
+    expect(path[path.length - 1]).toEqual({ x: 60, y: 70 });
+  });
+});
+
+describe('Integration: Right-click and WASD', () => {
+  it('WASD direction updates after canceling auto-movement', () => {
+    const engine = new GameEngine(42);
+    engine.startMoveTo(65, 60);
+    engine.movePlayer(0, 1); // Down
+
+    expect(engine.getFacing()).toBe(Dir.Down);
+    expect(engine.hasAutoPath()).toBe(false);
+  });
+});
+
+// ==================== BFS PATHFINDING & AUTO-MOVEMENT ====================
+
+describe('BFS Pathfinding & Auto-Movement', () => {
+  it('finds path to adjacent grass tile', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][61].terrain = 'grass';
+    const result = engine.startMoveTo(60, 61);
+    expect(result).toBe(true);
+  });
+});

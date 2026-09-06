@@ -27,6 +27,19 @@ import {
   ASM_RECIPES,
 } from '../types';
 
+// ==================== AUTO-MOVEMENT TYPES ====================
+
+export interface AutoPathState {
+  /** Ordered list of waypoints (exclusive of start, inclusive of target). */
+  path: { x: number; y: number }[];
+}
+
+export interface HarvestTargetState {
+  x: number;
+  y: number;
+  type: ResourceTypeValue;
+}
+
 // ==================== SEEDED PRNG ====================
 
 class SeededRandom {
@@ -232,6 +245,12 @@ function createBuilding(type: BuildingTypeValue): Building {
 export class GameEngine {
   private _state: GameState;
 
+  // ==================== AUTO-MOVEMENT STATE ====================
+  private _autoPath: { x: number; y: number }[] = [];
+  private _harvestTarget: HarvestTargetState | null = null;
+  private _isHarvesting = false;
+  private _moveCooldown = 0;
+
   constructor(seed: number = 42) {
     const map = generateMap(seed);
     const startX = Math.floor(MAP_SIZE / 2);
@@ -271,6 +290,7 @@ export class GameEngine {
     if (this._state.config.paused) return;
     this._state.save.tick++;
     this._state.save.gameTime++;
+    this.updatePlayer();
     this.updateGenerators();
     this.updatePowerGrid();
     this.updateBuildings();
@@ -776,9 +796,268 @@ export class GameEngine {
     }
   }
 
+  // ==================== AUTO-MOVEMENT & PATHFINDING ====================
+
+  /** BFS pathfinding from (sx, sy) to (tx, ty). Returns null if no path exists. */
+  private bfsFindPath(sx: number, sy: number, tx: number, ty: number): { x: number; y: number }[] | null {
+    if (sx === tx && sy === ty) return [];
+
+    const visited = new Set<string>();
+    visited.add(`${sx},${sy}`);
+    // Each entry: { x, y, parent: index in queue }
+    const queue: { x: number; y: number; parent: number }[] = [];
+    queue.push({ x: sx, y: sy, parent: -1 });
+
+    let head = 0;
+    while (head < queue.length) {
+      const cur = queue[head++];
+       if (cur.x === tx && cur.y === ty) {
+          // Reconstruct path from target back to start via parent pointers.
+          const path: { x: number; y: number }[] = [];
+          let idx = head - 1; // head is now queue.length since we found target
+         while (idx >= 0) {
+           const node = queue[idx];
+           if (!(node.x === sx && node.y === sy)) {
+             path.push({ x: node.x, y: node.y });
+           }
+           if (node.parent === -1) break;
+           idx = node.parent;
+         }
+         // Reverse to get forward path
+         path.reverse();
+         return path;
+       }
+      // Explore neighbors in consistent order: Up, Right, Down, Left
+      for (let dir = 0; dir < 4; dir++) {
+        const nx = cur.x + DELTA[dir].x;
+        const ny = cur.y + DELTA[dir].y;
+        const key = `${nx},${ny}`;
+        if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
+        if (visited.has(key)) continue;
+        if (!this.isWalkable(nx, ny)) continue;
+        visited.add(key);
+        queue.push({ x: nx, y: ny, parent: head - 1 });
+      }
+    }
+    return null;
+  }
+
+  /** Check if a tile is walkable (same rules as normal player movement). */
+  isWalkable(x: number, y: number): boolean {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
+    const tile = this._state.save.map[y][x];
+    if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'forest') return false;
+    // Buildings block movement (stand adjacent to them)
+    if (tile.building) return false;
+    return true;
+  }
+
+  /**
+   * Process one step of auto-movement.
+   * Called every tick during the simulation.
+   */
+  private updatePlayer(): void {
+    const p = this._state.save.player;
+
+    // Handle movement cooldown
+    if (this._moveCooldown > 0) {
+      this._moveCooldown--;
+      return;
+    }
+
+    // Auto-movement: follow the path
+    if (this._autoPath.length > 0) {
+      const next = this._autoPath[0];
+      const dx = next.x - p.x;
+      const dy = next.y - p.y;
+      this.movePlayer(dx, dy);
+      this._autoPath.shift();
+
+      // Check if we've arrived at the harvest target
+      if (this._isHarvesting && this._harvestTarget) {
+        if (p.x === this._harvestTarget.x && p.y === this._harvestTarget.y) {
+          this.doHarvest();
+        }
+      }
+      // Set cooldown so next step doesn't happen this tick
+      this._moveCooldown = 3;
+      return;
+    }
+
+    // Already at destination but still harvesting (no path needed)
+    if (this._isHarvesting && this._harvestTarget) {
+      // Harvest resources at current position
+      this.doHarvest();
+    }
+  }
+
+  /** Perform one harvest tick on resource deposits at the player's current tile. */
+  private doHarvest(): void {
+    if (!this._harvestTarget) return;
+    const tile = this._state.save.map[this._state.save.player.y]?.[this._state.save.player.x];
+    if (!tile) return;
+
+    // Check if the resource under the player matches our target
+    if (tile.resource && tile.resource.type === this._harvestTarget.type && tile.resource.amount > 0) {
+      const canAccept = this.canAddToPlayerInventory(tile.resource.type);
+      if (canAccept) {
+        tile.resource.amount--;
+        if (tile.resource.amount < 0) tile.resource.amount = 0;
+        this.addToPlayerInventory({ type: tile.resource.type, amount: 1 });
+        this._state.save.player.stats.stonesMined++;
+        if (tile.resource.type === 'wood') this._state.save.player.stats.woodChopped++;
+      }
+    }
+
+    // Check if still harvesting
+    if (!tile.resource || tile.resource.amount <= 0 || tile.resource.type !== this._harvestTarget.type) {
+      // Deposit depleted
+      if (this._harvestTarget && tile.resource?.type === this._harvestTarget.type) {
+        // Resource is fully depleted
+      }
+      if (!tile.resource || tile.resource.amount <= 0) {
+        this.cancelAutoPath();
+        return;
+      }
+    }
+
+    // Check if inventory is full
+    if (!this.canAddToPlayerInventory(this._harvestTarget.type)) {
+      this.cancelAutoPath();
+      return;
+    }
+
+    // Cooldown for harvest speed (harvest every 2 ticks)
+    this._moveCooldown = 2;
+  }
+
+  /** Check if the player can accept one more item of the given type. */
+  private canAddToPlayerInventory(type: string): boolean {
+    const p = this._state.save.player;
+    const item = p.inventory.find(i => i.type === type);
+    if (item) return item.amount < p.maxInventorySlots;
+    return p.inventory.length < p.maxInventorySlots;
+  }
+
+  /**
+   * Right-click on terrain: move player to the clicked tile via pathfinding.
+   * Returns true if a path was found and movement started.
+   */
+  startMoveTo(tx: number, ty: number): boolean {
+    this.cancelAutoPath();
+    if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) return false;
+    if (!this.isWalkable(tx, ty)) return false;
+
+    // If already at the target, nothing to do
+    if (this._state.save.player.x === tx && this._state.save.player.y === ty) return false;
+
+    const path = this.bfsFindPath(this._state.save.player.x, this._state.save.player.y, tx, ty);
+    if (!path || path.length === 0) return false;
+
+    this._autoPath = path;
+    this._moveCooldown = 3;
+    return true;
+  }
+
+  /**
+   * Right-click on a resource deposit: path to the nearest reachable adjacent tile
+   * and begin harvesting.
+   * Returns true if a valid adjacent tile was found and movement started.
+   */
+  startHarvestAt(tx: number, ty: number): boolean {
+    this.cancelAutoPath();
+    if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) return false;
+    const tile = this._state.save.map[ty][tx];
+    if (!tile.resource || tile.resource.amount <= 0) return false;
+
+    const p = this._state.save.player;
+
+    // If player is already standing on the resource, harvest in place.
+    if (p.x === tx && p.y === ty) {
+      this._harvestTarget = { x: tx, y: ty, type: tile.resource.type };
+      this._isHarvesting = true;
+      return true;
+    }
+
+    // Find the nearest reachable cardinally-adjacent walkable tile.
+    const adjacent = [
+      { x: tx, y: ty - 1 },  // North
+      { x: tx + 1, y: ty },  // East
+      { x: tx, y: ty + 1 },  // South
+      { x: tx - 1, y: ty },  // West
+    ];
+
+    // BFS from player to find nearest adjacent tile to the resource.
+    const visited = new Set<string>();
+    visited.add(`${p.x},${p.y}`);
+    const queue: { x: number; y: number; path: { x: number; y: number }[] }[] = [];
+    queue.push({ x: p.x, y: p.y, path: [] });
+
+    let head = 0;
+    let bestPath: { x: number; y: number }[] | null = null;
+
+    while (head < queue.length) {
+      const cur = queue[head++];
+
+      // Check if any adjacent tile to the resource is reached
+      for (const adj of adjacent) {
+        if (adj.x === cur.x && adj.y === cur.y) {
+          // Found a path to this adjacent tile.
+          if (!bestPath || cur.path.length < bestPath.length) {
+            bestPath = cur.path.slice();
+          }
+          continue;
+        }
+      }
+
+      if (bestPath) continue; // We already have a path, don't explore further
+
+      for (let dir = 0; dir < 4; dir++) {
+        const nx = cur.x + DELTA[dir].x;
+        const ny = cur.y + DELTA[dir].y;
+        const key = `${nx},${ny}`;
+        if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
+        if (visited.has(key)) continue;
+        if (!this.isWalkable(nx, ny)) continue;
+        visited.add(key);
+        const newPath = [...cur.path, { x: cur.x, y: cur.y }];
+        queue.push({ x: nx, y: ny, path: newPath });
+      }
+    }
+
+    if (!bestPath) return false; // No valid adjacent tile reachable
+
+    // Set up harvesting state.
+    this._harvestTarget = { x: tx, y: ty, type: tile.resource.type };
+    this._isHarvesting = true;
+
+    // Move to the adjacent tile; when there, doHarvest will handle the resource tile.
+    // The path should go to the adjacent tile, not onto the resource.
+    this._autoPath = bestPath;
+    this._moveCooldown = 3;
+    return true;
+  }
+
+  /**
+   * Cancel any auto-movement and harvesting.
+   */
+  cancelAutoPath(): void {
+    this._autoPath = [];
+    this._harvestTarget = null;
+    this._isHarvesting = false;
+    this._moveCooldown = 0;
+  }
+
+  // Getters for UI
+  getAutoPath(): { x: number; y: number }[] { return this._autoPath; }
+  getHarvestTarget(): HarvestTargetState | null { return this._harvestTarget; }
+  isHarvesting(): boolean { return this._isHarvesting; }
+  hasAutoPath(): boolean { return this._autoPath.length > 0; }
+
   // ==================== PLAYER ACTIONS ====================
 
   movePlayer(dx: number, dy: number): boolean {
+    this.cancelAutoPath();
     const p = this._state.save.player;
     if (dx !== 0 || dy !== 0) {
       p.facing = (dx === 1 ? Dir.Right : dx === -1 ? Dir.Left : dy === -1 ? Dir.Up : Dir.Down) as DirectionValue;

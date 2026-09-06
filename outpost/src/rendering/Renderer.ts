@@ -36,6 +36,10 @@ export interface RenderOptions {
   interactiveTile?: { x: number; y: number } | null;
   interactiveLabel?: string;
   facing?: DirectionValue;
+  /** Planned auto-movement path (blue dots). */
+  autoPath?: { x: number; y: number }[];
+  /** Whether the auto-path is valid (for coloring). */
+  autoPathValid?: boolean;
   /** Hide the bottom-right minimap (used by the dev-only visual showcase). */
   showMinimap?: boolean;
   /**
