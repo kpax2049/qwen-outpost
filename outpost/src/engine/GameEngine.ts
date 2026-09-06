@@ -873,9 +873,10 @@ export class GameEngine {
       this.movePlayer(dx, dy);
       this._autoPath.shift();
 
-      // Check if we've arrived at the harvest target
+      // Check if we've arrived adjacent to the harvest target (resource tile)
       if (this._isHarvesting && this._harvestTarget) {
-        if (p.x === this._harvestTarget.x && p.y === this._harvestTarget.y) {
+        const adjDist = Math.max(Math.abs(p.x - this._harvestTarget.x), Math.abs(p.y - this._harvestTarget.y));
+        if (adjDist <= 1) {
           this.doHarvest();
         }
       }
@@ -894,7 +895,10 @@ export class GameEngine {
   /** Perform one harvest tick on resource deposits at the player's current tile. */
   private doHarvest(): void {
     if (!this._harvestTarget) return;
-    const tile = this._state.save.map[this._state.save.player.y]?.[this._state.save.player.x];
+
+    // Check the harvest target tile (resource deposit), not the player's current tile.
+    // The player should be standing adjacent to the resource when harvesting.
+    const tile = this._state.save.map[this._harvestTarget.y]?.[this._harvestTarget.x];
     if (!tile) return;
 
     // Check if the resource under the player matches our target
@@ -1004,7 +1008,7 @@ export class GameEngine {
         if (adj.x === cur.x && adj.y === cur.y) {
           // Found a path to this adjacent tile.
           if (!bestPath || cur.path.length < bestPath.length) {
-            bestPath = cur.path.slice();
+            bestPath = [...cur.path, { x: adj.x, y: adj.y }];
           }
           continue;
         }

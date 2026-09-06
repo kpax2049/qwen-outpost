@@ -75,6 +75,8 @@ function buildOrthoPath(a: { x: number; y: number }, b: { x: number; y: number }
 const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine>(new GameEngine(42));
+  // E2E test hook
+  (window as any).__testEngine = () => engineRef.current;
   const rendererRef = useRef<Renderer | null>(null);
   const assetLoaderRef = useRef<AssetLoader | null>(null);
   const tickAccumulatorRef = useRef<number>(0);
@@ -674,9 +676,11 @@ const App: React.FC = () => {
 
   /** Handle right-click context menu: suppress browser menu + contextual action. */
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    // Only process right-clicks that originate on the canvas (not on HUD overlays).
+    if (e.currentTarget !== canvasRef.current) return;
     e.preventDefault();
     // Don't issue movement commands when UI is open or in build mode.
-    if (showBuildMenu || showInventory || showHelp || showTutorial || inspectedRef.current) return;
+    if (showBuildMenu || showInventory || showHelp || showTutorial) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
