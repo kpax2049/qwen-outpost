@@ -2884,6 +2884,105 @@ describe('BFS Pathfinding & Auto-Movement', () => {
     expect(engine.player.x).toBe(60);
     expect(engine.player.y).toBe(59);
   });
+
+  // ==================== RIGHT-CLICK FULL PATH MOVEMENT ====================
+
+  it('startMoveTo 4 tiles EAST reaches the exact target', () => {
+    const engine = new GameEngine(42);
+    engine.map[64][60].terrain = 'grass';
+    const result = engine.startMoveTo(64, 60);
+    expect(result).toBe(true);
+    expect(engine.hasAutoPath()).toBe(true);
+
+    // Cooldown 3 before each step: move at ticks 3, 7, 11, 15 (4 steps = 16 ticks)
+    for (let i = 0; i < 16; i++) engine.tick();
+
+    expect(engine.player.x).toBe(64);
+    expect(engine.player.y).toBe(60);
+    expect(engine.hasAutoPath()).toBe(false);
+  });
+
+  it('startMoveTo 4 tiles WEST reaches the exact target', () => {
+    const engine = new GameEngine(42);
+    engine.map[56][60].terrain = 'grass';
+    const result = engine.startMoveTo(56, 60);
+    expect(result).toBe(true);
+    expect(engine.hasAutoPath()).toBe(true);
+
+    for (let i = 0; i < 16; i++) engine.tick();
+
+    expect(engine.player.x).toBe(56);
+    expect(engine.player.y).toBe(60);
+    expect(engine.hasAutoPath()).toBe(false);
+  });
+
+  it('startMoveTo 4 tiles NORTH reaches the exact target', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][56].terrain = 'grass';
+    const result = engine.startMoveTo(60, 56);
+    expect(result).toBe(true);
+    expect(engine.hasAutoPath()).toBe(true);
+
+    for (let i = 0; i < 16; i++) engine.tick();
+
+    expect(engine.player.x).toBe(60);
+    expect(engine.player.y).toBe(56);
+    expect(engine.hasAutoPath()).toBe(false);
+  });
+
+  it('startMoveTo 4 tiles SOUTH reaches the exact target', () => {
+    const engine = new GameEngine(42);
+    engine.map[60][64].terrain = 'grass';
+    const result = engine.startMoveTo(60, 64);
+    expect(result).toBe(true);
+    expect(engine.hasAutoPath()).toBe(true);
+
+    for (let i = 0; i < 16; i++) engine.tick();
+
+    expect(engine.player.x).toBe(60);
+    expect(engine.player.y).toBe(64);
+    expect(engine.hasAutoPath()).toBe(false);
+  });
+
+  it('multi-turn path around one obstacle reaches the exact target', () => {
+    const engine = new GameEngine(42);
+    // Block direct path from (60,60) going south
+    engine.map[60][61].terrain = 'water';
+    engine.map[60][62].terrain = 'water';
+    engine.map[60][63].terrain = 'water';
+    // Player at (60, 60), target is (60, 65) south side
+    engine.map[60][65].terrain = 'grass';
+    engine.map[61][63].terrain = 'grass';
+    engine.map[61][64].terrain = 'grass';
+    engine.map[61][65].terrain = 'grass';
+
+    const result = engine.startMoveTo(60, 65);
+    expect(result).toBe(true);
+    expect(engine.hasAutoPath()).toBe(true);
+
+    // Run enough ticks to complete the path
+    for (let i = 0; i < 30; i++) engine.tick();
+
+    expect(engine.player.x).toBe(60);
+    expect(engine.player.y).toBe(65);
+    expect(engine.hasAutoPath()).toBe(false);
+  });
+
+  it('_autoPath remains active across multiple ticks until the destination is reached', () => {
+    const engine = new GameEngine(42);
+    // 6-tile straight path east
+    engine.map[66][60].terrain = 'grass';
+    engine.startMoveTo(66, 60);
+
+    // Run until player reaches destination (auto-path clears when done)
+    while (engine.hasAutoPath()) {
+      engine.tick();
+    }
+
+    expect(engine.player.x).toBe(66);
+    expect(engine.player.y).toBe(60);
+    expect(engine.hasAutoPath()).toBe(false);
+  });
 });
 
 describe('Right-Click Resource Harvesting', () => {

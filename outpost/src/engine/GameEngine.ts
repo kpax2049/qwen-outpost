@@ -868,9 +868,7 @@ export class GameEngine {
     // Auto-movement: follow the path
     if (this._autoPath.length > 0) {
       const next = this._autoPath[0];
-      const dx = next.x - p.x;
-      const dy = next.y - p.y;
-      this.movePlayer(dx, dy);
+      this._movePlayer(next.x, next.y);
       this._autoPath.shift();
 
       // Check if we've arrived adjacent to the harvest target (resource tile)
@@ -1059,6 +1057,23 @@ export class GameEngine {
   hasAutoPath(): boolean { return this._autoPath.length > 0; }
 
   // ==================== PLAYER ACTIONS ====================
+
+  /** Internal: move player to absolute tile coordinates without canceling auto-path. */
+  private _movePlayer(tx: number, ty: number): boolean {
+    const p = this._state.save.player;
+    if (tx > p.x) p.facing = Dir.Right;
+    else if (tx < p.x) p.facing = Dir.Left;
+    else if (ty < p.y) p.facing = Dir.Up;
+    else if (ty > p.y) p.facing = Dir.Down;
+    const nx = tx;
+    const ny = ty;
+    if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) return false;
+    const tile = this._state.save.map[ny][nx];
+    if (tile.terrain === 'water' || tile.terrain === 'rock' || tile.terrain === 'forest') return false;
+    p.x = nx;
+    p.y = ny;
+    return true;
+  }
 
   movePlayer(dx: number, dy: number): boolean {
     this.cancelAutoPath();
