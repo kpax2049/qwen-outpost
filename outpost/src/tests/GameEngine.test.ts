@@ -419,7 +419,6 @@ describe('GameEngine - Conveyor Belts', () => {
 
     const belt0 = engine.getTile(60, 61)!.building!;
     const belt1 = engine.getTile(60, 62)!.building!;
-    const belt2 = engine.getTile(60, 63)!.building!;
     const storage = engine.getTile(60, 60)!.building!;
 
     // Fill all belts so the chain is fully blocked from the start.

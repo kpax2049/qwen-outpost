@@ -268,8 +268,11 @@ export interface PlayerState {
     minersBuilt: number;
     generatorsBuilt: number;
     smeltersBuilt: number;
+    steel_smeltersBuilt: number;
     assemblersBuilt: number;
     conveyorsBuilt: number;
+    storagesBuilt: number;
+    chestsBuilt: number;
     timePlayed: number;
   };
   _buildDirection?: DirectionValue;

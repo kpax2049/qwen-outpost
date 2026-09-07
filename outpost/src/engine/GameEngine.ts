@@ -268,7 +268,7 @@ export class GameEngine {
           facing: Dir.Down,
           inventory: [{ type: 'wood', amount: 5 }, { type: 'stone', amount: 5 }],
           maxInventorySlots: 20,
-          stats: { stonesMined: 0, woodChopped: 0, ingotsCrafted: 0, enginesCrafted: 0, ironIngotsCrafted: 0, copperWiresCrafted: 0, minersBuilt: 0, generatorsBuilt: 0, smeltersBuilt: 0, assemblersBuilt: 0, conveyorsBuilt: 0, timePlayed: 0 },
+          stats: { stonesMined: 0, woodChopped: 0, ingotsCrafted: 0, enginesCrafted: 0, ironIngotsCrafted: 0, copperWiresCrafted: 0, minersBuilt: 0, generatorsBuilt: 0, smeltersBuilt: 0, steel_smeltersBuilt: 0, assemblersBuilt: 0, conveyorsBuilt: 0, storagesBuilt: 0, chestsBuilt: 0, timePlayed: 0 },
         },
         tick: 0,
         gameTime: 0,
@@ -713,8 +713,8 @@ export class GameEngine {
 
     // Find the first adjacent empty belt and push one item onto it.
     for (let dir = 0; dir < 4; dir++) {
-      const nx = x + DELTA[dir].x;
-      const ny = y + DELTA[dir].y;
+      const nx = x + DELTA[dir as DirectionValue].x;
+      const ny = y + DELTA[dir as DirectionValue].y;
       if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
 
       const nextTile = this._state.save.map[ny][nx];
@@ -722,7 +722,7 @@ export class GameEngine {
       if (nextTile.building.type !== BuildingTypeMap.conveyor) continue;
 
       // Don't push into a conveyor facing back at us.
-      if (nextTile.building.direction === oppositeDirection(dir)) continue;
+      if (nextTile.building.direction === oppositeDirection(dir as DirectionValue)) continue;
       if (this.canAddToInventory(nextTile.building, item.type)) {
         this.removeItemFromInventory(b, item.type, 1);
         this.addToInventory(nextTile.building, { type: item.type, amount: 1 });
@@ -830,8 +830,8 @@ export class GameEngine {
        }
       // Explore neighbors in consistent order: Up, Right, Down, Left
       for (let dir = 0; dir < 4; dir++) {
-        const nx = cur.x + DELTA[dir].x;
-        const ny = cur.y + DELTA[dir].y;
+        const nx = cur.x + DELTA[dir as DirectionValue].x;
+        const ny = cur.y + DELTA[dir as DirectionValue].y;
         const key = `${nx},${ny}`;
         if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
         if (visited.has(key)) continue;
@@ -1010,8 +1010,8 @@ export class GameEngine {
       if (bestPath) continue; // We already have a path, don't explore further
 
       for (let dir = 0; dir < 4; dir++) {
-        const nx = cur.x + DELTA[dir].x;
-        const ny = cur.y + DELTA[dir].y;
+        const nx = cur.x + DELTA[dir as DirectionValue].x;
+        const ny = cur.y + DELTA[dir as DirectionValue].y;
         const key = `${nx},${ny}`;
         if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
         if (visited.has(key)) continue;
@@ -1510,7 +1510,6 @@ export class GameEngine {
         return { status: `Producing ${b.powerProduced ?? 0} power`, statusColor: 'ok' };
       }
       case BuildingTypeMap.miner: {
-        const tile = this._state.save.map[y][x];
         if (!b.active) return { status: 'No Power', statusColor: 'bad' };
         if (b.exhausted) return { status: `Exhausted — no ${b.minerResourceType ? RESOURCE_NAMES[b.minerResourceType] ?? b.minerResourceType : 'matching'} deposits in field`, statusColor: 'warn' };
         const reserve = this.countFieldReserve(x, y, b);

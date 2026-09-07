@@ -1104,7 +1104,7 @@ function Showcase() {
               playerInventory={playerItems}
             />
             {(inspection && (
-              <InspectionPanel data={inspection} onClose={() => {}} onDeposit={() => {}} canDeposit={() => false} onWithdraw={() => {}} canWithdraw={() => false} onRotate={() => {}} />
+              <InspectionPanel data={inspection} onClose={() => {}} onDeposit={() => {}} canDeposit={() => false} onWithdraw={() => {}} canWithdraw={() => false} onRotate={() => {}} onRemove={() => {}} />
             )) || <></>}
           </Stage>
         </div>
