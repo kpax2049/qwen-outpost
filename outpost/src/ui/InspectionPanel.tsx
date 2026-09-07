@@ -16,6 +16,7 @@ interface InspectionPanelProps {
   onWithdraw: (type: string) => void;
   canWithdraw: (type: string) => boolean;
   onRotate: () => void;
+  onRemove: () => void;
   onRecipeSelect?: (recipe: AsmRecipe) => void;
 }
 
@@ -50,7 +51,7 @@ const DEPOSIT_DISPLAY: Record<string, string> = {
   engine: 'Engine',
 };
 
-export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose, onDeposit, canDeposit, onWithdraw, canWithdraw, onRotate, onRecipeSelect }) => {
+export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose, onDeposit, canDeposit, onWithdraw, canWithdraw, onRotate, onRemove, onRecipeSelect }) => {
   const { building, playerItems } = data;
 
   return (
@@ -387,18 +388,17 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
             )}
 
             {/* Remove button */}
-            {building.type !== 'conveyor' && (
-              <button style={{
-                display: 'block', width: '100%', height: 30, marginTop: 8,
-                background: '#1d242e', border: '1px solid rgba(255,255,255,.09)',
-                borderRadius: 3,
-                fontFamily: "'Chakra Petch', sans-serif",
-                fontSize: 11, fontWeight: 600, letterSpacing: '.12em',
-                color: '#ec6058', cursor: 'pointer', textAlign: 'center',
-              }}>
-                REMOVE Q
-              </button>
-            )}
+            <button style={{
+              display: 'block', width: '100%', height: 30, marginTop: 8,
+              background: '#1d242e', border: '1px solid rgba(255,255,255,.09)',
+              borderRadius: 3,
+              fontFamily: "'Chakra Petch', sans-serif",
+              fontSize: 11, fontWeight: 600, letterSpacing: '.12em',
+              color: '#ec6058', cursor: 'pointer', textAlign: 'center',
+            }}
+            onClick={() => { onRemove(); onClose(); }}>
+              REMOVE Q
+            </button>
 
             {/* Take from building */}
             {building.inventory.length > 0 && building.type !== 'conveyor' && (

@@ -1290,8 +1290,12 @@ export class GameEngine {
   }
 
   removeBuilding(): boolean {
-    const p = this._state.save.player;
-    const tile = this._state.save.map[p.y][p.x];
+    return this.removeBuildingAt(this._state.save.player.x, this._state.save.player.y);
+  }
+
+  removeBuildingAt(x: number, y: number): boolean {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
+    const tile = this._state.save.map[y][x];
     if (!tile.building) return false;
 
     const def = BUILDING_DEFS[tile.building.type];

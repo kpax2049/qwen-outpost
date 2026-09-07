@@ -289,7 +289,13 @@ const App: React.FC = () => {
         setRenderTick(t => t + 1);
       }
       if (e.key.toLowerCase() === 'q' && !bt) {
-        engine.removeBuilding();
+        const insp = inspectedRef.current;
+        if (insp) {
+          engine.removeBuildingAt(insp.x, insp.y);
+          closeInspection();
+        } else {
+          engine.removeBuilding();
+        }
         setRenderTick(t => t + 1);
       }
       if (e.key.toLowerCase() === 't' && !bt) {
@@ -751,6 +757,14 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const handleRemoveInspected = useCallback(() => {
+    const ip = inspectedRef.current;
+    const engine = engineRef.current;
+    if (!ip) return;
+    engine.removeBuildingAt(ip.x, ip.y);
+    setRenderTick(t => t + 1);
+  }, []);
+
   const handleWithdraw = useCallback((type: string) => {
     const ip = inspectedRef.current;
     const engine = engineRef.current;
@@ -970,6 +984,7 @@ const App: React.FC = () => {
           onWithdraw={handleWithdraw}
           canWithdraw={canWithdraw}
           onRotate={handleRotateInspected}
+          onRemove={handleRemoveInspected}
           onRecipeSelect={handleRecipeSelect}
         />
       )}

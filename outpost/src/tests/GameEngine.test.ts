@@ -3458,3 +3458,148 @@ describe('Harvesting Regression Tests', () => {
   });
 });
 
+// ==================== Remote Removal Tests ====================
+
+describe('Engine - remote building removal (removeBuildingAt)', () => {
+
+  function makeBeltWith(direction: DirectionValue): Building {
+    return {
+      type: 'conveyor' as const, direction, active: true, powerConsumed: 0,
+      powerProduced: undefined, inventory: [], maxInventory: 1,
+      progress: 0, maxProgress: 12, producesItem: undefined, consumesItems: undefined, outputDirection: undefined,
+    };
+  }
+
+  it('removes a remote conveyor with removeBuildingAt', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    engine.map[70][70].terrain = 'grass';
+    engine.map[70][70].building = makeBeltWith(Dir.Right);
+    engine.player.x = 60; engine.player.y = 60; // not on the belt
+
+    const before = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
+
+    const removed = engine.removeBuildingAt(70, 70);
+
+    expect(removed).toBe(true);
+    expect(engine.map[70][70].building).toBeUndefined();
+    const after = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
+    expect(after).toBe(before + 1); // conveyor costs 2 stone, half refund = 1
+  });
+
+  it('removes a remote building with removeBuildingAt', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    engine.map[70][70].terrain = 'grass';
+    engine.placeBuildingAt('storage', 70, 70);
+    engine.player.x = 60; engine.player.y = 60; // not on the storage
+
+    const before = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
+
+    const removed = engine.removeBuildingAt(70, 70);
+
+    expect(removed).toBe(true);
+    expect(engine.map[70][70].building).toBeUndefined();
+    const after = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
+    expect(after).toBe(before + 2); // storage costs 5 stone, half refund = 2
+  });
+
+  it('removeBuilding (local) still works and uses the same refund path', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+    // placeBuilding on player tile moves player away, but building remains at player tile
+    engine.placeBuilding('storage');
+
+    const before = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
+
+    const removed = engine.removeBuilding();
+
+    expect(removed).toBe(true);
+    expect(engine.getTile(60, 60)?.building).toBeUndefined();
+    const after = engine.player.inventory.find(i => i.type === 'stone')?.amount ?? 0;
+    expect(after).toBe(before + 2);
+  });
+
+  it('removing a remote building does not remove the player tile', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    // Place a remote building
+    engine.map[70][70].terrain = 'grass';
+    engine.map[70][70].building = makeBeltWith(Dir.Right);
+
+    // Player's tile also has a building
+    engine.map[60][60].terrain = 'grass';
+    engine.map[60][60].building = makeBeltWith(Dir.Down);
+
+    engine.player.x = 60; engine.player.y = 60;
+
+    engine.removeBuildingAt(70, 70);
+
+    // Remote building removed, player's building preserved
+    expect(engine.map[70][70].building).toBeUndefined();
+    expect(engine.map[60][60].building).toBeDefined();
+    expect(engine.map[60][60].building!.type).toBe('conveyor');
+  });
+
+  it('removeBuildingAt on out-of-bounds coordinates returns false', () => {
+    const engine = new GameEngine(42);
+    expect(engine.removeBuildingAt(-1, 0)).toBe(false);
+    expect(engine.removeBuildingAt(MAP_SIZE, 0)).toBe(false);
+    expect(engine.removeBuildingAt(0, -1)).toBe(false);
+    expect(engine.removeBuildingAt(0, MAP_SIZE)).toBe(false);
+  });
+
+  it('removeBuildingAt on empty tile returns false', () => {
+    const engine = new GameEngine(42);
+    engine.player.x = 60; engine.player.y = 60;
+    // No building at 70,70
+    engine.map[70][70].terrain = 'grass';
+
+    expect(engine.removeBuildingAt(70, 70)).toBe(false);
+  });
+
+  it('remote conveyor removal preserves refund amounts correctly', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    engine.map[70][70].terrain = 'grass';
+    engine.map[70][70].building = makeBeltWith(Dir.Right);
+    engine.player.x = 60; engine.player.y = 60;
+
+    const initialStone = engine.player.inventory.find(i => i.type === 'stone')?.amount;
+
+    engine.removeBuildingAt(70, 70);
+
+    const afterStone = engine.player.inventory.find(i => i.type === 'stone')?.amount;
+    // Conveyor costs 2 stone, floor(2/2) = 1 stone refund
+    expect(afterStone).toBe(initialStone! + 1);
+  });
+
+  it('remote smelter removal preserves refund amounts correctly', () => {
+    const engine = new GameEngine(42);
+    fundPlayer(engine);
+
+    engine.map[70][70].terrain = 'grass';
+    engine.placeBuildingAt('smelter', 70, 70);
+    engine.player.x = 60; engine.player.y = 60;
+
+    const beforeIron = engine.player.inventory.find(i => i.type === 'iron')?.amount;
+    const beforeCoal = engine.player.inventory.find(i => i.type === 'coal')?.amount;
+    const beforeStone = engine.player.inventory.find(i => i.type === 'stone')?.amount;
+
+    engine.removeBuildingAt(70, 70);
+
+    const afterIron = engine.player.inventory.find(i => i.type === 'iron')?.amount;
+    const afterCoal = engine.player.inventory.find(i => i.type === 'coal')?.amount;
+    const afterStone = engine.player.inventory.find(i => i.type === 'stone')?.amount;
+
+    // Smelter costs 5i, 3c, 5s => refund floor(5/2)=2i, floor(3/2)=1c, floor(5/2)=2s
+    expect(afterIron).toBe(beforeIron! + 2);
+    expect(afterCoal).toBe(beforeCoal! + 1);
+    expect(afterStone).toBe(beforeStone! + 2);
+  });
+});
+

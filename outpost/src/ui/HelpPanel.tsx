@@ -63,8 +63,8 @@ export const HelpPanel: React.FC<HelpPanelProps> = ({ onReviewTutorial }) => (
         <div><strong style={{ color: '#e8edf2' }}>E</strong> — Manual harvesting / interact fallback</div>
         <div style={{ color: '#7e8c9a', fontStyle: 'italic', marginTop: 2 }}>WASD or a new RMB command cancels mouse-driven movement/harvesting</div>
         <div style={{ height: 6 }}></div>
-        <div><strong style={{ color: '#e8edf2' }}>R</strong> — Rotate building on current tile</div>
-        <div><strong style={{ color: '#e8edf2' }}>Q</strong> — Remove building (get half refund)</div>
+        <div><strong style={{ color: '#e8edf2' }}>R</strong> — Rotate building (remote if inspected, current tile otherwise)</div>
+        <div><strong style={{ color: '#e8edf2' }}>Q</strong> — Remove building (demolish; remote if inspected, current tile otherwise, half refund)</div>
         <div><strong style={{ color: '#e8edf2' }}>Left-Click a building</strong> — Inspect it (status, power, storage, deposits)</div>
       </div>
 
