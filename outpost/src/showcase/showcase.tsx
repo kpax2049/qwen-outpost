@@ -425,9 +425,9 @@ function Showcase() {
 
   // Tutorial steps mirroring the real game (some completed, some pending).
   const tutorialSteps: TutorialStep[] = [
-    { id: 'move', title: 'Move Around', body: 'Use WASD or Arrow keys to move. Scroll to zoom and Alt+Click to pan.', done: true },
-    { id: 'wood', title: 'Gather Wood', body: 'Face a tree and press E to chop it for Wood.', done: true },
-    { id: 'stone', title: 'Gather Stone', body: 'Face a rock and press E to mine Stone.', done: false },
+    { id: 'move', title: 'Move Around', body: 'Move with WASD / Arrow keys, or Right-Click terrain to pathfind. Scroll to zoom and Alt+Click to pan.', done: true },
+    { id: 'wood', title: 'Gather Wood', body: 'Right-Click a tree to auto-collect Wood, or walk over it with WASD.', done: true },
+    { id: 'stone', title: 'Gather Stone', body: 'Right-Click rocks to collect Stone, or walk over them. Ore deposits require Right-Click to harvest.', done: false },
     { id: 'build', title: 'Open the Build Menu', body: 'Press B (or click Build above) to open the build menu and select a structure.', done: false },
     { id: 'place', title: 'Place a Building', body: 'Pick a building, then click a tile to place it.', done: false },
     { id: 'belt', title: 'Chain Conveyors', body: 'Select the Conveyor, then CLICK-DRAG across the map to lay a route.', done: false },

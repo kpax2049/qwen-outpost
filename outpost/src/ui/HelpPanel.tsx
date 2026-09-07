@@ -38,7 +38,10 @@ export const HelpPanel: React.FC<HelpPanelProps> = ({ onReviewTutorial }) => (
         fontFamily: "'IBM Plex Sans', sans-serif",
         fontSize: 12, color: '#c6d2de', lineHeight: 1.7, marginBottom: 14,
       }}>
-        <div>WASD / Arrow Keys — Move player</div>
+        <div>WASD / Arrow Keys — Manual movement</div>
+        <div>Right-Click empty terrain — Pathfind and move to that tile</div>
+        <div>Right-Click Wood / Stone — Move onto the tile and auto-collect</div>
+        <div>Right-Click Coal / Iron / Copper / Gold — Path to an adjacent tile and continuously harvest</div>
         <div>Alt + Click — Pan camera</div>
         <div>Scroll wheel — Zoom</div>
       </div>
@@ -54,8 +57,12 @@ export const HelpPanel: React.FC<HelpPanelProps> = ({ onReviewTutorial }) => (
         fontFamily: "'IBM Plex Sans', sans-serif",
         fontSize: 12, color: '#c6d2de', lineHeight: 1.7, marginBottom: 14,
       }}>
-        <div><strong style={{ color: '#e8edf2' }}>E</strong> — Harvest the tile you're facing (or standing on)</div>
-        <div>&nbsp;&nbsp;- Trees → Wood, Rocks → Stone, Ore deposits → their ore</div>
+        <div><strong style={{ color: '#e8edf2' }}>RMB Wood / Stone</strong> — Move onto the tile and auto-collect</div>
+        <div>&nbsp;&nbsp;- Walking across Wood / Stone also auto-collects them</div>
+        <div><strong style={{ color: '#e8edf2' }}>RMB Coal / Iron / Copper / Gold</strong> — Path to an adjacent tile and continuously harvest</div>
+        <div><strong style={{ color: '#e8edf2' }}>E</strong> — Manual harvesting / interact fallback</div>
+        <div style={{ color: '#7e8c9a', fontStyle: 'italic', marginTop: 2 }}>WASD or a new RMB command cancels mouse-driven movement/harvesting</div>
+        <div style={{ height: 6 }}></div>
         <div><strong style={{ color: '#e8edf2' }}>R</strong> — Rotate building on current tile</div>
         <div><strong style={{ color: '#e8edf2' }}>Q</strong> — Remove building (get half refund)</div>
         <div><strong style={{ color: '#e8edf2' }}>Left-Click a building</strong> — Inspect it (status, power, storage, deposits)</div>

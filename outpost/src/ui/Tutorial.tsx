@@ -138,7 +138,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ steps, dismissed, onDismiss,
             fontFamily: "'IBM Plex Mono', monospace",
             fontSize: 11, color: '#7e8c9a', fontStyle: 'italic',
           }}>
-            {current.id === 'move' ? 'Use WASD / Arrow keys to move to a nearby goal.' : 'Complete the action above — it will auto-advance.'}
+            {current.id === 'move' ? 'Walk with WASD or Right-Click a tile to move there.' : 'Complete the action above — it will auto-advance.'}
           </div>
         )}
 

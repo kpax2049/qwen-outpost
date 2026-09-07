@@ -405,7 +405,7 @@ export const HUD: React.FC<HUDProps> = ({
           border: '1px solid #2a333c',
           zIndex: 10, whiteSpace: 'nowrap',
         }}>
-          Move to walk &middot; Click-drag to lay a belt route (auto-corners) &middot; R rotates a single belt &middot; click places
+          WASD / RMB move · RMB collect · drag lay belt (auto-corners) · R rotate · click place
         </div>
       )}
       {buildType && buildType !== 'conveyor' && (
@@ -418,7 +418,7 @@ export const HUD: React.FC<HUDProps> = ({
           border: '1px solid #2a333c',
           zIndex: 10, whiteSpace: 'nowrap',
         }}>
-          Move to walk &middot; click to place &mdash; stays selected until you Cancel or press Esc
+          WASD / RMB move · click to place — stays selected until Cancel or Esc
         </div>
       )}
 
@@ -435,9 +435,11 @@ export const HUD: React.FC<HUDProps> = ({
         color: '#94a3af',
         whiteSpace: 'nowrap',
       }}>
-        <span style={{ color: '#e6ebef' }}>WASD</span> move
+        <span style={{ color: '#e6ebef' }}>WASD / RMB</span> move
         <span style={{ color: '#3e4a57' }}>&middot;</span>
         <span style={{ color: '#e6ebef' }}>E</span> harvest
+        <span style={{ color: '#3e4a57' }}>&middot;</span>
+        <span style={{ color: '#e6ebef' }}>RMB</span> collect
         <span style={{ color: '#3e4a57' }}>&middot;</span>
         <span style={{ color: '#e6ebef' }}>drag</span> lay belt
         <span style={{ color: '#3e4a57' }}>&middot;</span>

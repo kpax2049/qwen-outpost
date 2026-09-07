@@ -825,17 +825,17 @@ const App: React.FC = () => {
   const tutorialSteps: TutorialStep[] = [
     {
       id: 'move', title: 'Move Around',
-      body: 'Use WASD or Arrow keys to move. Scroll to zoom and Alt+Click to pan. Head toward a green forest tree to begin gathering.',
+      body: 'Move with WASD / Arrow keys, or Right-Click any open terrain tile to pathfind there. Scroll to zoom and Alt+Click to pan. Head toward a green forest tree to begin gathering.',
       done: effectiveDone.move,
     },
     {
       id: 'wood', title: 'Gather Wood',
-      body: 'Face a tree and press E to chop it for Wood. The highlighted orange tile shows exactly what E will interact with.',
+      body: 'Right-Click a tree to move onto it and auto-collect Wood. You can also walk over trees with WASD to collect them. E is available as a manual fallback at any time.',
       done: effectiveDone.wood,
     },
     {
       id: 'stone', title: 'Gather Stone',
-      body: 'Find gray rock, face it, and press E to mine Stone. Trees and rocks are obstacles — stand next to them, face them, and press E. Ore deposits (coal, iron, copper, gold) are mined the same way.',
+      body: 'Right-Click a rock to move and auto-collect Stone, or walk over them with WASD. Coal, Iron, Copper, and Gold deposits require Right-Click — the player paths to an adjacent tile and continuously harvests. E remains a manual fallback.',
       done: effectiveDone.stone,
     },
     {
