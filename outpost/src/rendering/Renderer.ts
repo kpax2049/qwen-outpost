@@ -142,6 +142,7 @@ export class Renderer {
       smelter: 'R-b-smelter',
       steel_smelter: 'R-b-steel',
       assembler: 'R-b-assembler',
+      survey_lander: '',
     };
     return map[type] ?? '';
   }
@@ -714,6 +715,12 @@ export class Renderer {
       return;
     }
 
+    // Survey Lander: special multi-tile rendering (decal + lander sprite).
+    if (building.type === 'survey_lander') {
+      this.drawSurveyLander(gx, gy, building, map);
+      return;
+    }
+
     // Get cached building sprite
     const spriteKey = this.getBuildingSpriteKey(building.type);
     const baseSprite = this.assetLoader.get(spriteKey);
@@ -1012,6 +1019,41 @@ export class Renderer {
         ctx.arc(px, py, 4, 0, Math.PI * 2);
         ctx.stroke();
       }
+    }
+  }
+
+  // ======================== Survey Lander Rendering ========================
+
+  /**
+   * Draw the Survey Lander across a 2x2 tile footprint.
+   * Renders the landing-scar decal at full footprint size, then the lander sprite centered on top.
+   */
+  private drawSurveyLander(gx: number, gy: number, _building: Building, map: Tile[][]): void {
+    const { ctx } = this;
+    // Find the true top-left tile of the 2x2 footprint.
+    let lx = gx;
+    let ly = gy;
+    if (lx > 0 && map[ly][lx - 1]?.building?.type === 'survey_lander') lx--;
+    if (ly > 0 && map[ly - 1][lx]?.building?.type === 'survey_lander') ly--;
+
+    const bx = lx * TILE_SIZE;
+    const by = ly * TILE_SIZE;
+
+    const footprint = TILE_SIZE * 2;
+
+    // Draw the landing-scar decal covering the full 2x2 footprint.
+    const decalSprite = this.assetLoader.get('R-lander-decal');
+    if (decalSprite) {
+      ctx.drawImage(decalSprite.canvas, bx, by, footprint, footprint);
+    }
+
+    // Draw the lander sprite centered in the footprint.
+    // 64x64 sprite, centered in 96x96 = offset 16px from each edge.
+    const landerSprite = this.assetLoader.get('R-lander');
+    if (landerSprite) {
+      const landerSize = TILE_SIZE + 16; // 64px native scale
+      const offset = (footprint - landerSize) / 2; // 16
+      ctx.drawImage(landerSprite.canvas, bx + offset, by + offset, landerSize, landerSize);
     }
   }
 

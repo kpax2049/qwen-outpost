@@ -856,9 +856,10 @@ describe('GameEngine - Inventory Management', () => {
 });
 
 describe('Building Definitions', () => {
-  it('all building types have valid definitions', () => {
+  it('all constructible building types have valid definitions', () => {
     const types = Object.keys(BUILDING_DEFS) as BuildingTypeValue[];
     for (const type of types) {
+      if (type === 'survey_lander') continue; // permanent landmark, no cost
       const def = BUILDING_DEFS[type];
       expect(def.name).toBeTruthy();
       expect(def.cost.length).toBeGreaterThan(0);

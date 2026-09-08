@@ -231,6 +231,12 @@ const App: React.FC = () => {
       rendererRef.current!.updateTerrainCache();
       // Item sprites are 16x16 native — load them at 32px so they're clearly visible on conveyors.
       return loader.load(itemSpriteKeys, 32);
+    }).then(() => {
+      // Survey Lander assets: decal at 96px (2x tile), lander at 64px (native 64x64).
+      return loader.loadCustom([
+        { name: 'R-lander-decal', size: 96 },
+        { name: 'R-lander', size: 64 },
+      ]);
     }).catch(err => {
       console.warn('Asset loading failed (using fallback visuals):', err);
     });

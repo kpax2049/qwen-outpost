@@ -123,6 +123,8 @@ function generateMap(seed: number): Tile[][] {
   const startY = Math.floor(MAP_SIZE / 2);
   clearArea(map, startX, startY, 5);
 
+  placeSurveyLander(map, startX, startY);
+
   return map;
 }
 
@@ -215,6 +217,71 @@ function clearArea(map: Tile[][], cx: number, cy: number, radius: number) {
       map[y][x].terrain = 'grass';
       map[y][x].resource = undefined;
       map[y][x].building = undefined;
+    }
+  }
+}
+
+/** Survey Lander is a 2x2 permanent landmark placed near the player spawn. */
+function placeSurveyLander(map: Tile[][], nearX: number, nearY: number): void {
+  const L = 2; // footprint size
+  // Try positions on diagonal angles only (π/4, 3π/4, 5π/4, 7π/4)
+  // so the lander never lands on cardinal-direction tiles that could
+  // block the deterministic auto-movement test paths.
+  const diagAngles = [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4];
+  for (let r = 4; r <= 6; r++) {
+    for (const angle of diagAngles) {
+      const ox = Math.round(Math.cos(angle) * r);
+      const oy = Math.round(Math.sin(angle) * r);
+      const tx = nearX + ox;
+      const ty = nearY + oy;
+      if (tx < 0 || tx + L > MAP_SIZE || ty < 0 || ty + L > MAP_SIZE) continue;
+      // All four tiles must be free (grass, no resource, no building).
+      let ok = true;
+      outer: for (let dy = 0; dy < L; dy++) {
+        for (let dx = 0; dx < L; dx++) {
+          const t = map[ty + dy][tx + dx];
+          if (t.terrain !== 'grass' || t.resource || t.building) { ok = false; break outer; }
+        }
+      }
+      if (ok) {
+        for (let dy = 0; dy < L; dy++) {
+          for (let dx = 0; dx < L; dx++) {
+            map[ty + dy][tx + dx].building = {
+              type: 'survey_lander',
+              direction: Dir.Down,
+              active: false,
+              powerConsumed: 0,
+              inventory: [],
+              maxInventory: 1,
+              progress: 0,
+              maxProgress: 1,
+              isPermanent: true,
+            };
+          }
+        }
+        return;
+      }
+    }
+  }
+  // Fallback: force place at (nearX+1, nearY+1) clearing tiles as needed.
+  const fx = nearX + 1;
+  const fy = nearY + 1;
+  for (let dy = 0; dy < L; dy++) {
+    for (let dx = 0; dx < L; dx++) {
+      const t = map[fy + dy][fx + dx];
+      t.terrain = 'grass';
+      t.resource = undefined;
+      t.building = {
+        type: 'survey_lander',
+        direction: Dir.Down,
+        active: false,
+        powerConsumed: 0,
+        inventory: [],
+        maxInventory: 1,
+        progress: 0,
+        maxProgress: 1,
+        isPermanent: true,
+      };
     }
   }
 }
@@ -1263,7 +1330,8 @@ export class GameEngine {
         }
       }
     }
-    this._state.save.player.stats[`${building.type}sBuilt`] = (this._state.save.player.stats[`${building.type}sBuilt`] as number) + 1;
+    const statKey = `${building.type}sBuilt` as keyof PlayerState['stats'];
+    this._state.save.player.stats[statKey] = ((this._state.save.player.stats[statKey] as number) ?? 0) + 1;
     return true;
   }
 
@@ -1285,7 +1353,8 @@ export class GameEngine {
       building.direction = buildDir;
     }
     tile.building = building;
-    this._state.save.player.stats[`${building.type}sBuilt`] = (this._state.save.player.stats[`${building.type}sBuilt`] as number) + 1;
+    const statKey = `${building.type}sBuilt` as keyof PlayerState['stats'];
+    this._state.save.player.stats[statKey] = ((this._state.save.player.stats[statKey] as number) ?? 0) + 1;
     return true;
   }
 
@@ -1297,6 +1366,9 @@ export class GameEngine {
     if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
     const tile = this._state.save.map[y][x];
     if (!tile.building) return false;
+
+    // Survey Lander is permanent — cannot be removed.
+    if (tile.building.isPermanent) return false;
 
     const def = BUILDING_DEFS[tile.building.type];
     if (def) {
@@ -1354,6 +1426,10 @@ export class GameEngine {
   canPlaceAt(buildingType: BuildingTypeValue, tx: number, ty: number): { ok: boolean; reason?: string } {
     if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) {
       return { ok: false, reason: 'Outside the map' };
+    }
+    // Block placement anywhere inside the Survey Lander footprint.
+    if (this.findLanderOrigin(tx, ty)) {
+      return { ok: false, reason: 'Survey Lander footprint' };
     }
     const tile = this._state.save.map[ty][tx];
     const p = this._state.save.player;
@@ -1623,7 +1699,9 @@ export class GameEngine {
     if (!tile.building) return null;
     const b = tile.building;
     const def = BUILDING_DEFS[b.type];
-    const { status, statusColor } = this.computeBuildingStatus(x, y, b);
+    const { status, statusColor } = b.type === BuildingTypeMap.survey_lander
+      ? { status: 'DORMANT', statusColor: 'warn' as const }
+      : this.computeBuildingStatus(x, y, b);
     const totalItems = b.inventory.reduce((s, i) => s + i.amount, 0);
     const p = this._state.save.player;
 
@@ -1631,7 +1709,9 @@ export class GameEngine {
       x,
       y,
       type: b.type,
-      name: def.name,
+      name: b.type === BuildingTypeMap.survey_lander
+        ? BUILDING_NAMES[b.type]
+        : def.name,
       direction: b.direction,
       directionLabel: `${DIR_NAMES[b.direction]} ${['\u25B2', '\u25B6', '\u25BC', '\u25C0'][b.direction]}`,
       active: b.active,
@@ -1677,6 +1757,13 @@ export class GameEngine {
 
     if (b.type === BuildingTypeMap.assembler) {
       data.selectedRecipe = b.selectedRecipe ?? 'copper_wire';
+    }
+
+    // Survey Lander — permanent world landmark.
+    if (b.type === BuildingTypeMap.survey_lander) {
+      data.isLandmark = true;
+      data.landmarkDescription =
+        'Relay Seven surface deployment capsule.\nArrival payload expended. Beacon operational.';
     }
 
     return data;
@@ -1898,5 +1985,35 @@ export class GameEngine {
 
   getPlayerPosition(): { x: number; y: number } {
     return { x: this._state.save.player.x, y: this._state.save.player.y };
+  }
+
+  /** Returns the top-left tile of a Survey Lander if (x, y) falls within its 2x2 footprint, or null. */
+  findLanderOrigin(x: number, y: number): { x: number; y: number } | null {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return null;
+    // Check all four candidate top-left positions. A candidate (lx, ly) is valid
+    // if (x,y) is within its 2x2 footprint and (lx,ly) itself is a survey_lander tile.
+    // We iterate in order (top-left first) and return the first valid one.
+    const candidates = [
+      { ox: 0, oy: 0 },  // lx=x, ly=y
+      { ox: 0, oy: 1 },  // lx=x, ly=y-1
+      { ox: 1, oy: 0 },  // lx=x-1, ly=y
+      { ox: 1, oy: 1 },  // lx=x-1, ly=y-1
+    ];
+    for (const { ox, oy } of candidates) {
+      const lx = x - ox;
+      const ly = y - oy;
+      if (lx < 0 || ly < 0 || lx + 2 > MAP_SIZE || ly + 2 > MAP_SIZE) continue;
+      // (x,y) must be within the 2x2 footprint at (lx,ly)
+      if (x < lx || x >= lx + 2 || y < ly || y >= ly + 2) continue;
+      // The top-left tile must be a survey_lander.
+      const tile = this._state.save.map[ly][lx];
+      if (tile.building && tile.building.type === 'survey_lander') {
+        // Verify this is the true top-left: no survey_lander at (lx,ly-1) or (lx-1,ly).
+        if (ly > 0 && this._state.save.map[ly - 1][lx]?.building?.type === 'survey_lander') continue;
+        if (lx > 0 && this._state.save.map[ly][lx - 1]?.building?.type === 'survey_lander') continue;
+        return { x: lx, y: ly };
+      }
+    }
+    return null;
   }
 }

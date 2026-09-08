@@ -173,7 +173,8 @@ export type BuildingType =
   | 'conveyor'
   | 'smelter'
   | 'steel_smelter'
-  | 'assembler';
+  | 'assembler'
+  | 'survey_lander';
 
 export const BuildingTypeMap = {
   storage: 'storage',
@@ -184,6 +185,7 @@ export const BuildingTypeMap = {
   smelter: 'smelter',
   steel_smelter: 'steel_smelter',
   assembler: 'assembler',
+  survey_lander: 'survey_lander',
 } as const;
 
 export type BuildingTypeValue = typeof BuildingTypeMap[keyof typeof BuildingTypeMap];
@@ -250,6 +252,8 @@ export interface Building {
   miningFieldTargetY?: number;
   /** Miner only: true when all matching deposits in its field are depleted. */
   exhausted?: boolean;
+  /** True for world landmarks (Survey Lander) — cannot be removed or rotated. */
+  isPermanent?: boolean;
 }
 
 export interface PlayerState {
@@ -443,6 +447,17 @@ export const BUILDING_DEFS: Record<BuildingTypeValue, BuildingDefinition> = {
     color: '#00aa44',
     shape: 'diamond',
   },
+  survey_lander: {
+    type: 'survey_lander',
+    name: 'Survey Lander',
+    description: 'Permanent surface deployment capsule. Not constructible.',
+    cost: [],
+    powerConsumed: 0,
+    maxInventory: 0,
+    maxProgress: 0,
+    color: '#333333',
+    shape: 'rect',
+  },
 };
 
 export const BUILDING_COLORS: Record<BuildingTypeValue, string> = {
@@ -454,6 +469,7 @@ export const BUILDING_COLORS: Record<BuildingTypeValue, string> = {
   smelter: '#ff4400',
   steel_smelter: '#4444cc',
   assembler: '#00aa44',
+  survey_lander: '#333333',
 };
 
 export const BUILDING_NAMES: Record<BuildingTypeValue, string> = {
@@ -465,6 +481,7 @@ export const BUILDING_NAMES: Record<BuildingTypeValue, string> = {
   smelter: 'Smelter',
   steel_smelter: 'Steel Furnace',
   assembler: 'Assembler',
+  survey_lander: 'Survey Lander',
 };
 
 // ==================== UI TYPES ====================
@@ -547,4 +564,8 @@ export interface BuildingInspection {
   isPlayerStanding: boolean;
   /** Assembler only: the currently selected recipe. */
   selectedRecipe?: AsmRecipe;
+  /** True when this is a Survey Lander (permanent world landmark). */
+  isLandmark?: boolean;
+  /** Static description for permanent landmarks (e.g., Survey Lander). */
+  landmarkDescription?: string;
 }

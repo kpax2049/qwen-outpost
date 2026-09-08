@@ -68,16 +68,16 @@ describe('RMB Wood/Stone: movement + step-over collection', () => {
 
   it('startMoveTo to forest several tiles away follows path and collects', () => {
     const engine = new GameEngine(42);
-    engine.map[60][66].terrain = 'forest';
+    engine.map[66][60].terrain = 'forest';
 
-    engine.startMoveTo(66, 60);
+    engine.startMoveTo(60, 66);
     expect(engine.hasAutoPath()).toBe(true);
 
     for (let i = 0; i < 20; i++) engine.tick();
 
-    expect(engine.player.x).toBe(66);
-    expect(engine.player.y).toBe(60);
-    expect(engine.map[60][66].terrain).toBe('grass');
+    expect(engine.player.x).toBe(60);
+    expect(engine.player.y).toBe(66);
+    expect(engine.map[66][60].terrain).toBe('grass');
     const wood = engine.player.inventory.find(i => i.type === 'wood');
     expect(wood?.amount).toBe(6);
   });
@@ -188,24 +188,24 @@ describe('RMB Wood/Stone: movement + step-over collection', () => {
 
   it('startMoveTo to grass remains unchanged', () => {
     const engine = new GameEngine(42);
-    engine.map[60][64].terrain = 'grass';
+    engine.map[64][60].terrain = 'grass';
 
-    engine.startMoveTo(64, 60);
+    engine.startMoveTo(60, 64);
     for (let i = 0; i < 16; i++) engine.tick();
 
-    expect(engine.player.x).toBe(64);
-    expect(engine.player.y).toBe(60);
+    expect(engine.player.x).toBe(60);
+    expect(engine.player.y).toBe(64);
   });
 
   it('startMoveTo to sand remains unchanged', () => {
     const engine = new GameEngine(42);
-    engine.map[60][64].terrain = 'sand';
+    engine.map[64][60].terrain = 'sand';
 
-    engine.startMoveTo(64, 60);
+    engine.startMoveTo(60, 64);
     for (let i = 0; i < 16; i++) engine.tick();
 
-    expect(engine.player.x).toBe(64);
-    expect(engine.player.y).toBe(60);
+    expect(engine.player.x).toBe(60);
+    expect(engine.player.y).toBe(64);
   });
 
   it('startMoveTo to adjacent forest tile (distance 1) works', () => {

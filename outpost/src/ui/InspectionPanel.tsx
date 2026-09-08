@@ -376,7 +376,7 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
             )}
 
             {/* Direction */}
-            {building.direction !== undefined && (
+            {building.direction !== undefined && !building.isLandmark && (
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
                 fontFamily: "'IBM Plex Mono', monospace",
@@ -387,8 +387,30 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
               </div>
             )}
 
+            {/* Landmark description */}
+            {building.isLandmark && building.landmarkDescription && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: 11, color: '#c6d2de', whiteSpace: 'pre-line',
+                  lineHeight: 1.5, marginBottom: 8,
+                }}>
+                  {building.landmarkDescription}
+                </div>
+                <div style={{
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: 10, color: '#5faee0', fontStyle: 'italic',
+                  borderTop: '1px solid rgba(255,255,255,.06)',
+                  paddingTop: 8,
+                }}>
+                  This is where the outpost began.
+                </div>
+              </div>
+            )}
+
             {/* Remove button */}
-            <button style={{
+            {!building.isLandmark && (
+              <button style={{
               display: 'block', width: '100%', height: 30, marginTop: 8,
               background: '#1d242e', border: '1px solid rgba(255,255,255,.09)',
               borderRadius: 3,
@@ -399,6 +421,7 @@ export const InspectionPanel: React.FC<InspectionPanelProps> = ({ data, onClose,
             onClick={() => { onRemove(); onClose(); }}>
               REMOVE Q
             </button>
+            )}
 
             {/* Take from building */}
             {building.inventory.length > 0 && building.type !== 'conveyor' && (
