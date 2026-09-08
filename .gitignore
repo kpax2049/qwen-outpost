@@ -1,6 +1,9 @@
 # Playwright MCP artifacts
 .playwright-mcp/
 
+# QA scratch directory for ad-hoc browser artifacts
+.QA/
+
 # Debug files
 debug*.json
 
