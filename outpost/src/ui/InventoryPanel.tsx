@@ -2,7 +2,7 @@ import React from 'react';
 import { ITEM_DISPLAY_NAMES, BUILDING_NAMES } from '../types';
 import type { Item, Tile, ItemType } from '../types';
 
-const SPRITE_BASE = '/assets/relay-seven';
+const SPRITE_BASE = import.meta.env.BASE_URL + 'assets/relay-seven';
 
 function itemSpritePath(type: string): string {
   const map: Record<string, string> = {

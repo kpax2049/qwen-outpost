@@ -2,7 +2,7 @@
 
 **A top-down browser factory / automation game — Relay Seven.**
 
-[![License](https://img.shields.io/badge/license-Proprietary-blue)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Tests](https://img.shields.io/badge/tests-297_passing-brightgreen)
 
 ---
@@ -21,7 +21,7 @@ The game is designed around a single core loop: **extract → transport → refi
 
 ### The story
 
-Outpost was developed primarily as an experiment in using a **local coding model** — Qwen3.6-35B-35B-A3B-NVFP4, served through FreeToken on an NVIDIA RTX 3080 10 GB system — with OpenCode as the coding-agent harness. Human product direction, testing, and visual QA were critical throughout. Some limited stronger/remote-model assistance occurred during development, including a difficult conveyor-system rescue. Claude Design was used for the Relay Seven visual direction and asset-design iterations, including the Survey Lander.
+Outpost was developed primarily as an experiment in using a **local coding model** — Qwen3.6-35B-A3B-NVFP4, served through FreeToken on an NVIDIA RTX 3080 10 GB system — with OpenCode as the coding-agent harness. Human product direction, testing, and visual QA were critical throughout. Some limited stronger/remote-model assistance occurred during development, including a difficult conveyor-system rescue. Claude Design was used for the Relay Seven visual direction and asset-design iterations, including the Survey Lander.
 
 This project explores **how far a local coding model can go when paired with strong human direction, testing, and selective escalation.**
 
@@ -30,7 +30,7 @@ This project explores **how far a local coding model can go when paired with str
 ## Features
 
 - **WASD movement** with RMB tile pathfinding for precise navigation
-- **RMB contextual harvesting** — right-click resources to auto-collect
+- **RMB contextual actions** — right-click terrain to pathfind/move; right-click Wood/Stone to move onto tile and collect; right-click Coal/Iron/Copper/Gold to move adjacent and continuously harvest
 - **Finite resource deposits** — Wood, Stone, Coal, Iron, Copper, and Gold
 - **Step-over collection** — walk across Wood / Stone tiles to collect them
 - **Miners with 5x5 local extraction fields** — automated resource extraction
@@ -53,8 +53,9 @@ This project explores **how far a local coding model can go when paired with str
 | Input | Action |
 |-------|--------|
 | **WASD / Arrow Keys** | Manual movement |
-| **Right-Click** terrain | Pathfind and walk to tile |
-| **Right-Click** resource | Move to tile and auto-harvest |
+| **Right-Click** terrain (grass / sand / forest / rock) | Pathfind and walk to tile |
+| **Right-Click** Wood or Stone tile | Move onto tile and collect |
+| **Right-Click** Coal / Iron / Copper / Gold | Move to adjacent tile and continuously harvest |
 | **E** | Manual harvest / interact fallback |
 | **B** | Toggle build menu |
 | **I** | Toggle inventory panel |
@@ -164,7 +165,7 @@ Outpost was built entirely in this repository through **iterative AI-assisted de
 4. **Relay Seven** visual redesign was designed in Claude Design, with production sprites iterated and hand-tested.
 5. The Survey Lander landing landmark was designed and integrated.
 6. Tutorial, objectives, save/load, and inspection panels were built progressively.
-7. Full test coverage was achieved (297 unit tests across 8 test files).
+7. Comprehensive test suite with 297 unit tests across 8 test files.
 8. The game was manually completed from start to finish to verify the full experience.
 
 ---
@@ -191,13 +192,19 @@ See [ROADMAP.md](docs/ROADMAP.md) for planned post-v1 feature candidates.
 
 ## Project Status
 
-**Outpost v1.0.0 (Relay Seven) is feature-frozen and complete.**
+**Outpost v1.0.0 (Relay Seven) is a feature-frozen release candidate.**
 
 - 297 passing tests across 8 test files
 - Clean production build (main + showcase)
 - Game manually completed from start to finish
 - Save/load, victory Continue Playing, all core systems verified
 - No gameplay changes since feature freeze
+
+---
+
+## License
+
+Outpost is released under the [MIT License](LICENSE).
 
 ---
 

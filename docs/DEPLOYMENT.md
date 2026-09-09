@@ -54,6 +54,18 @@ https://kpax2049.github.io/qwen-outpost/
 
 This dual-config approach means localhost development is unaffected by the Pages configuration.
 
+### Subpath-safe asset loading
+
+All runtime asset URLs (sprite sheets, items, buildings) use `import.meta.env.BASE_URL + 'assets/relay-seven'` constructed at module load time. Vite replaces `import.meta.env.BASE_URL` with the configured base path at build time (`/` locally, `/qwen-outpost/` in production), so sprites load correctly regardless of deployment subpath. Hardcoded root-relative strings like `'/assets/relay-seven'` would fail under subpath deployment and have been eliminated.
+
+### HTML template handling
+
+Vite automatically rewrites root-relative paths (`/favicon.svg`, `/src/main.tsx`) in `index.html` and `showcase.html` during build. These files are processed as Vite HTML entry points, so the `base` option applies correctly.
+
+### showcase.html
+
+`showcase.html` is a developer-only Visual Showcase / Asset Atlas. It is included in the Pages artifact for convenience. It is never linked from the main game and has no impact on production gameplay. Excluding it from the artifact is optional but would require removing it from the Vite `rollupOptions.input` config.
+
 ### Manual deployment
 
 To trigger a manual deployment without pushing to `main`:

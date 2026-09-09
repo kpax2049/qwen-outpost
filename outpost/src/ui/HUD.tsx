@@ -3,7 +3,7 @@ import type { BuildingTypeValue, DirectionValue, PowerSummary, Item } from '../t
 import { BUILDING_NAMES, ITEM_DISPLAY_NAMES } from '../types';
 import type { ItemType } from '../types';
 
-const SPRITE_BASE = '/assets/relay-seven';
+const SPRITE_BASE = import.meta.env.BASE_URL + 'assets/relay-seven';
 
 const MATERIALS: ItemType[] = [
   'wood', 'stone', 'iron', 'copper', 'coal', 'gold',

@@ -2,7 +2,7 @@ import React from 'react';
 import { BUILDING_DEFS, ITEM_DISPLAY_NAMES, BUILDING_NAMES } from '../types';
 import type { Item, BuildingTypeValue } from '../types';
 
-const SPRITE_BASE = '/assets/relay-seven';
+const SPRITE_BASE = import.meta.env.BASE_URL + 'assets/relay-seven';
 
 interface BuildMenuProps {
   onSelectBuild: (type: BuildingTypeValue) => void;

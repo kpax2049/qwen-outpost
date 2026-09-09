@@ -8,7 +8,7 @@
 
 import { TILE_SIZE } from '../types';
 
-const BASE_URL = '/assets/relay-seven';
+const BASE_URL = import.meta.env.BASE_URL + 'assets/relay-seven';
 
 /** A single pre-rendered tile ready for blitting. */
 export interface TileSprite {
