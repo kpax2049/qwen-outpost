@@ -5,13 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Tests](https://img.shields.io/badge/tests-297_passing-brightgreen)
 
----
-
-## Screenshots
-
-> _Final release screenshots will be added here. See [RELEASE_MEDIA_PLAN.md](docs/RELEASE_MEDIA_PLAN.md) for capture guidance._
-
----
+![Outpost — a top-down factory automation game set on a remote world. The player's developed factory sprawls across the terrain, connected by conveyor belts and a shared power grid.](docs/media/outpost-hero.png)
 
 ## What is Outpost?
 
@@ -45,6 +39,12 @@ This project explores **how far a local coding model can go when paired with str
 - **Help panel** — full controls reference
 - **Permanent Survey Lander** arrival landmark (2x2 tile)
 - **Post-victory Continue Playing** — the game never ends
+
+---
+
+## Gameplay
+
+[![Outpost gameplay animation](docs/media/outpost-gameplay.gif)](docs/media/outpost-gameplay.gif)
 
 ---
 
@@ -97,6 +97,8 @@ Build a **Coal Generator** (5 Iron, 3 Copper, 5 Stone) and feed it Coal. One gen
 - **Copper Wire**: 1 Copper → 1 Copper Wire
 - **Gear**: 2 Iron Ingots + 2 Copper Wires → 1 Gear
 - **Engine**: 1 Steel Plate + 1 Gear + 2 Copper Wires → 1 Engine
+
+![Assembler inspection panel showing the Engine recipe selection and requirements.](docs/media/outpost-production.png)
 
 ### Victory — Craft 5 Engines
 Build 5 Engines to trigger the **Outpost Established** victory screen. You may Continue Playing indefinitely after.
@@ -173,7 +175,6 @@ Outpost was built entirely in this repository through **iterative AI-assisted de
 ## Relay Seven Visual Direction
 
 Relay Seven is the visual identity of Outpost v1. All sprites follow a unified design language:
-
 - **Palette**: Deep space blacks and navys with muted greens, warm accents, and desaturated industrial tones
 - **Typography**: Chakra Petch for UI headings, IBM Plex Sans for body text, IBM Plex Mono for data displays
 - **Sprite format**: 48x48px pixel art tiles (48px terrain, 16px items at 32px display, 64px Survey Lander)
@@ -181,6 +182,14 @@ Relay Seven is the visual identity of Outpost v1. All sprites follow a unified d
 - **UI**: Dark panels with subtle borders, colored status indicators, monospace data readouts
 
 Production sprites are in `design-final/relay-seven/sprites/` and deployed to `public/assets/relay-seven/`.
+
+---
+
+## Survey Lander
+
+Your journey begins with the Survey Lander — a 2x2 permanent landmark that marks your arrival on Relay Seven. It serves as both your starting point and a visual anchor for the entire outpost.
+
+![The Survey Lander on the alien terrain, with the player character nearby, surrounded by pond and forest.](docs/media/outpost-survey-lander.png)
 
 ---
 
@@ -199,6 +208,8 @@ See [ROADMAP.md](docs/ROADMAP.md) for planned post-v1 feature candidates.
 - Game manually completed from start to finish
 - Save/load, victory Continue Playing, all core systems verified
 - No gameplay changes since feature freeze
+
+![Outpost Established! — the victory screen overlay on a fully developed factory.](docs/media/outpost-victory.png)
 
 ---
 
